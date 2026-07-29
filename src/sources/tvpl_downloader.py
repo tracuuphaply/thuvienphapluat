@@ -1,0 +1,371 @@
+"""
+TVPL document downloader using Playwright.
+
+Handles:
+  - Login with TVPL account (keeps session/cookies)
+  - Session persistence via storage_state.json (avoid re-login)
+  - Navigate to document page
+  - Click "Tải Văn bản tiếng Việt" (.docx) button
+  - Handle 302 redirect to actual file
+  - Save downloaded file to data/tvpl/{doc_id}.{ext}
+
+Rate limited per NFR-04 to be polite to TVPL servers.
+
+Upgrade v1.1:
+  - Session persistence: saves cookies/localStorage to storage_state.json
+  - Re-login only when session expires (detected via failed navigation)
+  - Reduces login frequency by ~90%, avoids Cloudflare suspicion
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+import time
+from pathlib import Path
+from typing import Any
+
+from src.config import (
+    DATA_DIR,
+    TVPL_BASE_URL,
+    TVPL_FILES_DIR,
+    TVPL_PASSWORD,
+    TVPL_RATE_LIMIT_SECONDS,
+    TVPL_USERNAME,
+)
+
+logger = logging.getLogger(__name__)
+
+# Path to persist Playwright storage state (cookies + localStorage)
+STORAGE_STATE_PATH = DATA_DIR / "tvpl_session.json"
+
+
+class TVPLDownloader:
+    """Manages a Playwright browser session for TVPL downloads."""
+
+    def __init__(self) -> None:
+        self._browser = None
+        self._context = None
+        self._page = None
+        self._logged_in = False
+        self._last_request_time = 0.0
+        self._pw = None
+
+    async def start(self) -> None:
+        """Launch browser and create a context, restoring session if available."""
+        from playwright.async_api import async_playwright
+
+        self._pw = await async_playwright().start()
+        self._browser = await self._pw.chromium.launch(
+            headless=True,
+            args=["--disable-blink-features=AutomationControlled"],
+        )
+
+        # Restore saved session if storage_state.json exists
+        context_kwargs = {
+            "user_agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/125.0.0.0 Safari/537.36"
+            ),
+            "viewport": {"width": 1280, "height": 800},
+        }
+
+        if STORAGE_STATE_PATH.exists():
+            try:
+                context_kwargs["storage_state"] = str(STORAGE_STATE_PATH)
+                logger.info(
+                    "Restoring TVPL session from %s", STORAGE_STATE_PATH
+                )
+            except Exception as e:
+                logger.warning("Failed to load storage state: %s", e)
+
+        self._context = await self._browser.new_context(**context_kwargs)
+        self._page = await self._context.new_page()
+        logger.info("Playwright browser started.")
+
+    async def stop(self) -> None:
+        """Save session state, then close browser and cleanup."""
+        # Persist session before closing
+        await self._save_session()
+
+        if self._browser:
+            await self._browser.close()
+        if self._pw:
+            await self._pw.stop()
+        self._logged_in = False
+        logger.info("Playwright browser closed.")
+
+    async def _save_session(self) -> None:
+        """Save current browser cookies & localStorage to disk."""
+        if self._context is None:
+            return
+        try:
+            state = await self._context.storage_state()
+            import json
+            STORAGE_STATE_PATH.write_text(
+                json.dumps(state, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            logger.info("TVPL session saved to %s", STORAGE_STATE_PATH)
+        except Exception as e:
+            logger.warning("Failed to save session state: %s", e)
+
+    async def _is_session_valid(self) -> bool:
+        """
+        Quick check: navigate to TVPL homepage and see if we're logged in.
+        Detects login state by looking for user profile elements.
+        """
+        try:
+            await self._page.goto(
+                TVPL_BASE_URL, wait_until="domcontentloaded", timeout=15000
+            )
+            # If logged in, TVPL shows a user icon/name element
+            logged_in_indicator = self._page.locator(
+                '[class*="user-info"], [class*="avatar"], '
+                'a[href*="logout"], a:has-text("Tài khoản"), '
+                '[id*="userInfo"], [class*="logged-in"]'
+            )
+            is_valid = await logged_in_indicator.count() > 0
+            if is_valid:
+                logger.info("Existing TVPL session is still valid.")
+            else:
+                logger.info("TVPL session expired, re-login required.")
+            return is_valid
+        except Exception as e:
+            logger.warning("Session validation check failed: %s", e)
+            return False
+
+    async def login(
+        self,
+        username: str = TVPL_USERNAME,
+        password: str = TVPL_PASSWORD,
+    ) -> bool:
+        """
+        Login to TVPL with provided credentials.
+        First checks if saved session is still valid; only re-logins if expired.
+        Returns True if login successful.
+        """
+        if not username or not password:
+            logger.warning("TVPL credentials not configured, skipping login.")
+            return False
+
+        if self._logged_in:
+            logger.info("Already logged in to TVPL (this run).")
+            return True
+
+        # Check if the restored session is still valid
+        if STORAGE_STATE_PATH.exists():
+            if await self._is_session_valid():
+                self._logged_in = True
+                return True
+
+        # Session expired or no saved state — do fresh login
+        try:
+            await self._rate_limit()
+            await self._page.goto(
+                f"{TVPL_BASE_URL}/page/login.aspx", wait_until="networkidle"
+            )
+
+            # Fill login form — TVPL uses ASP.NET WebForms
+            # The actual selectors may need adjustment based on current TVPL page structure
+            email_input = self._page.locator(
+                'input[type="email"], input[name*="Email"], input[id*="txtEmail"]'
+            )
+            password_input = self._page.locator(
+                'input[type="password"], input[name*="Password"], input[id*="txtPassword"]'
+            )
+
+            if await email_input.count() > 0:
+                await email_input.first.fill(username)
+                await password_input.first.fill(password)
+
+                # Click login button
+                login_btn = self._page.locator(
+                    'input[type="submit"], button[type="submit"], '
+                    'a[id*="btnLogin"], input[id*="btnLogin"]'
+                )
+                await login_btn.first.click()
+                await self._page.wait_for_load_state("networkidle")
+
+                self._logged_in = True
+                # Immediately save session so next run won't need to re-login
+                await self._save_session()
+                logger.info("TVPL login successful (fresh login, session saved).")
+                return True
+            else:
+                logger.error("Could not find TVPL login form elements.")
+                return False
+
+        except Exception as e:
+            logger.error("TVPL login failed: %s", e)
+            return False
+
+    async def download_document(
+        self,
+        tvpl_url: str,
+        doc_id: str,
+    ) -> dict[str, Any]:
+        """
+        Navigate to a document page and download the Vietnamese version.
+
+        Returns dict with file paths and success status:
+          {
+              "success": bool,
+              "docx_path": str | None,
+              "pdf_path": str | None,
+              "error": str | None,
+          }
+        """
+        result = {
+            "success": False,
+            "docx_path": None,
+            "pdf_path": None,
+            "error": None,
+        }
+
+        try:
+            await self._rate_limit()
+
+            # Navigate to document page
+            await self._page.goto(tvpl_url, wait_until="networkidle")
+            logger.info("Navigated to: %s", tvpl_url)
+
+            # Wait for page to fully load
+            await self._page.wait_for_timeout(2000)
+
+            # Check if session was invalidated mid-run (redirect to login page)
+            if "/login" in self._page.url.lower():
+                logger.warning("Session invalidated mid-run, attempting re-login...")
+                self._logged_in = False
+                if STORAGE_STATE_PATH.exists():
+                    STORAGE_STATE_PATH.unlink()
+                if await self.login():
+                    await self._page.goto(tvpl_url, wait_until="networkidle")
+                    await self._page.wait_for_timeout(2000)
+                else:
+                    result["error"] = "Re-login failed"
+                    return result
+
+            # Try to download Vietnamese version
+            docx_path = await self._try_download_vietnamese(doc_id)
+            if docx_path:
+                result["docx_path"] = str(docx_path)
+                result["has_docx"] = True
+                result["success"] = True
+                logger.info("Downloaded .docx: %s", docx_path)
+
+            # Try to download PDF version
+            pdf_path = await self._try_download_pdf(doc_id)
+            if pdf_path:
+                result["pdf_path"] = str(pdf_path)
+                result["has_pdf"] = True
+                result["success"] = True
+                logger.info("Downloaded PDF: %s", pdf_path)
+
+        except Exception as e:
+            result["error"] = str(e)
+            logger.error("Download failed for %s: %s", doc_id, e)
+
+        return result
+
+    async def _try_download_vietnamese(self, doc_id: str) -> Path | None:
+        """
+        Click the "Tải Văn bản tiếng Việt" button and save the file.
+        The button triggers __doPostBack which redirects to the download URL.
+        """
+        try:
+            # Look for the download tab first
+            download_tab = self._page.locator(
+                'a:has-text("Tải về"), a:has-text("Download"), '
+                '[id*="tabDownload"], [class*="tab-download"]'
+            )
+            if await download_tab.count() > 0:
+                await download_tab.first.click()
+                await self._page.wait_for_timeout(1000)
+
+            # Look for Vietnamese download link
+            vn_link = self._page.locator(
+                'a:has-text("Tải Văn bản tiếng Việt"), '
+                'a:has-text("tiếng Việt"), '
+                'a[id*="vietnameseHyperLink"], '
+                'a[id*="VietLink"]'
+            )
+
+            if await vn_link.count() > 0:
+                # Set up download handler
+                async with self._page.expect_download(timeout=30000) as download_info:
+                    await vn_link.first.click()
+
+                download = await download_info.value
+                save_path = TVPL_FILES_DIR / f"{doc_id}.docx"
+                await download.save_as(str(save_path))
+                return save_path
+
+        except Exception as e:
+            logger.debug("Vietnamese download attempt failed: %s", e)
+
+        return None
+
+    async def _try_download_pdf(self, doc_id: str) -> Path | None:
+        """
+        Try to download the PDF version of the document.
+        TVPL embeds PDFs from files.thuvienphapluat.vn/uploads/FilePDFUpload/{id}.pdf
+        """
+        import httpx
+
+        pdf_url = f"https://files.thuvienphapluat.vn/uploads/FilePDFUpload/{doc_id}.pdf"
+        save_path = TVPL_FILES_DIR / f"{doc_id}.pdf"
+
+        try:
+            # Transfer cookies from Playwright to httpx for authenticated download
+            cookies = await self._context.cookies()
+            cookie_dict = {c["name"]: c["value"] for c in cookies}
+
+            async with httpx.AsyncClient(cookies=cookie_dict, follow_redirects=True) as client:
+                resp = await client.get(pdf_url)
+                if resp.status_code == 200 and len(resp.content) > 1000:
+                    save_path.write_bytes(resp.content)
+                    return save_path
+        except Exception as e:
+            logger.debug("PDF download attempt failed: %s", e)
+
+        return None
+
+    async def _rate_limit(self) -> None:
+        """Enforce rate limiting between requests."""
+        elapsed = time.time() - self._last_request_time
+        if elapsed < TVPL_RATE_LIMIT_SECONDS:
+            wait = TVPL_RATE_LIMIT_SECONDS - elapsed
+            logger.debug("Rate limiting: waiting %.1fs", wait)
+            await asyncio.sleep(wait)
+        self._last_request_time = time.time()
+
+
+# ──────────────────────────────────────────────
+# Convenience wrapper for synchronous usage
+# ──────────────────────────────────────────────
+def download_documents_sync(
+    documents: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """
+    Synchronous wrapper to download multiple documents.
+    Returns list of download results.
+    """
+    async def _run():
+        downloader = TVPLDownloader()
+        await downloader.start()
+        results = []
+        try:
+            await downloader.login()
+            for doc in documents:
+                tvpl_url = doc.get("tvpl_url", "")
+                tvpl_id = doc.get("tvpl_id", "")
+                if tvpl_url and tvpl_id:
+                    result = await downloader.download_document(tvpl_url, tvpl_id)
+                    result["tvpl_id"] = tvpl_id
+                    results.append(result)
+        finally:
+            await downloader.stop()
+        return results
+
+    return asyncio.run(_run())

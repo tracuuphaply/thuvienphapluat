@@ -1,0 +1,26 @@
+# Environment & secrets
+.env
+credentials/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# Data (large files — track separately or via .gitkeep)
+data/tvpl/
+data/moj/
+data/snapshots/
+data/backups/
+data/logs/
+*.db
+*.sqlite
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store

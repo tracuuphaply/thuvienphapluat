@@ -1,0 +1,28 @@
+[project]
+name = "thuvienphapluat"
+version = "0.1.0"
+description = "Hệ thống Cập nhật Văn bản Pháp luật Doanh nghiệp — Phase 1"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27",
+    "feedparser>=6.0",
+    "playwright>=1.48",
+    "sqlalchemy>=2.0",
+    "aiosqlite>=0.20",           # SQLite async driver (dev)
+    "psycopg2-binary>=2.9",      # PostgreSQL driver (production)
+    "python-telegram-bot>=21.0",
+    "google-api-python-client>=2.150",
+    "google-auth>=2.35",
+    "python-dotenv>=1.0",
+    "structlog>=24.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"

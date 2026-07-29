@@ -1,0 +1,217 @@
+# 📘 HƯỚNG DẪN CHUYỂN GIAO & VẬN HÀNH HỆ THỐNG
+## Hệ thống Cập nhật Văn bản Pháp luật Doanh nghiệp (Phase 1)
+
+> **Dành cho:** Đồng nghiệp nhận chuyển giao & vận hành hệ thống  
+> **Hỗ trợ hệ điều hành:** Windows 10/11, Linux, macOS  
+> **Phiên bản:** 1.0 (Full Package)  
+
+---
+
+## 📑 MỤC LỤC
+1. [Tổng quan & Yêu cầu Hệ thống](#1-tổng-quan--yêu-cầu-hệ-thống)
+2. [Hướng dẫn chuẩn bị Credentials (Bắt buộc)](#2-hướng-dẫn-chuẩn-bị-credentials-bắt-buộc)
+   - [2.1. Telegram Bot Token & Chat ID](#21-telegram-bot-token--chat-id)
+   - [2.2. Tài khoản Thư viện Pháp luật (TVPL)](#22-tài-khoản-thư-viện-pháp-luật-tvpl)
+   - [2.3. Google Drive API (Service Account Key)](#23-google-drive-api-service-account-key)
+3. [Hướng dẫn Cài đặt Môi trường](#3-hướng-dẫn-cài-đặt-môi-trường)
+   - [Dành cho Windows](#dành-cho-windows)
+   - [Dành cho Linux / macOS](#dành-cho-linux--macos)
+4. [Cấu hình file `.env`](#4-cấu-hình-file-env)
+5. [Hướng dẫn Chạy & Kiểm thử Hệ thống](#5-hướng-dẫn-chạy--kiểm-thử-hệ-thống)
+6. [Thiết lập Lịch chạy Tự động Hàng ngày (Scheduler)](#6-thiết-lập-lịch-chạy-tự-động-hàng-ngày-scheduler)
+7. [Xử lý Sự cố Thường gặp (Troubleshooting)](#7-xử-lý-sự-cố-thường-gặp-troubleshooting)
+
+---
+
+## 1. TỔNG QUAN & YÊU CẦU HỆ THỐNG
+
+Hệ thống hoạt động tự động hàng ngày để phát hiện văn bản quy phạm pháp luật mới thuộc **10 lĩnh vực doanh nghiệp**, tải bản biên tập `.docx`/PDF từ TVPL, làm giàu dữ liệu từ Bộ Tư pháp (MOJ), đẩy file lên Google Drive và gửi thông báo qua Telegram.
+
+### Yêu cầu phần mềm trên máy tính vận hành:
+* **Hệ điều hành:** Windows 10/11 (khuyên dùng) hoặc Linux / macOS.
+* **Python:** Phiên bản **3.11** trở lên (Tải tại [python.org](https://www.python.org/)).  
+  *(Lưu ý trên Windows: Nhớ tích chọn **"Add Python to PATH"** khi cài đặt).*
+* **Trình duyệt:** Chromium (sẽ được tự động cài qua Playwright).
+
+---
+
+## 2. HƯỚNG DẪN CHUẨN BỊ CREDENTIALS (BẮT BUỘC)
+
+Trước khi chạy chương trình, bạn cần có **3 nhóm thông tin** sau:
+
+### 2.1. Telegram Bot Token & Chat ID
+Nhận thông báo văn bản mới hàng ngày trực tiếp vào nhóm Telegram của công ty.
+
+1. **Tạo Bot:**
+   * Mở ứng dụng Telegram, tìm kiếm bot tên `@BotFather`.
+   * Gửi lệnh `/newbot` $\rightarrow$ Nhập tên hiển thị (VD: `Gatlas Legal Bot`) $\rightarrow$ Nhập username kết thúc bằng `bot` (VD: `gatlas_legal_bot`).
+   * `@BotFather` sẽ gửi lại bạn một **API Token** (Ví dụ: `7123456789:AAEfghIJKlmnoPQrsTUVwxyz...`). Lưu mã này lại.
+2. **Lấy Chat ID nhóm nhận tin:**
+   * Tạo một nhóm Telegram mới (hoặc dùng nhóm sẵn có) và **thêm Bot vừa tạo vào nhóm**.
+   * Thêm bot `@userinfobot` hoặc `@raw_data_bot` vào nhóm để xem **Group Chat ID** (thường bắt đầu bằng dấu trừ, ví dụ: `-1001234567890`).
+   * Hoặc gửi 1 tin nhắn bất kỳ vào nhóm, sau đó mở trình duyệt truy cập:  
+     `https://api.telegram.org/bot<TOKEN_CỦA_BẠN>/getUpdates`  
+     Tìm chuỗi `"chat":{"id": -100xxxxxxxxx}` để lấy Chat ID.
+
+---
+
+### 2.2. Tài khoản Thư viện Pháp luật (TVPL)
+Tài khoản này dùng để đăng nhập tự động và tải các file đính kèm biên tập dạng `.docx` / PDF từ trang `thuvienphapluat.vn`.
+
+* **Yêu cầu:** Tài khoản TVPL trả phí (Pro/VIP) của công ty luật.
+* **Cần chuẩn bị:** `Email/Tên đăng nhập` + `Mật khẩu`.
+
+---
+
+### 2.3. Google Drive API (Service Account Key)
+Dùng để tự động tải các file `.docx` và `.pdf` đã thu thập lên thư mục Google Drive của công ty và lấy đường link phân quyền xem trực tiếp.
+
+1. **Tạo Google Cloud Project & Bật API:**
+   * Truy cập [Google Cloud Console](https://console.cloud.google.com/).
+   * Tạo một Project mới (đặt tên ví dụ: `Gatlas Legal Drive`).
+   * Vào mục **APIs & Services** $\rightarrow$ **Library** $\rightarrow$ Tìm kiếm `Google Drive API` $\rightarrow$ Bấm **Enable**.
+2. **Tạo Service Account & Tải JSON Key:**
+   * Vào **APIs & Services** $\rightarrow$ **Credentials** $\rightarrow$ Bấm **Create Credentials** $\rightarrow$ Chọn **Service Account**.
+   * Đặt tên Service Account (VD: `gdrive-bot`) $\rightarrow$ Bấm **Create and Continue** $\rightarrow$ Bấm **Done**.
+   * Bấm vào Service Account vừa tạo $\rightarrow$ Chuyển sang tab **Keys** $\rightarrow$ Bấm **Add Key** $\rightarrow$ Chọn **Create new key** $\rightarrow$ Chọn định dạng **JSON** $\rightarrow$ Bấm **Create**.
+   * Một file JSON sẽ tự động tải về máy. Hãy đổi tên file này thành `gdrive_service_account.json` và lưu vào thư mục `credentials/` trong dự án.
+3. **Chia sẻ quyền truy cập Thư mục Google Drive:**
+   * Mở file JSON vừa tải, tìm dòng `"client_email"` (ví dụ: `gdrive-bot@gatlas-legal.iam.gserviceaccount.com`).
+   * Vào Google Drive của bạn, **tạo 1 Thư mục gốc** (VD: `Kho_Van_Ban_Phap_Luat`).
+   * Phải chuột vào Thư mục đó $\rightarrow$ Chọn **Share (Chia sẻ)** $\rightarrow$ Dán địa chỉ `client_email` ở trên vào $\rightarrow$ Cấp quyền **Editor (Người chỉnh sửa)**.
+   * Lấy **Folder ID** trên đường dẫn trình duyệt:  
+     Ví dụ URL: `https://drive.google.com/drive/folders/1ABCxyz_90123456789` $\rightarrow$ Folder ID là `1ABCxyz_90123456789`.
+
+---
+
+## 3. HƯỚNG DẪN CÀI ĐẶT MÔI TRƯỜNG
+
+### Dành cho Windows (Dễ nhất - 1 Click):
+1. Giải nén thư mục dự án `thuvienphapluat`.
+2. Mở thư mục `scripts` và **nhấp kép chuột vào file `setup.bat`**.
+3. Tự động quá trình sẽ:
+   * Tạo môi trường ảo Python (`.venv`).
+   * Cài đặt đầy đủ các thư viện cần thiết.
+   * Tải trình duyệt tự động Chromium cho Playwright.
+   * Tạo sẵn file `.env` mẫu và khởi tạo Database SQLite.
+
+### Dành cho Linux / macOS:
+Mở Terminal tại thư mục dự án và chạy các lệnh sau:
+```bash
+# 1. Tạo môi trường ảo Python
+python3 -m venv .venv
+source .venv/bin/activate
+
+# 2. Cài đặt dependencies
+pip install -e .
+
+# 3. Cài đặt trình duyệt Playwright
+playwright install chromium
+
+# 4. Tạo file cấu hình .env
+cp .env.example .env
+
+# 5. Khởi tạo Database SQLite
+python scripts/setup_db.py
+```
+
+---
+
+## 4. CẤU HÌNH FILE `.ENV`
+
+Mở file `.env` nằm ở thư mục gốc của dự án bằng bất kỳ trình soạn thảo văn bản nào (Notepad, VS Code, v.v.) và điền đầy đủ các giá trị đã chuẩn bị ở **Mục 2**:
+
+```env
+# === Database (Mặc định dùng SQLite cục bộ, không cần sửa) ===
+DATABASE_URL=sqlite:///data/legal_docs.db
+
+# === 1. Tài khoản TVPL (Thư viện Pháp luật) ===
+TVPL_USERNAME=taikhoan_congty@gmail.com
+TVPL_PASSWORD=matkhau_tvpl_o_day
+
+# === 2. Telegram Bot ===
+TELEGRAM_BOT_TOKEN=7123456789:AAEfghIJKlmnoPQrsTUVwxyz...
+TELEGRAM_CHAT_ID=-1001234567890
+TELEGRAM_ADMIN_CHAT_ID=-1001234567890
+
+# === 3. Google Drive ===
+GDRIVE_SERVICE_ACCOUNT_FILE=credentials/gdrive_service_account.json
+GDRIVE_ROOT_FOLDER_ID=1ABCxyz_90123456789
+
+# === Cấu hình Lịch trình & Tốc độ ===
+TVPL_RATE_LIMIT_SECONDS=7
+MOJ_WINDOW_DAYS=30
+DAILY_RUN_HOUR=6
+```
+
+---
+
+## 5. HƯỚNG DẪN CHẠY & KIỂM THỬ HỆ THỐNG
+
+### 🛠️ Cách 1: Chạy thử nghiệm xem trước (Dry-Run — Không gửi Telegram thực)
+Dùng để kiểm tra xem hệ thống cào dữ liệu có hoạt động tốt không mà không làm nhiễu nhóm Telegram:
+
+* **Trên Windows:**
+  Mở CMD / PowerShell trong thư mục dự án và chạy:
+  ```cmd
+  .venv\Scripts\activate.bat
+  python -m src.main --dry-run --skip-gdrive
+  ```
+* **Trên Linux / macOS:**
+  ```bash
+  source .venv/bin/activate
+  python -m src.main --dry-run --skip-gdrive
+  ```
+
+### 🚀 Cách 2: Chạy chính thức toàn bộ Pipeline (Full Run)
+Hệ thống sẽ cào văn bản mới, tải file `.docx`, upload lên Google Drive và gửi bản tin vào nhóm Telegram:
+
+* **Trên Windows:**
+  ```cmd
+  .venv\Scripts\activate.bat
+  python -m src.main
+  ```
+* **Trên Linux / macOS:**
+  ```bash
+  source .venv/bin/activate
+  python -m src.main
+  ```
+
+---
+
+## 6. THIẾT LẬP LỊCH CHẠY TỰ ĐỘNG HÀNG NGÀY (SCHEDULER)
+
+Để hệ thống tự động thức dậy chạy vào **06:00 sáng mỗi ngày**:
+
+### 💻 Trên Windows (Dùng Task Scheduler):
+1. Nhấn phím `Windows + R`, gõ `taskschd.msc` và ấn Enter.
+2. Tại cột bên phải, chọn **Create Basic Task...**
+3. **Name:** Đặt tên `Gatlas Legal Update Pipeline` $\rightarrow$ Next.
+4. **Trigger:** Chọn `Daily` $\rightarrow$ Next $\rightarrow$ Đặt thời gian `06:00:00 AM` $\rightarrow$ Next.
+5. **Action:** Chọn `Start a program` $\rightarrow$ Next.
+6. **Program/script:** Bấm Browse chọn đường dẫn đến file:  
+   `C:\duong-dan-du-an\thuvienphapluat\scripts\run_daily.bat`
+7. **Start in (optional):** Điền đường dẫn thư mục gốc dự án:  
+   `C:\duong-dan-du-an\thuvienphapluat\`
+8. Bấm **Finish** để hoàn tất.
+
+### 🐧 Trên Linux / macOS (Dùng Crontab):
+Mở terminal và gõ `crontab -e`, thêm dòng sau:
+```cron
+0 6 * * * /duong-dan-du-an/thuvienphapluat/scripts/run_daily.sh
+```
+
+---
+
+## 7. XỬ LÝ SỰ CỐ THƯỜNG GẶP (TROUBLESHOOTING)
+
+| Hiện tượng | Nguyên nhân | Cách khắc phục |
+|---|---|---|
+| `[LỖI] Chưa tìm thấy Python` | Máy Windows chưa cài Python hoặc chưa tích chọn "Add Python to PATH". | Tải bản Python 3.11+ chính thức, khi cài tích chọn ô "Add python.exe to PATH". |
+| `FileNotFoundError: credentials/gdrive_service_account.json` | Chưa copy file key JSON của Google Drive vào đúng vị trí. | Tải file JSON từ Google Cloud Console, đổi tên thành `gdrive_service_account.json` và lưu vào thư mục `credentials/`. |
+| `Telegram send failed: 401 Unauthorized` | Sai `TELEGRAM_BOT_TOKEN`. | Kiểm tra lại chuỗi Token được cấp từ `@BotFather`. |
+| `Playwright Error: Executable doesn't exist` | Chưa cài đặt trình duyệt Chromium cho Playwright. | Chạy lệnh `playwright install chromium` trong môi trường ảo `.venv`. |
+| Không tải được file `.docx` từ TVPL | Sai tài khoản TVPL hoặc hết hạn gói trả phí. | Kiểm tra lại username/password trong `.env` và đăng nhập thử thủ công trên web TVPL. |
+
+---
+*Tài liệu sẵn sàng bàn giao cho nhân sự vận hành.*
