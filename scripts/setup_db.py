@@ -14,10 +14,22 @@ from src.storage.database import init_db, get_session, engine
 from src.storage.models import Document, CrawlRun
 
 
+import argparse
+
 def main():
+    parser = argparse.ArgumentParser(description="Database Setup & Reset Utility")
+    parser.add_argument("--reset", action="store_true", help="Reset database (delete data/legal_docs.db and recreate schema)")
+    args = parser.parse_args()
+
     print("=" * 50)
     print("Database Setup — Legal Document System")
     print("=" * 50)
+
+    db_file = Path(__file__).resolve().parent.parent / "data" / "legal_docs.db"
+    if args.reset:
+        if db_file.exists():
+            db_file.unlink()
+            print("🗑️ Resetting database: deleted existing legal_docs.db")
 
     # Show connection info
     print(f"\nDatabase URL: {engine.url}")
@@ -42,3 +54,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

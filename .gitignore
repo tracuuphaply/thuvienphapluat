@@ -16,6 +16,12 @@ data/moj/
 data/snapshots/
 data/backups/
 data/logs/
+data/clean_text/
+data/chunks/
+data/metadata/
+data/lark_cache.json
+data/tvpl_session.json
+data/tvpl_cookies.json
 *.db
 *.sqlite
 

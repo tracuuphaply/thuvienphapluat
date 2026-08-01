@@ -25,14 +25,21 @@ TVPL_PASSWORD = os.getenv("TVPL_PASSWORD", "")
 TVPL_RSS_URL = "https://thuvienphapluat.vn/rss.xml"
 TVPL_BASE_URL = "https://thuvienphapluat.vn"
 TVPL_RATE_LIMIT_SECONDS = float(os.getenv("TVPL_RATE_LIMIT_SECONDS", "7"))
+# Tải file .docx/.pdf từ TVPL bằng Playwright (cần TVPL_USERNAME/PASSWORD)
+TVPL_DOWNLOAD_ENABLED = os.getenv("TVPL_DOWNLOAD_ENABLED", "true").lower() in (
+    "true", "1", "yes",
+)
 
 # ──────────────────────────────────────────────
 # MOJ (Bộ Tư pháp) API
 # ──────────────────────────────────────────────
-MOJ_BASE_URL = "https://vbpl.vn/api/qtdc/public"
+MOJ_BASE_URL = "https://vbpl-bientap-gateway.moj.gov.vn/api/qtdc/public"
+
 MOJ_PAGE_SIZE = 100
 MOJ_WINDOW_DAYS = int(os.getenv("MOJ_WINDOW_DAYS", "30"))
 MOJ_RATE_LIMIT_SECONDS = 0.5  # 500ms between requests
+# Safety cap so a broken cutoff can never paginate through all 170k+ documents
+MOJ_MAX_PAGES = int(os.getenv("MOJ_MAX_PAGES", "40"))
 
 # ──────────────────────────────────────────────
 # Telegram
@@ -49,6 +56,22 @@ GDRIVE_SERVICE_ACCOUNT_FILE = os.getenv(
     str(PROJECT_ROOT / "credentials" / "gdrive_service_account.json"),
 )
 GDRIVE_ROOT_FOLDER_ID = os.getenv("GDRIVE_ROOT_FOLDER_ID", "")
+
+# ──────────────────────────────────────────────
+# Lark Drive
+# ──────────────────────────────────────────────
+LARK_APP_ID = os.getenv("LARK_APP_ID", "")
+LARK_APP_SECRET = os.getenv("LARK_APP_SECRET", "")
+LARK_ROOT_FOLDER_TOKEN = os.getenv("LARK_ROOT_FOLDER_TOKEN", "")
+LARK_DOMAIN = os.getenv("LARK_DOMAIN", "open.larksuite.com")
+# Mỗi văn bản được lưu trong một thư mục con riêng (chứa cả file TVPL và Bộ Tư pháp)
+LARK_FOLDER_PER_DOC = os.getenv("LARK_FOLDER_PER_DOC", "true").lower() in (
+    "true", "1", "yes",
+)
+
+# Auto-delete local docx/pdf files after upload to save disk space
+AUTO_CLEANUP_LOCAL_FILES = os.getenv("AUTO_CLEANUP_LOCAL_FILES", "true").lower() in ("true", "1", "yes")
+
 
 # ──────────────────────────────────────────────
 # File Storage Paths
@@ -95,6 +118,37 @@ BUSINESS_FIELD_SLUGS: dict[str, int] = {
     "Ke-toan-Kiem-toan": 9,
     "Lao-dong-Tien-luong": 10,
     "So-huu-tri-tue": 14,
+}
+
+# ──────────────────────────────────────────────
+# MOJ field matching
+#
+# API vbpl-bientap trả về lĩnh vực dưới dạng tên tiếng Việt (documentFields /
+# documentMajors), không phải mã số như TVPL. Bảng dưới ánh xạ từ khoá trong tên
+# lĩnh vực → mã lĩnh vực doanh nghiệp ở trên.
+# ──────────────────────────────────────────────
+MOJ_FIELD_KEYWORDS: dict[str, int] = {
+    "doanh nghiệp": 1,
+    "hộ kinh doanh": 1,
+    "hợp tác xã": 1,
+    "đầu tư": 2,
+    "thương mại": 3,
+    "công thương": 3,
+    "cạnh tranh": 3,
+    "xuất khẩu": 4,
+    "nhập khẩu": 4,
+    "hải quan": 4,
+    "thuế": 6,
+    "phí": 6,
+    "lệ phí": 6,
+    "chứng khoán": 7,
+    "bảo hiểm": 8,
+    "kế toán": 9,
+    "kiểm toán": 9,
+    "lao động": 10,
+    "tiền lương": 10,
+    "việc làm": 10,
+    "sở hữu trí tuệ": 14,
 }
 
 # TVPL fields query string for GetWidget.ashx

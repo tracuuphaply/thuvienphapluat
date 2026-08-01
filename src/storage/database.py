@@ -37,9 +37,27 @@ SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 
 def init_db() -> None:
-    """Create all tables if they don't exist."""
+    """Create all tables if they don't exist and add missing columns."""
     Base.metadata.create_all(bind=engine)
+
+    # Auto-add missing columns to existing SQLite table if needed
+    with engine.connect() as conn:
+        from sqlalchemy import text
+        for col, col_type in [
+            ("lark_docx_link", "TEXT"),
+            ("lark_pdf_link", "TEXT"),
+            ("lark_folder_token", "VARCHAR(100)"),
+            ("pub_date", "DATE"),
+        ]:
+            try:
+                conn.execute(text(f"ALTER TABLE documents ADD COLUMN {col} {col_type};"))
+                conn.commit()
+                logger.info("Migrated DB: added column %s to documents", col)
+            except Exception:
+                pass  # Column already exists
+
     logger.info("Database tables initialized.")
+
 
 
 @contextmanager

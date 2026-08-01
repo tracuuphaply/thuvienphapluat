@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import date
+from email.utils import parsedate_to_datetime
 from typing import Any
 
 import feedparser
@@ -75,6 +77,16 @@ def is_business_item(entry: dict) -> bool:
     return False
 
 
+def _parse_pub_date(raw: str) -> date | None:
+    """Chuyển ngày RFC 822 của RSS ('Mon, 21 Jul 2026 10:00:00 GMT') sang date."""
+    if not raw:
+        return None
+    try:
+        return parsedate_to_datetime(raw).date()
+    except (TypeError, ValueError):
+        return None
+
+
 def parse_rss_entry(entry: dict) -> dict[str, Any]:
     """
     Parse a single RSS entry into a normalized document trigger dict.
@@ -87,8 +99,11 @@ def parse_rss_entry(entry: dict) -> dict[str, Any]:
     # Extract doc_num from title — typically the title IS the doc number
     title = (entry.get("title", "") or "").strip()
 
-    # Parse publication date
-    pub_date = entry.get("published", "") or entry.get("updated", "")
+    # Parse publication date (RFC 822 → date), dùng để xếp thư mục lưu trữ khi
+    # văn bản chưa có ngày ban hành từ Bộ Tư pháp.
+    pub_date = _parse_pub_date(
+        entry.get("published", "") or entry.get("updated", "")
+    )
 
     return {
         "title": title,

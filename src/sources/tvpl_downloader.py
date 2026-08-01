@@ -38,6 +38,28 @@ logger = logging.getLogger(__name__)
 # Path to persist Playwright storage state (cookies + localStorage)
 STORAGE_STATE_PATH = DATA_DIR / "tvpl_session.json"
 
+# Cookie xuất từ trình duyệt thật của người dùng (xem HUONG_DAN_CHUYEN_GIAO §2.5).
+# Dùng khi Cloudflare chặn trình duyệt tự động: cf_clearance gắn với IP + User-Agent
+# của phiên đã vượt qua thử thách nên phải xuất từ chính máy sẽ chạy pipeline.
+COOKIES_PATH = DATA_DIR / "tvpl_cookies.json"
+
+# Tiêu đề trang khi Cloudflare chặn (tiếng Anh + bản địa hoá tiếng Việt)
+_CHALLENGE_TITLES = (
+    "just a moment",
+    "chờ một chút",
+    "attention required",
+    "access denied",
+)
+
+
+def _is_challenge_title(title: str) -> bool:
+    lowered = (title or "").lower()
+    return any(marker in lowered for marker in _CHALLENGE_TITLES)
+
+
+class TVPLBlockedError(RuntimeError):
+    """Cloudflare chặn truy cập tự động — không văn bản nào tải được."""
+
 
 class TVPLDownloader:
     """Manages a Playwright browser session for TVPL downloads."""
@@ -80,8 +102,43 @@ class TVPLDownloader:
                 logger.warning("Failed to load storage state: %s", e)
 
         self._context = await self._browser.new_context(**context_kwargs)
+
+        # Nạp cookie xuất từ trình duyệt thật (nếu có) — cách duy nhất vượt được
+        # Cloudflare khi chạy tự động.
+        if COOKIES_PATH.exists():
+            try:
+                import json
+
+                cookies = json.loads(COOKIES_PATH.read_text(encoding="utf-8"))
+                await self._context.add_cookies(cookies)
+                logger.info("Loaded %d TVPL cookies from %s", len(cookies), COOKIES_PATH)
+            except Exception as e:
+                logger.warning("Failed to load TVPL cookies: %s", e)
+
         self._page = await self._context.new_page()
         logger.info("Playwright browser started.")
+
+    async def _goto(self, url: str, timeout: int = 45000) -> None:
+        """
+        Điều hướng tới một URL và chờ Cloudflare (nếu có) giải xong.
+
+        Dùng 'domcontentloaded' chứ không phải 'networkidle': TVPL chạy quảng cáo
+        và analytics liên tục nên mạng không bao giờ "idle" — chờ networkidle
+        luôn timeout kể cả khi trang đã tải xong.
+        """
+        await self._page.goto(url, wait_until="domcontentloaded", timeout=timeout)
+
+        # Thử thách Cloudflare tự giải trong vài giây nếu phiên hợp lệ
+        for _ in range(6):
+            if not _is_challenge_title(await self._page.title()):
+                return
+            await self._page.wait_for_timeout(2500)
+
+        raise TVPLBlockedError(
+            "Cloudflare đang chặn truy cập tự động vào thuvienphapluat.vn. "
+            f"Xuất cookie từ trình duyệt thật ra {COOKIES_PATH} hoặc đặt "
+            "TVPL_DOWNLOAD_ENABLED=false để chỉ dùng nguồn Bộ Tư pháp."
+        )
 
     async def stop(self) -> None:
         """Save session state, then close browser and cleanup."""
@@ -116,9 +173,7 @@ class TVPLDownloader:
         Detects login state by looking for user profile elements.
         """
         try:
-            await self._page.goto(
-                TVPL_BASE_URL, wait_until="domcontentloaded", timeout=15000
-            )
+            await self._goto(TVPL_BASE_URL, timeout=30000)
             # If logged in, TVPL shows a user icon/name element
             logged_in_indicator = self._page.locator(
                 '[class*="user-info"], [class*="avatar"], '
@@ -131,6 +186,8 @@ class TVPLDownloader:
             else:
                 logger.info("TVPL session expired, re-login required.")
             return is_valid
+        except TVPLBlockedError:
+            raise
         except Exception as e:
             logger.warning("Session validation check failed: %s", e)
             return False
@@ -162,9 +219,7 @@ class TVPLDownloader:
         # Session expired or no saved state — do fresh login
         try:
             await self._rate_limit()
-            await self._page.goto(
-                f"{TVPL_BASE_URL}/page/login.aspx", wait_until="networkidle"
-            )
+            await self._goto(f"{TVPL_BASE_URL}/page/login.aspx")
 
             # Fill login form — TVPL uses ASP.NET WebForms
             # The actual selectors may need adjustment based on current TVPL page structure
@@ -196,6 +251,8 @@ class TVPLDownloader:
                 logger.error("Could not find TVPL login form elements.")
                 return False
 
+        except TVPLBlockedError:
+            raise
         except Exception as e:
             logger.error("TVPL login failed: %s", e)
             return False
@@ -227,7 +284,7 @@ class TVPLDownloader:
             await self._rate_limit()
 
             # Navigate to document page
-            await self._page.goto(tvpl_url, wait_until="networkidle")
+            await self._goto(tvpl_url)
             logger.info("Navigated to: %s", tvpl_url)
 
             # Wait for page to fully load
@@ -240,7 +297,7 @@ class TVPLDownloader:
                 if STORAGE_STATE_PATH.exists():
                     STORAGE_STATE_PATH.unlink()
                 if await self.login():
-                    await self._page.goto(tvpl_url, wait_until="networkidle")
+                    await self._goto(tvpl_url)
                     await self._page.wait_for_timeout(2000)
                 else:
                     result["error"] = "Re-login failed"
@@ -262,6 +319,8 @@ class TVPLDownloader:
                 result["success"] = True
                 logger.info("Downloaded PDF: %s", pdf_path)
 
+        except TVPLBlockedError:
+            raise
         except Exception as e:
             result["error"] = str(e)
             logger.error("Download failed for %s: %s", doc_id, e)
@@ -364,6 +423,10 @@ def download_documents_sync(
                     result = await downloader.download_document(tvpl_url, tvpl_id)
                     result["tvpl_id"] = tvpl_id
                     results.append(result)
+        except TVPLBlockedError as e:
+            # Cloudflare chặn ở cấp site: thử tiếp các văn bản còn lại chỉ tốn
+            # thêm vài chục phút mà chắc chắn hỏng → dừng luôn, trả về phần đã tải.
+            logger.error("Dừng tải TVPL: %s", e)
         finally:
             await downloader.stop()
         return results

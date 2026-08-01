@@ -20,6 +20,8 @@ from src.config import (
     BUSINESS_FIELD_CODES,
     BUSINESS_FIELDS,
     MOJ_BASE_URL,
+    MOJ_FIELD_KEYWORDS,
+    MOJ_MAX_PAGES,
     MOJ_PAGE_SIZE,
     MOJ_RATE_LIMIT_SECONDS,
     MOJ_WINDOW_DAYS,
@@ -35,20 +37,42 @@ _client = httpx.Client(
 )
 
 
-def fetch_doc_list(page: int = 1, page_size: int = MOJ_PAGE_SIZE) -> dict[str, Any]:
+def fetch_doc_list(
+    page: int = 1,
+    page_size: int = MOJ_PAGE_SIZE,
+    keyword: str = "",
+) -> dict[str, Any]:
     """
     Fetch a page of documents from MOJ.
     POST /doc/all with sortBy=issueDate desc.
+
+    `keyword` filters server-side (khớp số hiệu hoặc tiêu đề) — dùng để tra cứu
+    trực tiếp một văn bản thay vì phải duyệt hết danh sách.
     """
-    payload = {
+    payload: dict[str, Any] = {
         "pageSize": page_size,
         "pageNumber": page,
         "sortDirection": "desc",
         "sortBy": "issueDate",
     }
+    if keyword:
+        payload["keyword"] = keyword
     resp = _client.post("/doc/all", json=payload)
     resp.raise_for_status()
     return resp.json()
+
+
+def _extract_items(resp_json: dict) -> list[dict]:
+    """
+    Lấy danh sách văn bản từ response của /doc/all.
+
+    Gateway vbpl-bientap trả về {"data": {"total": N, "items": [...]}}; các bản
+    cũ hơn trả thẳng {"data": [...]}. Hỗ trợ cả hai để không phụ thuộc phiên bản.
+    """
+    data = resp_json.get("data", [])
+    if isinstance(data, dict):
+        return data.get("items") or data.get("data") or []
+    return data or []
 
 
 def fetch_doc_detail(doc_id: str) -> dict[str, Any]:
@@ -61,27 +85,55 @@ def fetch_doc_detail(doc_id: str) -> dict[str, Any]:
     return resp.json()
 
 
+def _extract_field_names(doc: dict) -> list[str]:
+    """
+    Lấy tên các lĩnh vực của một văn bản MOJ.
+
+    Gateway vbpl-bientap trả documentFields/documentMajors với `id` là UUID và
+    `name` là tên lĩnh vực tiếng Việt, nên phải khớp theo tên chứ không theo mã.
+    Lưu ý: hai mảng này chỉ có ở API chi tiết (/doc/{id}), API danh sách trả null.
+    """
+    names: list[str] = []
+    for key in ("documentFields", "documentMajors"):
+        for obj in doc.get(key) or []:
+            if isinstance(obj, dict) and obj.get("name"):
+                names.append(str(obj["name"]))
+    return names
+
+
 def _extract_field_codes(doc: dict) -> set[int]:
-    """
-    Extract field codes from a MOJ document response.
-    Checks documentFields and documentMajors arrays.
-    """
+    """Ánh xạ tên lĩnh vực MOJ → mã lĩnh vực doanh nghiệp (BUSINESS_FIELDS)."""
     codes: set[int] = set()
-    for field_obj in doc.get("documentFields", []):
-        fid = field_obj.get("id")
-        if fid is not None:
-            codes.add(int(fid))
-    for major_obj in doc.get("documentMajors", []):
-        mid = major_obj.get("id")
-        if mid is not None:
-            codes.add(int(mid))
+    for name in _extract_field_names(doc):
+        lowered = name.lower()
+        for keyword, code in MOJ_FIELD_KEYWORDS.items():
+            if keyword in lowered:
+                codes.add(code)
     return codes
 
 
 def is_business_document(doc: dict) -> bool:
-    """Check if a document belongs to any business-related field."""
-    doc_codes = _extract_field_codes(doc)
-    return bool(doc_codes & BUSINESS_FIELD_CODES)
+    """
+    Kiểm tra văn bản có thuộc lĩnh vực doanh nghiệp không.
+
+    Chỉ dựa trên lĩnh vực khai báo; nếu văn bản không có thông tin lĩnh vực
+    (API danh sách) thì trả False — việc lọc lúc đó do TVPL đảm nhiệm.
+    """
+    return bool(_extract_field_codes(doc) & BUSINESS_FIELD_CODES)
+
+
+def title_looks_business(doc: dict) -> bool:
+    """
+    Tiền lọc rẻ tiền cho văn bản chỉ xuất hiện ở MOJ.
+
+    API danh sách không trả lĩnh vực, mà gọi API chi tiết cho cả nghìn văn bản
+    mỗi ngày thì quá tốn. Vì vậy lọc thô theo từ khoá trong tiêu đề trước, rồi
+    mới xác nhận bằng lĩnh vực thật ở bước bổ sung chi tiết.
+    """
+    haystack = " ".join(
+        str(doc.get(key) or "") for key in ("title", "doc_num", "docNum", "agency_name")
+    ).lower()
+    return any(keyword in haystack for keyword in MOJ_FIELD_KEYWORDS)
 
 
 def get_field_name(doc: dict) -> str:
@@ -91,7 +143,9 @@ def get_field_name(doc: dict) -> str:
     if matching:
         code = min(matching)  # Pick the primary (lowest code)
         return BUSINESS_FIELDS.get(code, "Khác")
-    return "Khác"
+    # Không khớp lĩnh vực doanh nghiệp → giữ nguyên tên lĩnh vực gốc của MOJ
+    names = _extract_field_names(doc)
+    return names[0] if names else "Khác"
 
 
 def parse_doc_summary(doc: dict) -> dict[str, Any]:
@@ -122,6 +176,20 @@ def parse_doc_summary(doc: dict) -> dict[str, Any]:
     }
 
 
+# referenceType của gateway vbpl-bientap → nhãn quan hệ tiếng Việt
+REFERENCE_TYPE_LABELS: dict[int, str] = {
+    1: "Sửa đổi, bổ sung",
+    2: "Thay thế",
+    3: "Bãi bỏ",
+    4: "Hủy bỏ",
+    5: "Đình chỉ",
+    6: "Hướng dẫn",
+    7: "Quy định chi tiết",
+    8: "Căn cứ",
+    9: "Dẫn chiếu",
+}
+
+
 def parse_doc_detail(detail_resp: dict) -> dict[str, Any]:
     """
     Parse full document detail including references and content.
@@ -129,20 +197,35 @@ def parse_doc_detail(detail_resp: dict) -> dict[str, Any]:
     data = detail_resp.get("data", detail_resp)
     summary = parse_doc_summary(data)
 
-    # Extract references for the relationship graph
+    # Extract references for the relationship graph.
+    # Gateway trả {"targetDocument": {...}, "referenceType": <int>}; bản cũ trả
+    # thẳng docNum/relationType nên hỗ trợ cả hai dạng.
     references = []
-    for ref in data.get("references", []):
-        ref_data = ref if isinstance(ref, dict) else {}
-        target_num = (ref_data.get("docNum") or ref_data.get("refDocNum") or "").strip()
-        rel_type = (ref_data.get("type") or ref_data.get("relationType") or "Liên quan").strip()
+    for ref in data.get("references") or []:
+        if not isinstance(ref, dict):
+            continue
+        target = ref.get("targetDocument") or {}
+        target_num = (
+            (target.get("docNum") if isinstance(target, dict) else "")
+            or ref.get("docNum")
+            or ref.get("refDocNum")
+            or ""
+        ).strip()
+        rel_type = ref.get("type") or ref.get("relationType")
+        if not rel_type:
+            rel_type = REFERENCE_TYPE_LABELS.get(ref.get("referenceType"), "Liên quan")
         if target_num:
             references.append({
                 "target_doc_num": target_num,
-                "relation_type": rel_type,
+                "relation_type": str(rel_type).strip(),
             })
 
-    # Extract full text content (HTML)
-    fulltext_html = data.get("documentContent", "") or data.get("content", "")
+    # Extract full text content (HTML) — gateway lồng trong documentContent.content
+    content = data.get("documentContent")
+    if isinstance(content, dict):
+        fulltext_html = content.get("content") or ""
+    else:
+        fulltext_html = content or data.get("content") or ""
 
     summary["references"] = references
     summary["fulltext_html"] = fulltext_html
@@ -165,17 +248,14 @@ def scan_incremental(window_days: int = MOJ_WINDOW_DAYS) -> list[dict[str, Any]]
         "MOJ scan started: window=%d days, cutoff=%s", window_days, cutoff
     )
 
-    while True:
+    while page <= MOJ_MAX_PAGES:
         try:
             resp_json = fetch_doc_list(page=page)
         except httpx.HTTPStatusError as e:
             logger.error("MOJ API error on page %d: %s", page, e)
             break
 
-        # Handle response format: { "data": [...], "totalItems": N }
-        data = resp_json.get("data", [])
-        if isinstance(data, dict):
-            data = data.get("data", [])  # nested data key
+        data = _extract_items(resp_json)
         if not data:
             logger.info("MOJ scan: no more data at page %d", page)
             break
@@ -196,10 +276,10 @@ def scan_incremental(window_days: int = MOJ_WINDOW_DAYS) -> list[dict[str, Any]]
                 past_window = True
                 continue
 
-            # Filter for business fields
-            if not is_business_document(doc_data):
-                continue
-
+            # API danh sách không trả lĩnh vực, nên KHÔNG lọc theo lĩnh vực ở đây.
+            # Toàn bộ văn bản trong cửa sổ được giữ lại làm chỉ mục để đối chiếu
+            # với TVPL (bước merge); việc lọc lĩnh vực cho văn bản chỉ-có-ở-MOJ
+            # do merge_triggers đảm nhiệm sau khi đã bổ sung chi tiết.
             parsed = parse_doc_summary(doc_data)
             if parsed["doc_num"]:
                 results.append(parsed)
@@ -212,9 +292,50 @@ def scan_incremental(window_days: int = MOJ_WINDOW_DAYS) -> list[dict[str, Any]]
 
         page += 1
         time.sleep(MOJ_RATE_LIMIT_SECONDS)
+    else:
+        logger.warning(
+            "MOJ scan: hit page cap (%d pages), window may be incomplete",
+            MOJ_MAX_PAGES,
+        )
 
-    logger.info("MOJ scan complete: %d business documents found", len(results))
+    logger.info("MOJ scan complete: %d documents in %d-day window", len(results), window_days)
     return results
+
+
+def search_by_doc_num(doc_num: str) -> dict[str, Any] | None:
+    """
+    Tra cứu một văn bản trên MOJ theo số hiệu.
+
+    Dùng để bổ sung dữ liệu Bộ Tư pháp cho văn bản phát hiện từ TVPL nhưng nằm
+    ngoài cửa sổ quét. API `keyword` khớp mờ (vd. '40/2026/QĐ-UBND' trả 31 kết
+    quả của nhiều tỉnh khác nhau) nên chỉ nhận kết quả khớp chính xác số hiệu;
+    nếu còn nhiều hơn một ứng viên thì bỏ qua để tránh gán nhầm văn bản.
+    """
+    from src.pipeline.deduplicator import normalize_doc_num
+
+    if not doc_num:
+        return None
+
+    try:
+        resp_json = fetch_doc_list(page=1, page_size=20, keyword=doc_num)
+    except (httpx.HTTPStatusError, httpx.RequestError) as e:
+        logger.warning("MOJ lookup failed for %s: %s", doc_num, e)
+        return None
+
+    target = normalize_doc_num(doc_num)
+    matches = [
+        parse_doc_summary(item)
+        for item in _extract_items(resp_json)
+        if normalize_doc_num(str(item.get("docNum") or "")) == target
+    ]
+
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        logger.info(
+            "MOJ lookup ambiguous for %s (%d matches), skipping", doc_num, len(matches)
+        )
+    return None
 
 
 def _parse_date(value: Any) -> date | None:

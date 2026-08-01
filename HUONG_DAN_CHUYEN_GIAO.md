@@ -84,6 +84,92 @@ Dùng để tự động tải các file `.docx` và `.pdf` đã thu thập lên
 
 ---
 
+### 2.4. Lark Drive / Feishu Drive (Lưu trữ trên Lark)
+Nếu công ty bạn sử dụng **Lark Suite (hoặc Feishu)** làm không gian làm việc chính:
+
+1. **Tạo Custom App trên Lark Developer Console:**
+   * Truy cập [Lark Developer Console](https://open.larksuite.com/app) (hoặc [Feishu Open Platform](https://open.feishu.cn/app)).
+   * Bấm **Create Custom App** $\rightarrow$ Đặt tên (VD: `Legal Storage Bot`).
+   * Vào mục **Credentials & Basic Info** $\rightarrow$ Lấy **App ID** (dạng `cli_xxxxxxxx`) và **App Secret**.
+2. **Cấp quyền truy cập Drive (Permissions):**
+   * Vào mục **Permissions & Scopes** $\rightarrow$ Thêm các quyền:
+     - `drive:drive` (Xem/sửa file Drive)
+     - `drive:file` (Tải lên file)
+2b. **Bật tính năng Bot (BẮT BUỘC) rồi Release:**
+   * **Add Features** → **Bot** → **Enable**.
+   * **Version Management & Release** → **Create Version** → **Release** → chờ admin duyệt.
+   * Lý do: ô tìm kiếm trong cửa sổ chia sẻ thư mục của Lark Drive **chỉ tìm được
+     người dùng và bot**, không tìm được app thuần. App chưa bật Bot sẽ không bao
+     giờ xuất hiện khi bạn gõ tên nó ở bước 3.
+   * Kiểm tra nhanh: gọi `GET /open-apis/bot/v3/info`; nếu trả
+     `{"code": 11205, "msg": "app do not have bot"}` là chưa bật.
+   * Ở phần **Availability**, chọn **All members** (hoặc thêm sẵn người sẽ dùng) —
+     bot chỉ hiện với tài khoản nằm trong phạm vi availability.
+3. **Tạo thư mục gốc và CHIA SẺ CHO APP (bước bắt buộc):**
+   * Mở Lark Drive → **Thư mục của tôi** (My Space) → **Mới** → **Thư mục** →
+     đặt tên, ví dụ `Kho_Van_Ban_Phap_Luat`.
+   * Chuột phải vào thư mục → **Chia sẻ** → gõ tên app (VD `Legal Storage Bot`)
+     → chọn app trong danh sách → đặt quyền **Có thể chỉnh sửa** (Can edit) →
+     **Xong**.
+   * ⚠️ **Không được bỏ qua bước chia sẻ.** Lark **không có API để chia sẻ thư
+     mục**, nên nếu app tự tạo thư mục trong không gian riêng của nó, thư mục vẫn
+     tồn tại nhưng mọi tài khoản người dùng đều nhận lỗi *"Bạn không có quyền truy
+     cập vào thư mục"*. Thư mục phải do người dùng tạo rồi chia sẻ ngược lại cho app.
+   * ⚠️ Quyền **"Chỉ xem"** (Can view) không đủ — app cần tạo thư mục con và tải file lên.
+4. **Lấy Root Folder Token:**
+   * Mở thư mục vừa tạo, xem URL:
+     `https://<tenant>.larksuite.com/drive/folder/FLDxxxxxxxxxxxx`
+     → phần `FLDxxxxxxxxxxxx` chính là **Folder Token**.
+5. **Cấu hình file `.env`:**
+   * Điền `LARK_APP_ID`, `LARK_APP_SECRET`, `LARK_ROOT_FOLDER_TOKEN`.
+6. **Kiểm tra lại trước khi chạy pipeline:**
+   ```bash
+   python scripts/lark_check.py
+   ```
+   Script báo `✅ Ghi được vào thư mục gốc` là đạt. Nếu báo lỗi, làm lại bước 3.
+
+**Cấu trúc lưu trữ kết quả** — mỗi văn bản một thư mục riêng, chứa dữ liệu cả hai nguồn:
+
+```
+Kho_Van_Ban_Phap_Luat/
+└── Doanh nghiệp/            ← lĩnh vực
+    └── 2026/
+        └── Thang_07/
+            └── 292_2026_NĐ-CP/        ← số hiệu văn bản
+                ├── 292_2026_NĐ-CP.docx          (TVPL)
+                ├── 292_2026_NĐ-CP.pdf           (TVPL)
+                ├── 292_2026_NĐ-CP_BoTuPhap.md   (toàn văn Bộ Tư pháp, đã làm sạch)
+                ├── 292_2026_NĐ-CP_BoTuPhap.html (toàn văn gốc)
+                └── 292_2026_NĐ-CP_metadata.json (metadata hợp nhất 2 nguồn)
+```
+
+---
+
+### 2.5. Tải file .docx/.pdf từ TVPL (Cloudflare)
+
+TVPL đặt sau Cloudflare và **chặn mọi trình duyệt tự động** (đã kiểm chứng với cả
+Chromium headless, headless=false và Google Chrome thật — đều nhận trang *"Chờ một
+chút..."* / HTTP 403). Chỉ RSS feed là truy cập được tự do.
+
+Hệ quả: **không có file `.docx`/`.pdf` từ TVPL** trừ khi cung cấp cookie hợp lệ.
+Toàn văn văn bản vẫn có đầy đủ từ **API Bộ Tư pháp** (`_BoTuPhap.md` / `.html`),
+nên hệ thống vẫn chạy trọn vẹn khi thiếu file TVPL.
+
+Nếu cần file gốc từ TVPL:
+1. Đăng nhập thuvienphapluat.vn bằng trình duyệt **trên chính máy chạy pipeline**.
+2. Dùng extension xuất cookie (VD *EditThisCookie*) → xuất toàn bộ cookie của
+   `thuvienphapluat.vn` ra định dạng JSON.
+3. Lưu vào `data/tvpl_cookies.json` — pipeline sẽ tự nạp ở lần chạy sau.
+4. Cookie `cf_clearance` gắn với **IP + User-Agent**, nên hết hạn sau vài giờ đến
+   vài ngày; cần xuất lại khi log báo `Cloudflare đang chặn truy cập tự động`.
+
+Không cần file TVPL thì tắt hẳn để tiết kiệm thời gian chạy:
+```
+TVPL_DOWNLOAD_ENABLED=false
+```
+
+---
+
 ## 3. HƯỚNG DẪN CÀI ĐẶT MÔI TRƯỜNG
 
 ### Dành cho Windows (Dễ nhất - 1 Click):
@@ -164,7 +250,9 @@ Dùng để kiểm tra xem hệ thống cào dữ liệu có hoạt động tố
   ```
 
 ### 🚀 Cách 2: Chạy chính thức toàn bộ Pipeline (Full Run)
-Hệ thống sẽ cào văn bản mới, tải file `.docx`, upload lên Google Drive và gửi bản tin vào nhóm Telegram:
+Hệ thống sẽ cào văn bản mới, lấy toàn văn từ Bộ Tư pháp, tải file `.docx` từ TVPL,
+upload lên Lark Drive (hoặc Google Drive nếu chưa cấu hình Lark) và gửi bản tin
+vào nhóm Telegram:
 
 * **Trên Windows:**
   ```cmd
@@ -176,6 +264,28 @@ Hệ thống sẽ cào văn bản mới, tải file `.docx`, upload lên Google 
   source .venv/bin/activate
   python -m src.main
   ```
+
+### 🔁 Cách 3: Upload bù khi bước upload từng hỏng
+
+Khi lần chạy trước lấy được dữ liệu nhưng upload thất bại (chưa cấu hình
+`LARK_ROOT_FOLDER_TOKEN`, mất mạng, hết hạn token…), không cần quét lại nguồn:
+
+```bash
+python -m src.main --upload-only
+```
+
+Lệnh này chỉ xử lý các văn bản trong DB chưa có `lark_folder_token`, dùng lại dữ
+liệu đã có sẵn dưới `data/`.
+
+### 🧪 Các cờ khác
+
+| Cờ | Tác dụng |
+|---|---|
+| `--dry-run` | In thử bản tin Telegram, không gửi thật |
+| `--skip-gdrive` | Bỏ qua toàn bộ bước upload |
+| `--moj-only` | Chỉ quét Bộ Tư pháp, không đụng TVPL |
+| `--limit N` | Chỉ xử lý N văn bản mới đầu tiên (chạy thử cho nhanh) |
+| `--upload-only` | Chỉ upload bù, không quét nguồn |
 
 ---
 

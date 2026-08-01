@@ -38,6 +38,10 @@ class Document(Base):
     title = Column(Text, nullable=False)
     doc_type = Column(String(100), comment="Loại VB: Nghị định, Thông tư…")
     issue_date = Column(Date, comment="Ngày ban hành")
+    pub_date = Column(
+        Date,
+        comment="Ngày TVPL đăng tin — dùng xếp thư mục khi chưa rõ ngày ban hành",
+    )
     eff_from = Column(Date, comment="Ngày có hiệu lực")
     eff_to = Column(Date, nullable=True, comment="Ngày hết hiệu lực")
     eff_status = Column(
@@ -67,10 +71,14 @@ class Document(Base):
     clean_text_path = Column(Text, comment="Clean Markdown path")
     chunks_path = Column(Text, comment="Legal chunks JSON path")
 
-    # Google Drive links
+    # Google Drive & Lark Drive links
     gdrive_docx_link = Column(Text)
     gdrive_pdf_link = Column(Text)
     gdrive_folder_id = Column(String(100))
+    lark_docx_link = Column(Text)
+    lark_pdf_link = Column(Text)
+    lark_folder_token = Column(String(100))
+
 
     # Event tracking
     event_type = Column(

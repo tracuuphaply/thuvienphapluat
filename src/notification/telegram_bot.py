@@ -12,6 +12,7 @@ from typing import Any
 
 from src.config import (
     BUSINESS_FIELDS,
+    LARK_APP_ID,
     TELEGRAM_ADMIN_CHAT_ID,
     TELEGRAM_BOT_TOKEN,
     TELEGRAM_CHAT_ID,
@@ -29,13 +30,27 @@ EVENT_LABELS = {
 
 def build_daily_digest(documents: list[dict[str, Any]]) -> str:
     """
-    Build a Telegram message (Markdown format) summarizing today's documents.
+    Build a Telegram message (Markdown format) summarizing documents with detailed timestamps
+    and Lark Drive / Google Drive links.
     """
-    today = date.today().strftime("%d/%m/%Y")
+    now_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     if not documents:
-        return f"📋 *VĂN BẢN DOANH NGHIỆP — {today}*\n\n✅ Không có văn bản mới hôm nay."
+        return f"📋 *VĂN BẢN DOANH NGHIỆP — {now_str}*\n\n✅ Không có văn bản mới trong lần quét này."
 
-    lines = [f"📋 *VĂN BẢN DOANH NGHIỆP MỚI — {today}*\n"]
+    lines = [f"📋 *VĂN BẢN DOANH NGHIỆP MỚI*"]
+    lines.append(f"⏰ *Thời điểm quét:* `{now_str}`")
+
+    # Add Lark Drive root folder link for easy browsing
+    if LARK_APP_ID:
+        try:
+            from src.storage.lark_drive import get_lark_root_folder_url
+            root_url = get_lark_root_folder_url()
+            if root_url:
+                lines.append(f"📂 [Mở kho lưu trữ Lark Drive]({root_url})")
+        except Exception:
+            pass  # Lark module not available
+
+    lines.append("")  # blank line
 
     # Group by event type
     by_event: dict[str, list] = {"A": [], "B": [], "C": []}
@@ -75,7 +90,7 @@ def build_daily_digest(documents: list[dict[str, Any]]) -> str:
 
             info_parts = []
             if issue_date:
-                info_parts.append(f"📅 {issue_date}")
+                info_parts.append(f"📅 Ban hành: {issue_date}")
             if eff_status:
                 info_parts.append(f"⚡ {_escape_md(eff_status)}")
             if field_name:
@@ -83,14 +98,17 @@ def build_daily_digest(documents: list[dict[str, Any]]) -> str:
             if info_parts:
                 lines.append(" | ".join(info_parts))
 
-            # Google Drive links
-            gdrive_docx = doc.get("gdrive_docx_link")
-            gdrive_pdf = doc.get("gdrive_pdf_link")
+            # Cloud Drive links (Lark Drive / Google Drive)
+            docx_link = doc.get("lark_docx_link") or doc.get("gdrive_docx_link")
+            pdf_link = doc.get("lark_pdf_link") or doc.get("gdrive_pdf_link")
+            folder_url = doc.get("lark_folder_url")
             link_parts = []
-            if gdrive_docx:
-                link_parts.append(f"[📁 Tải .docx]({gdrive_docx})")
-            if gdrive_pdf:
-                link_parts.append(f"[📄 Xem PDF]({gdrive_pdf})")
+            if docx_link:
+                link_parts.append(f"[📁 Tải .docx]({docx_link})")
+            if pdf_link:
+                link_parts.append(f"[📄 Xem PDF]({pdf_link})")
+            if folder_url:
+                link_parts.append(f"[📂 Thư mục]({folder_url})")
 
             # Source links
             tvpl_url = doc.get("tvpl_url")
@@ -109,10 +127,11 @@ def build_daily_digest(documents: list[dict[str, Any]]) -> str:
     count_c = len(by_event.get("C", []))
     lines.append(f"\n━━━━━━━━━━━━━━━━")
     lines.append(
-        f"📊 *Tổng:* {count_a} mới | {count_b} đổi hiệu lực | {count_c} sửa/thay"
+        f"📊 *Tổng đợt quét:* {count_a} mới | {count_b} đổi hiệu lực | {count_c} sửa/thay"
     )
 
     return "\n".join(lines)
+
 
 
 def _escape_md(text: str) -> str:
