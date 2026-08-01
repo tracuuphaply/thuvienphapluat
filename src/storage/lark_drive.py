@@ -396,6 +396,11 @@ class LarkDriveClient:
         file_size = path.stat().st_size
         token = self.get_tenant_access_token()
 
+        # Lark cho phép trùng tên file trong cùng thư mục, nên chạy lại sẽ tạo
+        # bản sao thay vì cập nhật. Xoá bản cũ trước để thư mục luôn có đúng một
+        # bản mới nhất của mỗi file.
+        self._delete_existing(parent_folder_token, upload_name)
+
         url = f"{self.api_base_url}/open-apis/drive/v1/files/upload_all"
 
         headers = {
@@ -431,6 +436,30 @@ class LarkDriveClient:
             "file_token": file_token,
             "view_link": view_link,
         }
+
+    def _delete_existing(self, folder_token: str, file_name: str) -> None:
+        """Xoá file cùng tên đang có trong thư mục (nếu có) trước khi tải bản mới."""
+        if not folder_token:
+            return
+        try:
+            headers = self._headers()
+            resp = httpx.get(
+                f"{self.api_base_url}/open-apis/drive/v1/files",
+                headers=headers,
+                params={"folder_token": folder_token, "page_size": "200"},
+                timeout=20.0,
+            )
+            for item in resp.json().get("data", {}).get("files", []):
+                if item.get("type") != "folder" and item.get("name") == file_name:
+                    httpx.delete(
+                        f"{self.api_base_url}/open-apis/drive/v1/files/{item['token']}",
+                        headers=headers,
+                        params={"type": "file"},
+                        timeout=20.0,
+                    )
+                    logger.info("Thay thế file cũ trên Lark: %s", file_name)
+        except Exception as e:
+            logger.warning("Không kiểm tra được file trùng tên %s: %s", file_name, e)
 
     def _set_file_permission(self, file_token: str) -> None:
         """

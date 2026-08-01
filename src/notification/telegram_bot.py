@@ -88,6 +88,16 @@ def build_daily_digest(documents: list[dict[str, Any]]) -> str:
             if agency:
                 lines.append(f"🏛 {_escape_md(agency)}")
 
+            # Sự kiện C: nói rõ văn bản nào vừa tác động tới văn bản này —
+            # đây mới là thông tin người dùng cần hành động.
+            impacted_by = doc.get("impacted_by")
+            if impacted_by:
+                impact_type = doc.get("impact_type", "tác động")
+                lines.append(
+                    f"⚠️ *{_escape_md(impact_type)}* bởi "
+                    f"*{_escape_md(str(impacted_by))}*"
+                )
+
             info_parts = []
             if issue_date:
                 info_parts.append(f"📅 Ban hành: {issue_date}")

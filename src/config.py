@@ -29,6 +29,23 @@ TVPL_RATE_LIMIT_SECONDS = float(os.getenv("TVPL_RATE_LIMIT_SECONDS", "7"))
 TVPL_DOWNLOAD_ENABLED = os.getenv("TVPL_DOWNLOAD_ENABLED", "true").lower() in (
     "true", "1", "yes",
 )
+# Dùng Google Chrome thật qua cổng debug (CDP) thay vì Chromium của Playwright.
+# Cloudflare của TVPL chặn Chromium do Playwright khởi chạy, kể cả headless=false;
+# Chrome thật khởi chạy bình thường rồi gắn qua CDP thì vượt được.
+TVPL_USE_CDP = os.getenv("TVPL_USE_CDP", "true").lower() in ("true", "1", "yes")
+# Tài khoản TVPL có hạn mức tải/ngày (đo được ~45 lượt). Vượt hạn mức thì trang
+# vẫn mở bình thường nhưng link tải biến mất, nên phải tự dừng thay vì thử tiếp.
+TVPL_MAX_DOWNLOADS_PER_RUN = int(os.getenv("TVPL_MAX_DOWNLOADS_PER_RUN", "40"))
+# Số lần liên tiếp không thấy link tải thì coi như đã hết hạn mức và dừng batch
+TVPL_MISSING_LINK_STREAK = int(os.getenv("TVPL_MISSING_LINK_STREAK", "5"))
+TVPL_CDP_PORT = int(os.getenv("TVPL_CDP_PORT", "9222"))
+# Hồ sơ Chrome riêng cho pipeline — giữ phiên đăng nhập TVPL giữa các lần chạy,
+# không đụng tới hồ sơ Chrome cá nhân của người dùng.
+TVPL_CHROME_PROFILE_DIR = os.getenv(
+    "TVPL_CHROME_PROFILE_DIR",
+    str(PROJECT_ROOT / "data" / "chrome_profile"),
+)
+TVPL_CHROME_PATH = os.getenv("TVPL_CHROME_PATH", "")
 
 # ──────────────────────────────────────────────
 # MOJ (Bộ Tư pháp) API

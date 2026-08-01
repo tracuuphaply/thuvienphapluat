@@ -25,13 +25,15 @@
 
 ## 1. TỔNG QUAN & YÊU CẦU HỆ THỐNG
 
-Hệ thống hoạt động tự động hàng ngày để phát hiện văn bản quy phạm pháp luật mới thuộc **10 lĩnh vực doanh nghiệp**, tải bản biên tập `.docx`/PDF từ TVPL, làm giàu dữ liệu từ Bộ Tư pháp (MOJ), đẩy file lên Google Drive và gửi thông báo qua Telegram.
+Hệ thống hoạt động tự động hàng ngày để phát hiện văn bản quy phạm pháp luật mới thuộc **10 lĩnh vực doanh nghiệp**, tải bản biên tập `.docx` từ TVPL, lấy toàn văn + quan hệ dẫn chiếu từ Bộ Tư pháp (MOJ), đẩy lên Lark Drive (hoặc Google Drive) theo cây thư mục Lĩnh vực/Năm/Tháng/Số hiệu, và gửi thông báo qua Telegram.
 
 ### Yêu cầu phần mềm trên máy tính vận hành:
 * **Hệ điều hành:** Windows 10/11 (khuyên dùng) hoặc Linux / macOS.
 * **Python:** Phiên bản **3.11** trở lên (Tải tại [python.org](https://www.python.org/)).  
   *(Lưu ý trên Windows: Nhớ tích chọn **"Add Python to PATH"** khi cài đặt).*
-* **Trình duyệt:** Chromium (sẽ được tự động cài qua Playwright).
+* **Google Chrome** — bắt buộc nếu muốn tải file `.docx` từ TVPL. Chromium do
+  Playwright cài **không dùng được** cho việc này (bị Cloudflare chặn), chi tiết ở §2.5.
+* **Playwright + Chromium:** vẫn cài như bình thường, dùng làm phương án dự phòng.
 
 ---
 
@@ -145,17 +147,77 @@ Kho_Van_Ban_Phap_Luat/
 
 ---
 
-### 2.5. Tải file .docx/.pdf từ TVPL (Cloudflare)
+### 2.5. Tải file .docx từ TVPL — yêu cầu Google Chrome
 
-TVPL đặt sau Cloudflare và **chặn mọi trình duyệt tự động** (đã kiểm chứng với cả
-Chromium headless, headless=false và Google Chrome thật — đều nhận trang *"Chờ một
-chút..."* / HTTP 403). Chỉ RSS feed là truy cập được tự do.
+TVPL đặt sau Cloudflare. Kết quả kiểm chứng (2026-08):
 
-Hệ quả: **không có file `.docx`/`.pdf` từ TVPL** trừ khi cung cấp cookie hợp lệ.
-Toàn văn văn bản vẫn có đầy đủ từ **API Bộ Tư pháp** (`_BoTuPhap.md` / `.html`),
-nên hệ thống vẫn chạy trọn vẹn khi thiếu file TVPL.
+| Cách truy cập | Kết quả |
+|---|---|
+| `httpx` / `requests` | ❌ HTTP 403 |
+| Chromium của Playwright (headless) | ❌ Trang *"Chờ một chút…"* |
+| Chromium của Playwright (hiện cửa sổ) | ❌ Trang *"Chờ một chút…"* |
+| Playwright khởi chạy Chrome thật (`channel="chrome"`) | ❌ Trang *"Chờ một chút…"* |
+| **Chrome thật chạy độc lập + gắn qua CDP** | ✅ **Vào được, tải được file** |
 
-Nếu cần file gốc từ TVPL, phải cung cấp cookie của một phiên duyệt web thật:
+Điểm mấu chốt: Cloudflare không chặn Chrome, nó chặn **trình duyệt do công cụ tự
+động khởi chạy**. Nên pipeline khởi chạy Google Chrome như một tiến trình bình
+thường (`--remote-debugging-port`), rồi mới gắn vào điều khiển qua giao thức CDP.
+
+**Yêu cầu:** máy chạy pipeline phải cài **Google Chrome** (không phải Chromium,
+không phải Edge). Đường dẫn mặc định được dò tự động trên Windows/macOS/Linux;
+nếu cài ở chỗ khác thì khai báo `TVPL_CHROME_PATH` trong `.env`.
+
+**Hồ sơ Chrome riêng:** pipeline dùng thư mục `data/chrome_profile`, tách hẳn khỏi
+Chrome cá nhân của bạn (không đọc lịch sử, không đụng tài khoản Google của bạn).
+Phiên đăng nhập TVPL được lưu ở đây nên chỉ đăng nhập một lần, các lần sau dùng
+lại — mỗi văn bản chỉ mất ~6 giây thay vì ~20 giây.
+
+> ⚠️ Chrome phải được **tắt êm** sau mỗi lần chạy thì cookie mới kịp ghi ra đĩa.
+> Pipeline đã xử lý việc này; đừng tắt máy đột ngột giữa lúc đang chạy, nếu không
+> lần sau phải đăng nhập lại (vẫn tự động, chỉ chậm hơn).
+
+**Nếu máy không có Chrome:** pipeline tự quay về Chromium và sẽ bị Cloudflare
+chặn — lúc đó chỉ còn toàn văn từ Bộ Tư pháp (`_BoTuPhap.md`/`.html`), hệ thống
+vẫn chạy bình thường. Muốn tắt hẳn bước tải để chạy nhanh hơn:
+
+```
+TVPL_DOWNLOAD_ENABLED=false
+```
+
+#### Hạn mức tải của tài khoản TVPL
+
+Đo thực tế (2026-08-01): tải liên tục được **44 file** rồi dừng hẳn — từ đó trở đi
+trang văn bản vẫn mở bình thường nhưng **link tải biến mất**. Đây là hạn mức
+tải/ngày của tài khoản, không phải lỗi kỹ thuật và không phải do Cloudflare.
+
+Hệ thống xử lý việc này bằng hai lớp:
+
+| Biến | Mặc định | Tác dụng |
+|---|---|---|
+| `TVPL_MAX_DOWNLOADS_PER_RUN` | 40 | Dừng chủ động trước khi chạm hạn mức |
+| `TVPL_MISSING_LINK_STREAK` | 5 | 5 văn bản liên tiếp mất link → dừng, báo rõ lý do |
+
+**Vận hành hàng ngày không bị ảnh hưởng**: mỗi ngày chỉ có khoảng 10–20 văn bản
+mới, còn xa hạn mức. Chỉ khi nạp bù lần đầu (hàng trăm văn bản) mới chạm trần —
+lúc đó chạy `backfill_tvpl_files.py` vài ngày liên tiếp, mỗi ngày một mẻ.
+
+Muốn tải nhiều hơn mỗi ngày thì phải nâng cấp gói tài khoản TVPL.
+
+#### Tải bù cho văn bản đã có trong database
+
+```bash
+python scripts/backfill_tvpl_files.py            # tất cả văn bản còn thiếu file
+python scripts/backfill_tvpl_files.py --limit 10 # chạy thử 10 văn bản
+```
+
+File tải xong được đẩy thẳng vào đúng thư mục Lark Drive của văn bản đó.
+
+---
+
+### 2.6. (Dự phòng) Dùng cookie khi không cài được Chrome
+
+Chỉ cần đến cách này nếu máy vận hành **không thể cài Google Chrome**. Cách này
+phải làm thủ công định kỳ, nên ưu tiên cách ở §2.5.
 
 #### Bước 1 — Đăng nhập bằng trình duyệt
 
@@ -241,11 +303,9 @@ Loaded 12 TVPL cookies from .../data/tvpl_cookies.json (cf_clearance: có)
   gửi qua chat/email** cho người khác.
 * Vì phải làm thủ công định kỳ, nếu không thực sự cần file `.docx` gốc thì nên
   đặt `TVPL_DOWNLOAD_ENABLED=false` và dùng toàn văn từ Bộ Tư pháp.
-
-Không cần file TVPL thì tắt hẳn để tiết kiệm thời gian chạy:
-```
-TVPL_DOWNLOAD_ENABLED=false
-```
+* Lưu ý: cách này **chỉ hữu ích khi trình duyệt của bạn thực sự có `cf_clearance`**.
+  Nếu Cloudflare chưa từng ra thử thách cho bạn thì cookie đó không tồn tại và
+  không có gì để mượn — lúc đó bắt buộc dùng cách Chrome + CDP ở §2.5.
 
 ---
 

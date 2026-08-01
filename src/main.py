@@ -39,7 +39,7 @@ from src.notification.telegram_bot import (
     send_daily_digest,
     send_error_alert,
 )
-from src.pipeline.deduplicator import merge_triggers
+from src.pipeline.deduplicator import merge_triggers, normalize_doc_num
 from src.sources.moj_api import (
     fetch_doc_detail,
     parse_doc_detail,
@@ -84,6 +84,66 @@ MOJ_AUTHORITATIVE_FIELDS = frozenset({
     "agency_name",
     "signer",
 })
+
+
+# Quan hệ khiến văn bản ĐÍCH bị tác động → sinh sự kiện C cho văn bản đích.
+# "Căn cứ" và "Dẫn chiếu" chỉ là tham chiếu, không làm thay đổi hiệu lực.
+IMPACTING_RELATIONS = frozenset({
+    "Sửa đổi, bổ sung",
+    "Thay thế",
+    "Bãi bỏ",
+    "Hủy bỏ",
+    "Đình chỉ",
+})
+
+
+def detect_affected_documents(
+    session: Any,
+    new_docs: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """
+    Tìm các văn bản CŨ trong DB bị văn bản mới sửa đổi/thay thế (sự kiện C).
+
+    Văn bản mới mang theo danh sách quan hệ từ Bộ Tư pháp; nếu văn bản đích đã
+    có trong kho thì người dùng cần được báo là văn bản họ đang áp dụng vừa bị
+    tác động — đây chính là giá trị chính của hệ thống, không chỉ báo văn bản mới.
+    """
+    affected: dict[str, dict[str, Any]] = {}
+    # Văn bản của chính lần chạy này đã được báo là "mới", không báo lại là "bị sửa"
+    current_run = {
+        normalize_doc_num(str(d.get("doc_num", ""))) for d in new_docs
+    }
+
+    for doc_data in new_docs:
+        for ref in doc_data.get("_references", []):
+            if ref.get("relation_type") not in IMPACTING_RELATIONS:
+                continue
+
+            target = get_document_by_doc_num(session, ref["target_doc_num"])
+            if target is None or target.doc_num in affected:
+                continue
+            if normalize_doc_num(target.doc_num) in current_run:
+                continue
+
+            target.event_type = "C"
+            target.notified_at = None  # để được đưa vào bản tin lần này
+
+            row = {
+                col.name: getattr(target, col.name)
+                for col in target.__table__.columns
+            }
+            row["impacted_by"] = doc_data.get("doc_num")
+            row["impact_type"] = ref["relation_type"]
+            affected[target.doc_num] = row
+
+            logger.info(
+                "  → Sự kiện C: %s bị %s bởi %s",
+                target.doc_num,
+                ref["relation_type"].lower(),
+                doc_data.get("doc_num"),
+            )
+
+    return list(affected.values())
 
 
 def setup_logging() -> None:
@@ -351,6 +411,9 @@ def run_pipeline(
             logger.info("STEP 5: Saving to database")
             logger.info("=" * 60)
 
+            # Phải chạy trước vòng lặp bên dưới vì nó xoá key "_references"
+            affected_docs = detect_affected_documents(session, enriched_docs)
+
             saved_docs: list[dict[str, Any]] = []
             for doc_data in enriched_docs:
                 refs = doc_data.pop("_references", [])
@@ -378,6 +441,13 @@ def run_pipeline(
 
             session.commit()
             logger.info("Saved %d documents to database.", len(saved_docs))
+
+            if affected_docs:
+                logger.info(
+                    "Có %d văn bản cũ bị sửa đổi/thay thế (sự kiện C).",
+                    len(affected_docs),
+                )
+                saved_docs.extend(affected_docs)
 
             # ── Step 6: Upload to Cloud Drive (Lark Drive / Google Drive) ──
             if not skip_gdrive:

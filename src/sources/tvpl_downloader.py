@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -27,9 +29,15 @@ from typing import Any
 from src.config import (
     DATA_DIR,
     TVPL_BASE_URL,
+    TVPL_CDP_PORT,
+    TVPL_CHROME_PATH,
+    TVPL_CHROME_PROFILE_DIR,
     TVPL_FILES_DIR,
+    TVPL_MAX_DOWNLOADS_PER_RUN,
+    TVPL_MISSING_LINK_STREAK,
     TVPL_PASSWORD,
     TVPL_RATE_LIMIT_SECONDS,
+    TVPL_USE_CDP,
     TVPL_USERNAME,
 )
 
@@ -59,6 +67,10 @@ def _is_challenge_title(title: str) -> bool:
 
 class TVPLBlockedError(RuntimeError):
     """Cloudflare chặn truy cập tự động — không văn bản nào tải được."""
+
+
+class TVPLQuotaError(RuntimeError):
+    """Tài khoản TVPL đã hết lượt tải trong ngày."""
 
 
 # Ánh xạ sameSite từ định dạng extension sang định dạng Playwright
@@ -107,6 +119,22 @@ def normalize_cookies(raw: list[dict]) -> list[dict[str, Any]]:
     return cookies
 
 
+def _find_chrome() -> str:
+    """Tìm Google Chrome theo đường dẫn cài đặt mặc định của từng hệ điều hành."""
+    candidates = {
+        "darwin": ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"],
+        "win32": [
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        ],
+    }.get(sys.platform, ["/usr/bin/google-chrome", "/usr/bin/chromium-browser"])
+
+    for path in candidates:
+        if Path(path).exists():
+            return path
+    return ""
+
+
 class TVPLDownloader:
     """Manages a Playwright browser session for TVPL downloads."""
 
@@ -117,12 +145,68 @@ class TVPLDownloader:
         self._logged_in = False
         self._last_request_time = 0.0
         self._pw = None
+        self._chrome_proc = None
+        self._downloaded_count = 0
+        self._missing_link_streak = 0
+
+    async def _start_cdp(self) -> bool:
+        """
+        Khởi chạy Google Chrome thật rồi gắn vào qua CDP.
+
+        Cloudflare của TVPL chặn Chromium do Playwright khởi chạy (kể cả
+        headless=false và channel='chrome'), nhưng không chặn Chrome được khởi
+        chạy như một tiến trình bình thường rồi điều khiển qua cổng debug.
+        Chrome dùng hồ sơ riêng của pipeline nên phiên đăng nhập TVPL được giữ
+        lại giữa các lần chạy và không đụng tới hồ sơ cá nhân.
+        """
+        chrome = TVPL_CHROME_PATH or _find_chrome()
+        if not chrome:
+            logger.warning(
+                "Không tìm thấy Google Chrome — quay về Chromium của Playwright. "
+                "Đặt TVPL_CHROME_PATH trong .env nếu Chrome cài ở đường dẫn khác."
+            )
+            return False
+
+        Path(TVPL_CHROME_PROFILE_DIR).mkdir(parents=True, exist_ok=True)
+        self._chrome_proc = subprocess.Popen(
+            [
+                chrome,
+                f"--remote-debugging-port={TVPL_CDP_PORT}",
+                f"--user-data-dir={TVPL_CHROME_PROFILE_DIR}",
+                "--no-first-run",
+                "--no-default-browser-check",
+                "about:blank",
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+        # Chrome cần vài giây mới mở cổng debug
+        for _ in range(20):
+            await asyncio.sleep(1)
+            try:
+                self._browser = await self._pw.chromium.connect_over_cdp(
+                    f"http://localhost:{TVPL_CDP_PORT}"
+                )
+                self._context = self._browser.contexts[0]
+                logger.info("Đã gắn vào Google Chrome qua CDP (cổng %d).", TVPL_CDP_PORT)
+                return True
+            except Exception:
+                continue
+
+        logger.warning("Không gắn được vào Chrome qua CDP, quay về Chromium.")
+        return False
 
     async def start(self) -> None:
         """Launch browser and create a context, restoring session if available."""
         from playwright.async_api import async_playwright
 
         self._pw = await async_playwright().start()
+
+        if TVPL_USE_CDP and await self._start_cdp():
+            self._page = await self._context.new_page()
+            return
+
         self._browser = await self._pw.chromium.launch(
             headless=True,
             args=["--disable-blink-features=AutomationControlled"],
@@ -203,6 +287,18 @@ class TVPLDownloader:
 
         if self._browser:
             await self._browser.close()
+
+        # Chrome (chế độ CDP) phải được tắt êm bằng SIGTERM + chờ, nếu giết đột
+        # ngột nó chưa kịp ghi cookie ra đĩa và lần chạy sau phải đăng nhập lại.
+        if self._chrome_proc:
+            self._chrome_proc.terminate()
+            try:
+                self._chrome_proc.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                self._chrome_proc.kill()
+            self._chrome_proc = None
+            logger.info("Đã đóng Chrome, phiên đăng nhập được lưu lại.")
+
         if self._pw:
             await self._pw.stop()
         self._logged_in = False
@@ -266,8 +362,9 @@ class TVPLDownloader:
             logger.info("Already logged in to TVPL (this run).")
             return True
 
-        # Check if the restored session is still valid
-        if STORAGE_STATE_PATH.exists():
+        # Ở chế độ CDP phiên nằm trong hồ sơ Chrome chứ không phải storage_state,
+        # nên luôn phải hỏi trang chủ xem còn đăng nhập không.
+        if self._chrome_proc or STORAGE_STATE_PATH.exists():
             if await self._is_session_valid():
                 self._logged_in = True
                 return True
@@ -277,26 +374,21 @@ class TVPLDownloader:
             await self._rate_limit()
             await self._goto(f"{TVPL_BASE_URL}/page/login.aspx")
 
-            # Fill login form — TVPL uses ASP.NET WebForms
-            # The actual selectors may need adjustment based on current TVPL page structure
-            email_input = self._page.locator(
-                'input[type="email"], input[name*="Email"], input[id*="txtEmail"]'
-            )
-            password_input = self._page.locator(
-                'input[type="password"], input[name*="Password"], input[id*="txtPassword"]'
-            )
+            # Form đăng nhập TVPL (kiểm chứng 2026-08): #UserName / #Password /
+            # #Button1. Trang còn vài ô input ẩn (quên mật khẩu) nên phải bám
+            # đúng id, dùng selector chung sẽ trúng ô ẩn và treo 30s.
+            email_input = self._page.locator("#UserName")
+            password_input = self._page.locator("#Password")
 
             if await email_input.count() > 0:
-                await email_input.first.fill(username)
-                await password_input.first.fill(password)
+                await email_input.fill(username)
+                await password_input.fill(password)
+                await self._page.click("#Button1")
+                await self._page.wait_for_timeout(8000)
 
-                # Click login button
-                login_btn = self._page.locator(
-                    'input[type="submit"], button[type="submit"], '
-                    'a[id*="btnLogin"], input[id*="btnLogin"]'
-                )
-                await login_btn.first.click()
-                await self._page.wait_for_load_state("networkidle")
+                if await self._page.locator("#UserName").count() > 0:
+                    logger.error("TVPL login thất bại — kiểm tra lại tài khoản/mật khẩu.")
+                    return False
 
                 self._logged_in = True
                 # Immediately save session so next run won't need to re-login
@@ -375,7 +467,7 @@ class TVPLDownloader:
                 result["success"] = True
                 logger.info("Downloaded PDF: %s", pdf_path)
 
-        except TVPLBlockedError:
+        except (TVPLBlockedError, TVPLQuotaError):
             raise
         except Exception as e:
             result["error"] = str(e)
@@ -389,33 +481,51 @@ class TVPLDownloader:
         The button triggers __doPostBack which redirects to the download URL.
         """
         try:
-            # Look for the download tab first
-            download_tab = self._page.locator(
-                'a:has-text("Tải về"), a:has-text("Download"), '
-                '[id*="tabDownload"], [class*="tab-download"]'
-            )
-            if await download_tab.count() > 0:
-                await download_tab.first.click()
-                await self._page.wait_for_timeout(1000)
+            # Link tải nằm trong tab "Tải về" và bị ẩn cho tới khi mở tab đó —
+            # bấm thẳng vào link sẽ treo vì element không hiển thị.
+            tab = self._page.locator("#aTabTaiVe")
+            if await tab.count() > 0:
+                await tab.click()
+                await self._page.wait_for_timeout(2500)
 
-            # Look for Vietnamese download link
             vn_link = self._page.locator(
-                'a:has-text("Tải Văn bản tiếng Việt"), '
-                'a:has-text("tiếng Việt"), '
-                'a[id*="vietnameseHyperLink"], '
-                'a[id*="VietLink"]'
+                "#ctl00_Content_ThongTinVB_vietnameseHyperLink_Docx"
             )
+            if not await vn_link.count():
+                vn_link = self._page.locator(
+                    "#ctl00_Content_ThongTinVB_vietnameseHyperLink"
+                )
 
-            if await vn_link.count() > 0:
-                # Set up download handler
-                async with self._page.expect_download(timeout=30000) as download_info:
+            if await vn_link.count() > 0 and await vn_link.first.is_visible():
+                async with self._page.expect_download(timeout=60000) as download_info:
                     await vn_link.first.click()
 
                 download = await download_info.value
                 save_path = TVPL_FILES_DIR / f"{doc_id}.docx"
                 await download.save_as(str(save_path))
+                self._missing_link_streak = 0
+                self._downloaded_count += 1
                 return save_path
 
+            # Không phải lỗi kỹ thuật: TVPL ẩn link tải khi tài khoản hết hạn
+            # mức. Đếm số lần liên tiếp để phân biệt "văn bản này không có bản
+            # .docx" với "cả tài khoản đã hết lượt".
+            self._missing_link_streak += 1
+            logger.info(
+                "Không có link tải .docx cho %s (lần thứ %d liên tiếp)",
+                doc_id,
+                self._missing_link_streak,
+            )
+            if self._missing_link_streak >= TVPL_MISSING_LINK_STREAK:
+                raise TVPLQuotaError(
+                    f"{self._missing_link_streak} văn bản liên tiếp không có link tải "
+                    f"sau khi đã tải {self._downloaded_count} file — nhiều khả năng "
+                    "tài khoản TVPL đã hết hạn mức tải trong ngày. Chạy lại vào ngày "
+                    "mai hoặc nâng cấp gói tài khoản."
+                )
+
+        except (TVPLQuotaError, TVPLBlockedError):
+            raise
         except Exception as e:
             logger.debug("Vietnamese download attempt failed: %s", e)
 
@@ -473,6 +583,16 @@ def download_documents_sync(
         try:
             await downloader.login()
             for doc in documents:
+                if downloader._downloaded_count >= TVPL_MAX_DOWNLOADS_PER_RUN:
+                    logger.warning(
+                        "Đã tải %d file — dừng ở trần TVPL_MAX_DOWNLOADS_PER_RUN "
+                        "để không chạm hạn mức tài khoản. %d văn bản còn lại sẽ "
+                        "được tải ở lần chạy sau.",
+                        downloader._downloaded_count,
+                        len(documents) - len(results),
+                    )
+                    break
+
                 tvpl_url = doc.get("tvpl_url", "")
                 tvpl_id = doc.get("tvpl_id", "")
                 if tvpl_url and tvpl_id:
@@ -483,6 +603,8 @@ def download_documents_sync(
             # Cloudflare chặn ở cấp site: thử tiếp các văn bản còn lại chỉ tốn
             # thêm vài chục phút mà chắc chắn hỏng → dừng luôn, trả về phần đã tải.
             logger.error("Dừng tải TVPL: %s", e)
+        except TVPLQuotaError as e:
+            logger.warning("Dừng tải TVPL: %s", e)
         finally:
             await downloader.stop()
         return results
