@@ -23,6 +23,9 @@ data/lark_cache.json
 data/moj_rejected.json
 data/tvpl_session.json
 data/tvpl_cookies.json
+# Profile Chrome dùng cho CDP — chứa cookie đăng nhập và mật khẩu đã lưu
+# của trình duyệt. Không bao giờ đưa vào git.
+data/chrome_profile/
 *.db
 *.sqlite
 
