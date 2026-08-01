@@ -53,15 +53,16 @@ from src.storage.database import (
     finish_crawl_run,
     get_document_by_doc_num,
     get_session,
-    get_unnotified_documents,
     init_db,
     insert_references,
     insert_status_change,
     upsert_document,
 )
 from src.storage.file_store import (
+    load_rejected_doc_nums,
     save_document_metadata,
     save_moj_fulltext,
+    save_rejected_doc_nums,
     save_snapshot,
 )
 from src.storage.gdrive import upload_document_files
@@ -228,10 +229,19 @@ def run_pipeline(
             logger.info("Merged candidates: %d", len(candidates))
 
             # ── Step 3: Check DB for truly new documents ──
+            rejected = load_rejected_doc_nums()
+            skipped_known = 0
+
             new_docs: list[dict[str, Any]] = []
             for candidate in candidates:
                 doc_num = candidate.get("doc_num", "")
                 if not doc_num:
+                    continue
+
+                # Đã kiểm tra ở lần chạy trước và xác định không thuộc lĩnh vực
+                # doanh nghiệp → khỏi tải lại chi tiết để rồi loại lần nữa.
+                if doc_num in rejected:
+                    skipped_known += 1
                     continue
 
                 existing = get_document_by_doc_num(session, doc_num)
@@ -251,6 +261,13 @@ def run_pipeline(
                             detected_by="MOJ" if candidate.get("source_moj") else "TVPL",
                         )
                         new_docs.append(candidate)
+
+            if skipped_known:
+                logger.info(
+                    "Bỏ qua %d văn bản đã xác định không thuộc lĩnh vực doanh nghiệp "
+                    "ở các lần chạy trước.",
+                    skipped_known,
+                )
 
             if limit and len(new_docs) > limit:
                 logger.warning(
@@ -286,7 +303,9 @@ def run_pipeline(
                 # Văn bản phát hiện từ TVPL thường nằm ngoài cửa sổ quét MOJ →
                 # tra cứu trực tiếp theo số hiệu để lấy dữ liệu Bộ Tư pháp.
                 if not doc_data.get("moj_id") and doc_data.get("doc_num"):
-                    moj_match = search_by_doc_num(doc_data["doc_num"])
+                    moj_match = search_by_doc_num(
+                        doc_data["doc_num"], doc_data.get("title", "")
+                    )
                     if moj_match:
                         for key, value in moj_match.items():
                             if value:
@@ -335,6 +354,7 @@ def run_pipeline(
                                 doc_data.get("doc_num"),
                                 detail.get("field_name"),
                             )
+                            rejected.add(doc_data.get("doc_num", ""))
                             continue
 
                         # Save fulltext HTML
@@ -369,6 +389,8 @@ def run_pipeline(
                         logger.error("MOJ enrich failed for %s: %s", moj_id, e)
 
                 enriched_docs.append(doc_data)
+
+            save_rejected_doc_nums(rejected)
 
             # ── Step 4b: Download .docx from TVPL ──
             downloadable = [

@@ -7,7 +7,8 @@ and sends it to a configured Telegram group chat.
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime
+import re
+from datetime import datetime
 from typing import Any
 
 from src.config import (
@@ -35,7 +36,7 @@ def build_daily_digest(documents: list[dict[str, Any]]) -> str:
     """
     now_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     if not documents:
-        return f"📋 *VĂN BẢN DOANH NGHIỆP — {now_str}*\n\n✅ Không có văn bản mới trong lần quét này."
+        return f"📋 *VĂN BẢN DOANH NGHIỆP — {now_str}*\n\n✅ Không có văn bản mới trong lần quét này\\."
 
     lines = [f"📋 *VĂN BẢN DOANH NGHIỆP MỚI*"]
     lines.append(f"⏰ *Thời điểm quét:* `{now_str}`")
@@ -64,7 +65,7 @@ def build_daily_digest(documents: list[dict[str, Any]]) -> str:
             continue
 
         label = EVENT_LABELS.get(evt_type, "📌")
-        lines.append(f"\n*{label}* ({len(evt_docs)} văn bản)")
+        lines.append(f"\n*{label}* \\({len(evt_docs)} văn bản\\)")
         lines.append("━━━━━━━━━━━━━━━━")
 
         for doc in evt_docs:
@@ -106,14 +107,14 @@ def build_daily_digest(documents: list[dict[str, Any]]) -> str:
             if field_name:
                 info_parts.append(f"📂 {_escape_md(field_name)}")
             if info_parts:
-                lines.append(" | ".join(info_parts))
+                lines.append(" \\| ".join(info_parts))
 
             # Cloud Drive links (Lark Drive / Google Drive)
             docx_link = doc.get("lark_docx_link") or doc.get("gdrive_docx_link")
             folder_url = doc.get("lark_folder_url")
             link_parts = []
             if docx_link:
-                link_parts.append(f"[📁 Tải .docx]({docx_link})")
+                link_parts.append(f"[📁 Tải \\.docx]({docx_link})")
             if folder_url:
                 link_parts.append(f"[📂 Thư mục]({folder_url})")
 
@@ -126,7 +127,7 @@ def build_daily_digest(documents: list[dict[str, Any]]) -> str:
                 link_parts.append(f"[🔗 MOJ]({moj_url})")
 
             if link_parts:
-                lines.append(" | ".join(link_parts))
+                lines.append(" \\| ".join(link_parts))
 
     # Summary footer
     count_a = len(by_event.get("A", []))
@@ -134,7 +135,7 @@ def build_daily_digest(documents: list[dict[str, Any]]) -> str:
     count_c = len(by_event.get("C", []))
     lines.append(f"\n━━━━━━━━━━━━━━━━")
     lines.append(
-        f"📊 *Tổng đợt quét:* {count_a} mới | {count_b} đổi hiệu lực | {count_c} sửa/thay"
+        f"📊 *Tổng đợt quét:* {count_a} mới \\| {count_b} đổi hiệu lực \\| {count_c} sửa/thay"
     )
 
     return "\n".join(lines)
@@ -142,11 +143,15 @@ def build_daily_digest(documents: list[dict[str, Any]]) -> str:
 
 
 def _escape_md(text: str) -> str:
-    """Escape special Markdown characters for Telegram."""
-    # Telegram MarkdownV2 special chars
+    """
+    Escape ký tự đặc biệt của Telegram MarkdownV2.
+
+    Phải dùng đúng cặp với parse_mode="MarkdownV2": ở Markdown bản cũ dấu `\\`
+    không phải ký tự thoát nên sẽ hiện nguyên trong tin nhắn ("292/2026/NĐ\\-CP").
+    """
     special = r"_*[]()~`>#+-=|{}.!"
     result = ""
-    for c in text:
+    for c in str(text):
         if c in special:
             result += f"\\{c}"
         else:
@@ -155,7 +160,7 @@ def _escape_md(text: str) -> str:
 
 
 async def send_message_async(
-    chat_id: str, text: str, parse_mode: str = "Markdown"
+    chat_id: str, text: str, parse_mode: str = "MarkdownV2"
 ) -> bool:
     """Send a message via Telegram Bot API (async)."""
     import httpx
@@ -195,7 +200,7 @@ async def send_message_async(
 
 
 def send_message_sync(
-    chat_id: str, text: str, parse_mode: str = "Markdown"
+    chat_id: str, text: str, parse_mode: str = "MarkdownV2"
 ) -> bool:
     """Send a message via Telegram Bot API (synchronous)."""
     import httpx
@@ -207,18 +212,31 @@ def send_message_sync(
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     chunks = _split_message(text, 4000)
 
+    def _post(client, chunk: str, mode: str | None):
+        payload = {
+            "chat_id": chat_id,
+            "text": chunk,
+            "disable_web_page_preview": True,
+        }
+        if mode:
+            payload["parse_mode"] = mode
+        return client.post(url, json=payload)
+
     try:
         with httpx.Client() as client:
             for chunk in chunks:
-                resp = client.post(
-                    url,
-                    json={
-                        "chat_id": chat_id,
-                        "text": chunk,
-                        "parse_mode": parse_mode,
-                        "disable_web_page_preview": True,
-                    },
-                )
+                resp = _post(client, chunk, parse_mode)
+
+                # Chỉ cần một ký tự chưa thoát là Telegram từ chối cả tin nhắn.
+                # Bản tin đến muộn dưới dạng text thuần vẫn hơn là không đến.
+                if resp.status_code == 400 and "parse" in resp.text.lower():
+                    logger.warning(
+                        "Telegram từ chối định dạng %s (%s) — gửi lại dạng text thuần.",
+                        parse_mode,
+                        resp.text[:200],
+                    )
+                    resp = _post(client, _strip_markdown(chunk), None)
+
                 if resp.status_code != 200:
                     logger.error(
                         "Telegram send failed: %s %s",
@@ -255,6 +273,18 @@ def send_error_alert(error_message: str) -> bool:
         f"Thời gian: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"
     )
     return send_message_sync(admin_id, text)
+
+
+def _strip_markdown(text: str) -> str:
+    """
+    Bỏ hết đánh dấu Markdown, giữ lại nội dung đọc được.
+
+    Dùng cho lần gửi dự phòng khi Telegram từ chối định dạng: link
+    `[nhãn](url)` được trải thành `nhãn: url` để không mất đường dẫn.
+    """
+    plain = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"\1: \2", text)
+    plain = re.sub(r"\\(.)", r"\1", plain)          # bỏ ký tự thoát
+    return plain.replace("*", "").replace("`", "").replace("_", "")
 
 
 def _split_message(text: str, max_len: int = 4000) -> list[str]:

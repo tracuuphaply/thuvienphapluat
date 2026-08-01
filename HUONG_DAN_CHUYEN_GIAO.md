@@ -451,6 +451,23 @@ Mở terminal và gõ `crontab -e`, thêm dòng sau:
 
 ---
 
+## 6b. CÁC FILE TRẠNG THÁI TRONG `data/`
+
+Pipeline giữ vài file nhỏ để chạy nhanh hơn ở các lần sau. Xoá đi không mất dữ
+liệu, chỉ là lần chạy kế tiếp sẽ chậm hơn hoặc phải đăng nhập lại.
+
+| File | Vai trò | Khi nào nên xoá |
+|---|---|---|
+| `data/moj_rejected.json` | Số hiệu văn bản đã xác định **không** thuộc lĩnh vực doanh nghiệp | Khi mở rộng danh sách lĩnh vực trong `config.py` — xoá để hệ thống kiểm tra lại từ đầu |
+| `data/lark_cache.json` | Bản đồ tên thư mục → token trên Lark Drive | Khi bạn tự đổi tên/di chuyển thư mục trên Lark |
+| `data/chrome_profile/` | Hồ sơ Chrome giữ phiên đăng nhập TVPL | Khi đổi tài khoản TVPL |
+| `data/tvpl_session.json` | Phiên Playwright (đường dự phòng) | Khi đăng nhập lỗi lặp lại |
+
+Riêng `moj_rejected.json` đáng chú ý: nhờ nó mà lần chạy thứ hai trở đi bỏ qua
+được ~40 văn bản đã kiểm tra (đo được: 27,6 giây → 6,4 giây mỗi lần chạy).
+
+---
+
 ## 7. XỬ LÝ SỰ CỐ THƯỜNG GẶP (TROUBLESHOOTING)
 
 | Hiện tượng | Nguyên nhân | Cách khắc phục |

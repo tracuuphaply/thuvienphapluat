@@ -62,6 +62,37 @@ def save_document_metadata(doc_data: dict) -> str | None:
     return str(path)
 
 
+# Văn bản đã kiểm tra và xác định KHÔNG thuộc lĩnh vực doanh nghiệp
+_REJECTED_PATH = MOJ_FILES_DIR.parent / "moj_rejected.json"
+
+
+def load_rejected_doc_nums() -> set[str]:
+    """
+    Danh sách số hiệu văn bản đã xác định không thuộc lĩnh vực doanh nghiệp.
+
+    Bộ lọc thô theo tiêu đề cho lọt vài chục văn bản mỗi lần quét, phải tải chi
+    tiết mới biết lĩnh vực thật rồi loại. Không nhớ lại thì mỗi lần chạy đều tải
+    lại đúng những văn bản đó — tốn thời gian và tăng tải lên API Bộ Tư pháp.
+    """
+    if not _REJECTED_PATH.exists():
+        return set()
+    try:
+        return set(json.loads(_REJECTED_PATH.read_text(encoding="utf-8")))
+    except (json.JSONDecodeError, ValueError):
+        return set()
+
+
+def save_rejected_doc_nums(doc_nums: set[str]) -> None:
+    """Ghi lại danh sách văn bản đã loại."""
+    try:
+        _REJECTED_PATH.write_text(
+            json.dumps(sorted(doc_nums), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    except OSError as e:
+        logger.warning("Không lưu được danh sách văn bản đã loại: %s", e)
+
+
 def save_snapshot(source: str, data: dict | list) -> str:
     """
     Save a raw API/RSS snapshot for audit purposes.

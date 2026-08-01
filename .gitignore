@@ -20,6 +20,7 @@ data/clean_text/
 data/chunks/
 data/metadata/
 data/lark_cache.json
+data/moj_rejected.json
 data/tvpl_session.json
 data/tvpl_cookies.json
 *.db

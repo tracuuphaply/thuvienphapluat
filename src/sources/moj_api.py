@@ -10,6 +10,7 @@ Sort by issueDate desc for stable pagination. Dedupe by `id`.
 from __future__ import annotations
 
 import logging
+import re
 import time
 from datetime import date, timedelta
 from typing import Any
@@ -302,14 +303,26 @@ def scan_incremental(window_days: int = MOJ_WINDOW_DAYS) -> list[dict[str, Any]]
     return results
 
 
-def search_by_doc_num(doc_num: str) -> dict[str, Any] | None:
+def _title_overlap(a: str, b: str) -> float:
+    """Tỷ lệ từ chung giữa hai tiêu đề (0–1), dùng để chọn đúng văn bản."""
+    tokens_a = {w for w in re.findall(r"\w+", a.lower()) if len(w) > 2}
+    tokens_b = {w for w in re.findall(r"\w+", b.lower()) if len(w) > 2}
+    if not tokens_a or not tokens_b:
+        return 0.0
+    return len(tokens_a & tokens_b) / min(len(tokens_a), len(tokens_b))
+
+
+def search_by_doc_num(doc_num: str, title_hint: str = "") -> dict[str, Any] | None:
     """
     Tra cứu một văn bản trên MOJ theo số hiệu.
 
     Dùng để bổ sung dữ liệu Bộ Tư pháp cho văn bản phát hiện từ TVPL nhưng nằm
-    ngoài cửa sổ quét. API `keyword` khớp mờ (vd. '40/2026/QĐ-UBND' trả 31 kết
-    quả của nhiều tỉnh khác nhau) nên chỉ nhận kết quả khớp chính xác số hiệu;
-    nếu còn nhiều hơn một ứng viên thì bỏ qua để tránh gán nhầm văn bản.
+    ngoài cửa sổ quét.
+
+    Số hiệu cấp tỉnh trùng nhau giữa các địa phương ('40/2026/QĐ-UBND' có 31 văn
+    bản khác nhau), nên khi có nhiều ứng viên thì dùng `title_hint` (tiêu đề từ
+    TVPL) để chọn: bản khớp nhất phải vượt ngưỡng và phải cách biệt rõ so với
+    bản nhì, nếu không thì bỏ qua còn hơn gán nhầm văn bản của tỉnh khác.
     """
     from src.pipeline.deduplicator import normalize_doc_num
 
@@ -317,24 +330,58 @@ def search_by_doc_num(doc_num: str) -> dict[str, Any] | None:
         return None
 
     try:
-        resp_json = fetch_doc_list(page=1, page_size=20, keyword=doc_num)
+        resp_json = fetch_doc_list(page=1, page_size=50, keyword=doc_num)
     except (httpx.HTTPStatusError, httpx.RequestError) as e:
         logger.warning("MOJ lookup failed for %s: %s", doc_num, e)
         return None
 
     target = normalize_doc_num(doc_num)
     matches = [
-        parse_doc_summary(item)
+        item
         for item in _extract_items(resp_json)
         if normalize_doc_num(str(item.get("docNum") or "")) == target
     ]
 
+    if not matches:
+        return None
     if len(matches) == 1:
-        return matches[0]
-    if len(matches) > 1:
+        return parse_doc_summary(matches[0])
+
+    if not title_hint:
         logger.info(
-            "MOJ lookup ambiguous for %s (%d matches), skipping", doc_num, len(matches)
+            "MOJ lookup ambiguous for %s (%d matches, không có tiêu đề đối chiếu)",
+            doc_num, len(matches),
         )
+        return None
+
+    scored = sorted(
+        (
+            (
+                _title_overlap(
+                    title_hint,
+                    f"{item.get('title', '')} {item.get('agencyName', '')}",
+                ),
+                item,
+            )
+            for item in matches
+        ),
+        key=lambda pair: pair[0],
+        reverse=True,
+    )
+    best_score, best = scored[0]
+    runner_up = scored[1][0]
+
+    if best_score >= 0.45 and best_score - runner_up >= 0.15:
+        logger.info(
+            "MOJ lookup %s: chọn bản của '%s' (khớp %.0f%% so với %.0f%%)",
+            doc_num, best.get("agencyName", "?"), best_score * 100, runner_up * 100,
+        )
+        return parse_doc_summary(best)
+
+    logger.info(
+        "MOJ lookup ambiguous for %s (%d matches, khớp cao nhất %.0f%% chưa đủ rõ)",
+        doc_num, len(matches), best_score * 100,
+    )
     return None
 
 
