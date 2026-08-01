@@ -110,13 +110,10 @@ def build_daily_digest(documents: list[dict[str, Any]]) -> str:
 
             # Cloud Drive links (Lark Drive / Google Drive)
             docx_link = doc.get("lark_docx_link") or doc.get("gdrive_docx_link")
-            pdf_link = doc.get("lark_pdf_link") or doc.get("gdrive_pdf_link")
             folder_url = doc.get("lark_folder_url")
             link_parts = []
             if docx_link:
                 link_parts.append(f"[📁 Tải .docx]({docx_link})")
-            if pdf_link:
-                link_parts.append(f"[📄 Xem PDF]({pdf_link})")
             if folder_url:
                 link_parts.append(f"[📂 Thư mục]({folder_url})")
 

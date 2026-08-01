@@ -62,21 +62,17 @@ class Document(Base):
 
     # File flags
     has_docx = Column(Boolean, default=False)
-    has_pdf = Column(Boolean, default=False)
     has_fulltext = Column(Boolean, default=False)
     has_chunks = Column(Boolean, default=False, comment="Đã tách Điều/Khoản")
     docx_path = Column(Text)
-    pdf_path = Column(Text)
     fulltext_path = Column(Text)
     clean_text_path = Column(Text, comment="Clean Markdown path")
     chunks_path = Column(Text, comment="Legal chunks JSON path")
 
     # Google Drive & Lark Drive links
     gdrive_docx_link = Column(Text)
-    gdrive_pdf_link = Column(Text)
     gdrive_folder_id = Column(String(100))
     lark_docx_link = Column(Text)
-    lark_pdf_link = Column(Text)
     lark_folder_token = Column(String(100))
 
 

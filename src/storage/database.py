@@ -45,7 +45,6 @@ def init_db() -> None:
         from sqlalchemy import text
         for col, col_type in [
             ("lark_docx_link", "TEXT"),
-            ("lark_pdf_link", "TEXT"),
             ("lark_folder_token", "VARCHAR(100)"),
             ("pub_date", "DATE"),
         ]:

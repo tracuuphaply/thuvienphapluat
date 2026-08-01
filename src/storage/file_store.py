@@ -2,7 +2,7 @@
 Local file storage manager.
 
 Handles saving files to organized local directories:
-  - data/tvpl/  → .docx/.pdf from TVPL
+  - data/tvpl/  → .docx from TVPL
   - data/moj/   → HTML fulltext + PDF from MOJ
   - data/snapshots/ → Raw JSON snapshots for diff/audit
 """
@@ -40,7 +40,7 @@ def save_document_metadata(doc_data: dict) -> str | None:
     """
     Lưu metadata hợp nhất của một văn bản (TVPL + Bộ Tư pháp) ra JSON.
 
-    File này được tải lên cùng thư mục với .docx/.pdf/toàn văn để mỗi thư mục
+    File này được tải lên cùng thư mục với .docx và toàn văn để mỗi thư mục
     văn bản là một hồ sơ đầy đủ, đọc được mà không cần truy cập database.
     """
     doc_num = str(doc_data.get("doc_num") or "").strip()

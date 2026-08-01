@@ -370,7 +370,7 @@ def run_pipeline(
 
                 enriched_docs.append(doc_data)
 
-            # ── Step 4b: Download .docx/.pdf from TVPL ──
+            # ── Step 4b: Download .docx from TVPL ──
             downloadable = [
                 d for d in enriched_docs if d.get("tvpl_url") and d.get("tvpl_id")
             ]
@@ -390,9 +390,6 @@ def run_pipeline(
                         if result.get("docx_path"):
                             doc_data["docx_path"] = result["docx_path"]
                             doc_data["has_docx"] = True
-                        if result.get("pdf_path"):
-                            doc_data["pdf_path"] = result["pdf_path"]
-                            doc_data["has_pdf"] = True
                         metrics["tvpl_downloaded"] += 1
                     logger.info(
                         "TVPL download: %d/%d documents có file",
@@ -475,10 +472,8 @@ def run_pipeline(
                             drive_result.get(key)
                             for key in (
                                 "lark_docx_link",
-                                "lark_pdf_link",
                                 "lark_fulltext_link",
                                 "gdrive_docx_link",
-                                "gdrive_pdf_link",
                             )
                         )
                         if uploaded_any:
@@ -489,29 +484,21 @@ def run_pipeline(
                             )
                             if existing:
                                 existing.gdrive_docx_link = drive_result.get("gdrive_docx_link")
-                                existing.gdrive_pdf_link = drive_result.get("gdrive_pdf_link")
                                 existing.gdrive_folder_id = drive_result.get("gdrive_folder_id")
                                 existing.lark_docx_link = drive_result.get("lark_docx_link")
-                                existing.lark_pdf_link = drive_result.get("lark_pdf_link")
                                 existing.lark_folder_token = drive_result.get("lark_folder_token")
                             metrics["gdrive_uploaded"] += 1
 
-                            # Auto-delete local docx/pdf files to save disk space
+                            # Xoá file .docx dưới data/ sau khi đã lên Drive.
+                            # Toàn văn và metadata giữ lại vì Phase 2 (RAG) cần.
                             if AUTO_CLEANUP_LOCAL_FILES:
                                 docx_p = doc_data.get("docx_path")
-                                pdf_p = doc_data.get("pdf_path")
                                 if docx_p and Path(docx_p).exists():
                                     try:
                                         Path(docx_p).unlink()
                                         logger.info("Cleaned up local file: %s", docx_p)
                                     except Exception as e:
                                         logger.warning("Failed to delete local temp file %s: %s", docx_p, e)
-                                if pdf_p and Path(pdf_p).exists():
-                                    try:
-                                        Path(pdf_p).unlink()
-                                        logger.info("Cleaned up local file: %s", pdf_p)
-                                    except Exception as e:
-                                        logger.warning("Failed to delete local temp file %s: %s", pdf_p, e)
 
                     except Exception as e:
                         logger.warning("Cloud Drive upload failed for %s: %s", doc_data.get("doc_num"), e)
@@ -613,10 +600,8 @@ def run_upload_only() -> dict[str, int]:
                 continue
 
             doc.lark_docx_link = result.get("lark_docx_link")
-            doc.lark_pdf_link = result.get("lark_pdf_link")
             doc.lark_folder_token = result.get("lark_folder_token")
             doc.gdrive_docx_link = result.get("gdrive_docx_link")
-            doc.gdrive_pdf_link = result.get("gdrive_pdf_link")
             metrics["gdrive_uploaded"] += 1
             session.commit()
 

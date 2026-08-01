@@ -6,7 +6,7 @@
 
 - **Quét tự động** từ 2 nguồn: Thư viện Pháp luật (TVPL) + Bộ Tư pháp (MOJ API)
 - **Lọc 10 lĩnh vực** doanh nghiệp: Doanh nghiệp, Đầu tư, Thương mại, Thuế, Lao động...
-- **Tải file biên tập** `.docx`/PDF từ TVPL (qua đăng nhập Playwright)
+- **Tải file biên tập** `.docx` từ TVPL (qua Google Chrome + CDP, xem HUONG_DAN §2.5)
 - **Lấy toàn văn + đồ thị quan hệ** từ MOJ API
 - **Upload Google Drive** tự động phân thư mục theo Lĩnh vực/Năm/Tháng
 - **Thông báo Telegram** hằng ngày kèm link Google Drive

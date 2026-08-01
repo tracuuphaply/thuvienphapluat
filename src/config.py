@@ -25,7 +25,7 @@ TVPL_PASSWORD = os.getenv("TVPL_PASSWORD", "")
 TVPL_RSS_URL = "https://thuvienphapluat.vn/rss.xml"
 TVPL_BASE_URL = "https://thuvienphapluat.vn"
 TVPL_RATE_LIMIT_SECONDS = float(os.getenv("TVPL_RATE_LIMIT_SECONDS", "7"))
-# Tải file .docx/.pdf từ TVPL bằng Playwright (cần TVPL_USERNAME/PASSWORD)
+# Tải file .docx từ TVPL bằng Playwright (cần TVPL_USERNAME/PASSWORD)
 TVPL_DOWNLOAD_ENABLED = os.getenv("TVPL_DOWNLOAD_ENABLED", "true").lower() in (
     "true", "1", "yes",
 )
@@ -86,7 +86,7 @@ LARK_FOLDER_PER_DOC = os.getenv("LARK_FOLDER_PER_DOC", "true").lower() in (
     "true", "1", "yes",
 )
 
-# Auto-delete local docx/pdf files after upload to save disk space
+# Auto-delete local .docx files after upload to save disk space
 AUTO_CLEANUP_LOCAL_FILES = os.getenv("AUTO_CLEANUP_LOCAL_FILES", "true").lower() in ("true", "1", "yes")
 
 

@@ -1,5 +1,5 @@
 """
-Tải bù file .docx/.pdf từ TVPL cho các văn bản đã có trong database.
+Tải bù file .docx từ TVPL cho các văn bản đã có trong database.
 
 Dùng khi những lần chạy trước không tải được file (bị Cloudflare chặn, chưa cấu
 hình Chrome, mất mạng…) nhưng metadata và toàn văn đã có sẵn.
@@ -81,9 +81,6 @@ def main() -> int:
             if result.get("docx_path"):
                 doc.docx_path = result["docx_path"]
                 doc.has_docx = True
-            if result.get("pdf_path"):
-                doc.pdf_path = result["pdf_path"]
-                doc.has_pdf = True
             downloaded += 1
             session.commit()
 
@@ -99,32 +96,24 @@ def main() -> int:
                 if doc.lark_folder_token:
                     # Văn bản đã có thư mục trên Drive — chỉ bổ sung file mới vào
                     # đúng thư mục đó, không tạo lại cây thư mục.
-                    base = str(doc.doc_num).replace("/", "_")
-                    for path, name in [
-                        (doc.docx_path, f"{base}.docx"),
-                        (doc.pdf_path, f"{base}.pdf"),
-                    ]:
-                        if path and Path(path).exists():
-                            link = client.upload_file(path, doc.lark_folder_token, name)
-                            if name.endswith(".docx"):
-                                doc.lark_docx_link = link["view_link"]
-                                doc.gdrive_docx_link = link["view_link"]
-                            else:
-                                doc.lark_pdf_link = link["view_link"]
-                                doc.gdrive_pdf_link = link["view_link"]
+                    name = str(doc.doc_num).replace("/", "_") + ".docx"
+                    if doc.docx_path and Path(doc.docx_path).exists():
+                        link = client.upload_file(
+                            doc.docx_path, doc.lark_folder_token, name
+                        )
+                        doc.lark_docx_link = link["view_link"]
+                        doc.gdrive_docx_link = link["view_link"]
                 else:
                     res = upload_document_files_lark(doc_data)
                     doc.lark_folder_token = res.get("lark_folder_token")
                     doc.lark_docx_link = res.get("lark_docx_link")
-                    doc.lark_pdf_link = res.get("lark_pdf_link")
 
                 uploaded += 1
                 session.commit()
 
-                if AUTO_CLEANUP_LOCAL_FILES:
-                    for path in (doc.docx_path, doc.pdf_path):
-                        if path and Path(path).exists():
-                            Path(path).unlink()
+                if AUTO_CLEANUP_LOCAL_FILES and doc.docx_path:
+                    if Path(doc.docx_path).exists():
+                        Path(doc.docx_path).unlink()
             except Exception as e:
                 logger.warning("Upload hỏng cho %s: %s", doc.doc_num, e)
 

@@ -58,7 +58,7 @@ Nhận thông báo văn bản mới hàng ngày trực tiếp vào nhóm Telegra
 ---
 
 ### 2.2. Tài khoản Thư viện Pháp luật (TVPL)
-Tài khoản này dùng để đăng nhập tự động và tải các file đính kèm biên tập dạng `.docx` / PDF từ trang `thuvienphapluat.vn`.
+Tài khoản này dùng để đăng nhập tự động và tải file biên tập `.docx` từ `thuvienphapluat.vn`. TVPL không phát hành bản PDF tải được nên hệ thống chỉ lấy `.docx` — bản này đã chứa đầy đủ nội dung văn bản.
 
 * **Yêu cầu:** Tài khoản TVPL trả phí (Pro/VIP) của công ty luật.
 * **Cần chuẩn bị:** `Email/Tên đăng nhập` + `Mật khẩu`.
@@ -66,7 +66,7 @@ Tài khoản này dùng để đăng nhập tự động và tải các file đ�
 ---
 
 ### 2.3. Google Drive API (Service Account Key)
-Dùng để tự động tải các file `.docx` và `.pdf` đã thu thập lên thư mục Google Drive của công ty và lấy đường link phân quyền xem trực tiếp.
+Dùng để tự động tải các file `.docx` đã thu thập lên thư mục Google Drive của công ty và lấy đường link phân quyền xem trực tiếp.
 
 1. **Tạo Google Cloud Project & Bật API:**
    * Truy cập [Google Cloud Console](https://console.cloud.google.com/).
@@ -139,7 +139,6 @@ Kho_Van_Ban_Phap_Luat/
         └── Thang_07/
             └── 292_2026_NĐ-CP/        ← số hiệu văn bản
                 ├── 292_2026_NĐ-CP.docx          (TVPL)
-                ├── 292_2026_NĐ-CP.pdf           (TVPL)
                 ├── 292_2026_NĐ-CP_BoTuPhap.md   (toàn văn Bộ Tư pháp, đã làm sạch)
                 ├── 292_2026_NĐ-CP_BoTuPhap.html (toàn văn gốc)
                 └── 292_2026_NĐ-CP_metadata.json (metadata hợp nhất 2 nguồn)

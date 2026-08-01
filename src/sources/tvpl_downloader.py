@@ -413,18 +413,19 @@ class TVPLDownloader:
         """
         Navigate to a document page and download the Vietnamese version.
 
+        Chỉ tải .docx: bản .docx đã chứa đầy đủ nội dung văn bản, còn TVPL không
+        phát hành bản PDF tải được kèm theo.
+
         Returns dict with file paths and success status:
           {
               "success": bool,
               "docx_path": str | None,
-              "pdf_path": str | None,
               "error": str | None,
           }
         """
         result = {
             "success": False,
             "docx_path": None,
-            "pdf_path": None,
             "error": None,
         }
 
@@ -458,14 +459,6 @@ class TVPLDownloader:
                 result["has_docx"] = True
                 result["success"] = True
                 logger.info("Downloaded .docx: %s", docx_path)
-
-            # Try to download PDF version
-            pdf_path = await self._try_download_pdf(doc_id)
-            if pdf_path:
-                result["pdf_path"] = str(pdf_path)
-                result["has_pdf"] = True
-                result["success"] = True
-                logger.info("Downloaded PDF: %s", pdf_path)
 
         except (TVPLBlockedError, TVPLQuotaError):
             raise
@@ -528,31 +521,6 @@ class TVPLDownloader:
             raise
         except Exception as e:
             logger.debug("Vietnamese download attempt failed: %s", e)
-
-        return None
-
-    async def _try_download_pdf(self, doc_id: str) -> Path | None:
-        """
-        Try to download the PDF version of the document.
-        TVPL embeds PDFs from files.thuvienphapluat.vn/uploads/FilePDFUpload/{id}.pdf
-        """
-        import httpx
-
-        pdf_url = f"https://files.thuvienphapluat.vn/uploads/FilePDFUpload/{doc_id}.pdf"
-        save_path = TVPL_FILES_DIR / f"{doc_id}.pdf"
-
-        try:
-            # Transfer cookies from Playwright to httpx for authenticated download
-            cookies = await self._context.cookies()
-            cookie_dict = {c["name"]: c["value"] for c in cookies}
-
-            async with httpx.AsyncClient(cookies=cookie_dict, follow_redirects=True) as client:
-                resp = await client.get(pdf_url)
-                if resp.status_code == 200 and len(resp.content) > 1000:
-                    save_path.write_bytes(resp.content)
-                    return save_path
-        except Exception as e:
-            logger.debug("PDF download attempt failed: %s", e)
 
         return None
 

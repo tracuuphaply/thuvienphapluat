@@ -5,7 +5,7 @@ Uses Lark OpenAPI to:
   - Obtain tenant_access_token using App ID & App Secret
   - Auto-discover root folder and tenant domain for correct URLs
   - Auto-create nested folder structure in Lark Drive: {field}/{year}/{month}
-  - Upload .docx/.pdf files using Lark Drive upload_all API
+  - Upload .docx and fulltext files using Lark Drive upload_all API
   - Set public/tenant view permissions
   - Return clickable view links for Telegram notifications
 """
@@ -347,8 +347,8 @@ class LarkDriveClient:
         Build or get nested folder token:
             Root / {Lĩnh vực} / {Năm} / {Tháng} / {Số hiệu VB}
 
-        Thư mục con theo số hiệu gom mọi nguồn của cùng một văn bản (file .docx/
-        .pdf tải từ TVPL và toàn văn + metadata từ Bộ Tư pháp) vào một chỗ.
+        Thư mục con theo số hiệu gom mọi nguồn của cùng một văn bản (file .docx
+        tải từ TVPL và toàn văn + metadata từ Bộ Tư pháp) vào một chỗ.
 
         `fallback_date` (ngày đăng RSS / ngày thu thập) dùng khi chưa biết ngày
         ban hành — văn bản chỉ có trên TVPL không có ngày ban hành, xếp hết vào
@@ -508,30 +508,26 @@ def upload_document_files_lark(doc_data: dict[str, Any]) -> dict[str, Any]:
     Đẩy toàn bộ dữ liệu của một văn bản lên Lark Drive.
 
     Mỗi văn bản có một thư mục riêng chứa dữ liệu của cả hai nguồn:
-      - TVPL:       <số hiệu>.docx, <số hiệu>.pdf
+      - TVPL:       <số hiệu>.docx
       - Bộ Tư pháp: <số hiệu>_BoTuPhap.md (toàn văn đã làm sạch),
                     <số hiệu>_BoTuPhap.html (toàn văn gốc)
 
     Returns dict matching document link fields:
       {
           "lark_docx_link": str | None,
-          "lark_pdf_link": str | None,
           "lark_fulltext_link": str | None,   # toàn văn từ Bộ Tư pháp
           "lark_folder_token": str | None,
           "lark_folder_url": str | None,      # clickable URL to the storage folder
           "gdrive_docx_link": str | None,     # for backward compatibility
-          "gdrive_pdf_link": str | None,      # for backward compatibility
       }
     """
     client = get_lark_client()
     result: dict[str, Any] = {
         "lark_docx_link": None,
-        "lark_pdf_link": None,
         "lark_fulltext_link": None,
         "lark_folder_token": None,
         "lark_folder_url": None,
         "gdrive_docx_link": None,
-        "gdrive_pdf_link": None,
     }
 
     doc_num = str(doc_data.get("doc_num") or "")
@@ -540,7 +536,6 @@ def upload_document_files_lark(doc_data: dict[str, Any]) -> dict[str, Any]:
     # (khoá kết quả, đường dẫn local, tên hiển thị trên Lark)
     uploads = [
         ("lark_docx_link", doc_data.get("docx_path"), f"{base}.docx"),
-        ("lark_pdf_link", doc_data.get("pdf_path"), f"{base}.pdf"),
         ("lark_fulltext_link", doc_data.get("clean_text_path"), f"{base}_BoTuPhap.md"),
         (None, doc_data.get("fulltext_path"), f"{base}_BoTuPhap.html"),
         (None, doc_data.get("metadata_path"), f"{base}_metadata.json"),
@@ -575,7 +570,6 @@ def upload_document_files_lark(doc_data: dict[str, Any]) -> dict[str, Any]:
 
         # Giữ tương thích ngược với các cột gdrive_* đang dùng ở nơi khác
         result["gdrive_docx_link"] = result["lark_docx_link"]
-        result["gdrive_pdf_link"] = result["lark_pdf_link"]
 
     except Exception as e:
         logger.error("Lark Drive upload error for %s: %s", doc_data.get("doc_num"), e)
