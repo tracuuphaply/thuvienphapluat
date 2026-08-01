@@ -155,13 +155,92 @@ Hệ quả: **không có file `.docx`/`.pdf` từ TVPL** trừ khi cung cấp co
 Toàn văn văn bản vẫn có đầy đủ từ **API Bộ Tư pháp** (`_BoTuPhap.md` / `.html`),
 nên hệ thống vẫn chạy trọn vẹn khi thiếu file TVPL.
 
-Nếu cần file gốc từ TVPL:
-1. Đăng nhập thuvienphapluat.vn bằng trình duyệt **trên chính máy chạy pipeline**.
-2. Dùng extension xuất cookie (VD *EditThisCookie*) → xuất toàn bộ cookie của
-   `thuvienphapluat.vn` ra định dạng JSON.
-3. Lưu vào `data/tvpl_cookies.json` — pipeline sẽ tự nạp ở lần chạy sau.
-4. Cookie `cf_clearance` gắn với **IP + User-Agent**, nên hết hạn sau vài giờ đến
-   vài ngày; cần xuất lại khi log báo `Cloudflare đang chặn truy cập tự động`.
+Nếu cần file gốc từ TVPL, phải cung cấp cookie của một phiên duyệt web thật:
+
+#### Bước 1 — Đăng nhập bằng trình duyệt
+
+Mở Chrome/Edge **trên chính máy sẽ chạy pipeline**, vào
+[thuvienphapluat.vn](https://thuvienphapluat.vn), đăng nhập tài khoản trong `.env`
+(`TVPL_USERNAME`).
+
+Mở thử một trang văn bản bất kỳ và bấm **Tải Văn bản tiếng Việt** để chắc chắn
+tài khoản tải được file. Nếu trình duyệt thật cũng không tải được thì cookie
+không cứu được — vấn đề nằm ở tài khoản chứ không phải Cloudflare.
+
+#### Bước 2 — Cài extension xuất cookie
+
+Dùng **Cookie-Editor** (khuyến nghị — còn hoạt động trên Chrome/Edge/Firefox):
+[Chrome Web Store](https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm)
+
+> *EditThisCookie* viết theo Manifest V2 nên đã bị Chrome ngừng hỗ trợ; nếu bạn
+> vẫn còn cài được thì dùng cũng được, định dạng xuất ra tương đương.
+
+#### Bước 3 — Xuất cookie
+
+1. Đang mở tab `thuvienphapluat.vn` (bắt buộc — extension chỉ xuất cookie của
+   tên miền đang mở).
+2. Bấm biểu tượng Cookie-Editor trên thanh công cụ.
+3. Bấm nút **Export** (góc dưới bên phải) → chọn **JSON**.
+4. Nội dung đã được copy vào clipboard.
+
+#### Bước 4 — Lưu file
+
+Tạo file `data/tvpl_cookies.json` trong thư mục dự án và dán nội dung vừa copy vào.
+
+* **Windows:** mở Notepad → dán → *Save As* → chọn đúng thư mục `data`, đặt tên
+  `tvpl_cookies.json`, mục *Save as type* chọn **All Files** (nếu để *Text
+  Documents* Notepad sẽ tự thêm đuôi `.txt` và pipeline không đọc được).
+* **macOS/Linux:** `pbpaste > data/tvpl_cookies.json`
+
+Nội dung đúng trông như thế này (một mảng JSON):
+
+```json
+[
+  {
+    "domain": ".thuvienphapluat.vn",
+    "expirationDate": 1785600000.5,
+    "httpOnly": false,
+    "name": "cf_clearance",
+    "path": "/",
+    "sameSite": "no_restriction",
+    "secure": true,
+    "value": "abc123..."
+  }
+]
+```
+
+Không cần chỉnh sửa gì thêm — pipeline tự chuyển đổi định dạng của extension
+(`expirationDate` → `expires`, `no_restriction` → `None`) sang định dạng
+Playwright yêu cầu.
+
+#### Bước 5 — Kiểm tra
+
+Chạy thử một văn bản:
+
+```bash
+python -m src.main --limit 1
+```
+
+Trong log tìm dòng:
+
+```
+Loaded 12 TVPL cookies from .../data/tvpl_cookies.json (cf_clearance: có)
+```
+
+* `cf_clearance: có` + có dòng `Downloaded .docx` → thành công.
+* `cf_clearance: KHÔNG` → xuất lại cookie khi đang mở đúng tab TVPL. Đây là
+  cookie Cloudflare cấp sau khi vượt thử thách; thiếu nó thì chắc chắn vẫn bị chặn.
+
+#### Lưu ý vận hành
+
+* Cookie `cf_clearance` gắn với **IP + User-Agent** của phiên đã vượt thử thách.
+  Đổi mạng (Wi-Fi sang 4G, VPN bật/tắt) là mất hiệu lực ngay.
+* Hạn dùng thường **vài giờ đến vài ngày**. Khi log báo
+  `Cloudflare đang chặn truy cập tự động` thì lặp lại bước 3–4.
+* File này chứa phiên đăng nhập của bạn — đã được `.gitignore` loại trừ, **không
+  gửi qua chat/email** cho người khác.
+* Vì phải làm thủ công định kỳ, nếu không thực sự cần file `.docx` gốc thì nên
+  đặt `TVPL_DOWNLOAD_ENABLED=false` và dùng toàn văn từ Bộ Tư pháp.
 
 Không cần file TVPL thì tắt hẳn để tiết kiệm thời gian chạy:
 ```

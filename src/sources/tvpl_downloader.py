@@ -61,6 +61,52 @@ class TVPLBlockedError(RuntimeError):
     """Cloudflare chặn truy cập tự động — không văn bản nào tải được."""
 
 
+# Ánh xạ sameSite từ định dạng extension sang định dạng Playwright
+_SAME_SITE_MAP = {
+    "no_restriction": "None",
+    "unspecified": "Lax",
+    "lax": "Lax",
+    "strict": "Strict",
+    "none": "None",
+}
+
+
+def normalize_cookies(raw: list[dict]) -> list[dict[str, Any]]:
+    """
+    Chuẩn hoá cookie xuất từ extension trình duyệt về định dạng Playwright.
+
+    Cookie-Editor / EditThisCookie dùng `expirationDate` (float) và
+    `sameSite: "no_restriction"`, còn Playwright cần `expires` và
+    `sameSite: "None"` — nạp thẳng file xuất ra sẽ bị từ chối. Các khoá thừa
+    (`hostOnly`, `session`, `storeId`, `id`) cũng phải loại bỏ.
+    """
+    cookies: list[dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, dict) or not item.get("name"):
+            continue
+
+        cookie: dict[str, Any] = {
+            "name": item["name"],
+            "value": str(item.get("value", "")),
+            "domain": item.get("domain") or ".thuvienphapluat.vn",
+            "path": item.get("path") or "/",
+            "httpOnly": bool(item.get("httpOnly", False)),
+            "secure": bool(item.get("secure", False)),
+        }
+
+        expires = item.get("expires", item.get("expirationDate"))
+        # Cookie phiên (không có hạn) dùng -1 theo quy ước của Playwright
+        cookie["expires"] = float(expires) if expires else -1
+
+        same_site = _SAME_SITE_MAP.get(str(item.get("sameSite", "")).lower())
+        if same_site:
+            cookie["sameSite"] = same_site
+
+        cookies.append(cookie)
+
+    return cookies
+
+
 class TVPLDownloader:
     """Manages a Playwright browser session for TVPL downloads."""
 
@@ -109,9 +155,19 @@ class TVPLDownloader:
             try:
                 import json
 
-                cookies = json.loads(COOKIES_PATH.read_text(encoding="utf-8"))
+                raw = json.loads(COOKIES_PATH.read_text(encoding="utf-8"))
+                if isinstance(raw, dict):
+                    raw = raw.get("cookies", [])
+                cookies = normalize_cookies(raw)
                 await self._context.add_cookies(cookies)
-                logger.info("Loaded %d TVPL cookies from %s", len(cookies), COOKIES_PATH)
+
+                has_clearance = any(c["name"] == "cf_clearance" for c in cookies)
+                logger.info(
+                    "Loaded %d TVPL cookies from %s (cf_clearance: %s)",
+                    len(cookies),
+                    COOKIES_PATH,
+                    "có" if has_clearance else "KHÔNG — nhiều khả năng vẫn bị chặn",
+                )
             except Exception as e:
                 logger.warning("Failed to load TVPL cookies: %s", e)
 
