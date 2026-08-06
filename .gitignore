@@ -53,3 +53,6 @@ Legal-Vault/
 
 # Allowlist quyền theo máy, không chia sẻ được
 .claude/settings.local.json
+
+# Thông tin thương hiệu riêng của từng người dùng
+report_branding.json

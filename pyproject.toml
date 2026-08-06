@@ -15,12 +15,20 @@ dependencies = [
     "google-auth>=2.35",
     "python-dotenv>=1.0",
     "structlog>=24.0",
+    # Kết xuất báo cáo PDF — pdf_exporter và report_pdf phụ thuộc trực tiếp,
+    # thiếu là vỡ ngay khi sinh báo cáo.
+    "reportlab>=4.0",
+    # Vẽ biểu đồ nhúng vào báo cáo (report_theme)
+    "matplotlib>=3.8",
+    # Tìm kiếm vector trong SQLite; thiếu thì hybrid search thoái hoá về BM25
+    "sqlite-vec>=0.1.6",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
+    "pyyaml>=6.0",              # kiểm tra frontmatter YAML của vault trong test
 ]
 
 [build-system]

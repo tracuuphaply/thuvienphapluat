@@ -1,0 +1,428 @@
+<?xml version='1.0' encoding='utf-8'?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_TheoDoiVanBanPhapLuat" targetNamespace="https://thongtincty.com/bpmn" exporter="thuvienphapluat/scripts/generate_bpmn.py" exporterVersion="1.0">
+  <bpmn:collaboration id="Collab_1">
+    <bpmn:participant id="Pool_HeThong" name="Hệ thống theo dõi văn bản pháp luật" processRef="Process_1" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_1" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="Lane_ThuThap" name="Thu thập văn bản">
+        <bpmn:flowNodeRef>Start_HangNgay</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Khoa</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_Quet_Split</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_QuetTVPL</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_QuetMOJ</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_Quet_Join</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_CoVanBan</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_NguonChet</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_XuLy" name="Xử lý &amp; lưu trữ">
+        <bpmn:flowNodeRef>Task_GopTrung</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_NapChiTiet</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_LamSach</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_LuuDB</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_CoSuKien</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_TruyXuat" name="Truy xuất &amp; sinh báo cáo">
+        <bpmn:flowNodeRef>Task_DongBo</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Nhung</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_TruyXuat</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_LocHieuLuc</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_SinhBaoCao</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_DoiChieu</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_TrichDan</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_ChanBaoCao</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_PhatHanh" name="Phát hành &amp; vận hành">
+        <bpmn:flowNodeRef>Task_XuatPDF</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ThongBao</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_SaoLuu</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_HoanTat</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_HangNgay" name="Đến giờ chạy hằng ngày&#10;(launchd 06:00)">
+      <bpmn:outgoing>f01</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="Task_Khoa" name="Lấy khoá chống chạy chồng">
+      <bpmn:incoming>f01</bpmn:incoming>
+      <bpmn:outgoing>f02</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:parallelGateway id="GW_Quet_Split">
+      <bpmn:incoming>f02</bpmn:incoming>
+      <bpmn:outgoing>f03</bpmn:outgoing>
+      <bpmn:outgoing>f04</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:task id="Task_QuetTVPL" name="Quét RSS Thư viện pháp luật">
+      <bpmn:incoming>f03</bpmn:incoming>
+      <bpmn:outgoing>f05</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:serviceTask id="Task_QuetMOJ" name="Gọi API Bộ Tư pháp&#10;(quét theo cửa sổ ngày)">
+      <bpmn:incoming>f04</bpmn:incoming>
+      <bpmn:outgoing>f06</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:parallelGateway id="GW_Quet_Join">
+      <bpmn:incoming>f05</bpmn:incoming>
+      <bpmn:incoming>f06</bpmn:incoming>
+      <bpmn:outgoing>f07</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:exclusiveGateway id="GW_CoVanBan" name="Có văn bản&#10;nào không?">
+      <bpmn:incoming>f07</bpmn:incoming>
+      <bpmn:outgoing>f08</bpmn:outgoing>
+      <bpmn:outgoing>f09</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="End_NguonChet" name="Ghi FAILED&#10;+ gửi cảnh báo">
+      <bpmn:incoming>f08</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:task id="Task_GopTrung" name="Gộp &amp; khử trùng&#10;theo doc_key">
+      <bpmn:incoming>f09</bpmn:incoming>
+      <bpmn:outgoing>f10</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:serviceTask id="Task_NapChiTiet" name="Nạp chi tiết + quan hệ&#10;từ Bộ Tư pháp">
+      <bpmn:incoming>f10</bpmn:incoming>
+      <bpmn:outgoing>f11</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:task id="Task_LamSach" name="Làm sạch, tách Điều/Khoản">
+      <bpmn:incoming>f11</bpmn:incoming>
+      <bpmn:outgoing>f12</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_LuuDB" name="Ghi CSDL, cập nhật&#10;lịch sử hiệu lực">
+      <bpmn:incoming>f12</bpmn:incoming>
+      <bpmn:outgoing>f13</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:exclusiveGateway id="GW_CoSuKien" name="Có sự kiện&#10;A / B / C?">
+      <bpmn:incoming>f13</bpmn:incoming>
+      <bpmn:outgoing>f14</bpmn:outgoing>
+      <bpmn:outgoing>f26</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:task id="Task_DongBo" name="Đồng bộ vault Obsidian&#10;+ chỉ mục RAG">
+      <bpmn:incoming>f14</bpmn:incoming>
+      <bpmn:outgoing>f15</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:serviceTask id="Task_Nhung" name="Nhúng vector các đoạn mới">
+      <bpmn:incoming>f15</bpmn:incoming>
+      <bpmn:outgoing>f16</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:task id="Task_TruyXuat" name="Truy xuất theo ngành VSIC&#10;(BM25 + vector)">
+      <bpmn:incoming>f16</bpmn:incoming>
+      <bpmn:outgoing>f17</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:businessRuleTask id="Task_LocHieuLuc" name="Loại văn bản hết hiệu lực,&#10;gắn cảnh báo">
+      <bpmn:incoming>f17</bpmn:incoming>
+      <bpmn:outgoing>f18</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:serviceTask id="Task_SinhBaoCao" name="Sinh báo cáo qua API v98">
+      <bpmn:incoming>f18</bpmn:incoming>
+      <bpmn:outgoing>f19</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:businessRuleTask id="Task_DoiChieu" name="Đối chiếu số hiệu&#10;với cơ sở dữ liệu">
+      <bpmn:incoming>f19</bpmn:incoming>
+      <bpmn:outgoing>f20</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:exclusiveGateway id="GW_TrichDan" name="Trích dẫn&#10;hợp lệ?">
+      <bpmn:incoming>f20</bpmn:incoming>
+      <bpmn:outgoing>f21</bpmn:outgoing>
+      <bpmn:outgoing>f22</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="End_ChanBaoCao" name="Chặn xuất bản,&#10;ghi số hiệu lạ">
+      <bpmn:incoming>f21</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:task id="Task_XuatPDF" name="Xuất PDF theo mẫu&#10;thương hiệu">
+      <bpmn:incoming>f22</bpmn:incoming>
+      <bpmn:outgoing>f23</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:sendTask id="Task_ThongBao" name="Gửi bản tin Telegram">
+      <bpmn:incoming>f23</bpmn:incoming>
+      <bpmn:outgoing>f24</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:task id="Task_SaoLuu" name="Sao lưu CSDL &amp; sản phẩm">
+      <bpmn:incoming>f24</bpmn:incoming>
+      <bpmn:incoming>f26</bpmn:incoming>
+      <bpmn:outgoing>f25</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:endEvent id="End_HoanTat" name="Hoàn tất lượt chạy">
+      <bpmn:incoming>f25</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="f01" sourceRef="Start_HangNgay" targetRef="Task_Khoa" />
+    <bpmn:sequenceFlow id="f02" sourceRef="Task_Khoa" targetRef="GW_Quet_Split" />
+    <bpmn:sequenceFlow id="f03" sourceRef="GW_Quet_Split" targetRef="Task_QuetTVPL" />
+    <bpmn:sequenceFlow id="f04" sourceRef="GW_Quet_Split" targetRef="Task_QuetMOJ" />
+    <bpmn:sequenceFlow id="f05" sourceRef="Task_QuetTVPL" targetRef="GW_Quet_Join" />
+    <bpmn:sequenceFlow id="f06" sourceRef="Task_QuetMOJ" targetRef="GW_Quet_Join" />
+    <bpmn:sequenceFlow id="f07" sourceRef="GW_Quet_Join" targetRef="GW_CoVanBan" />
+    <bpmn:sequenceFlow id="f08" sourceRef="GW_CoVanBan" targetRef="End_NguonChet" name="Không — nghi mất nguồn" />
+    <bpmn:sequenceFlow id="f09" sourceRef="GW_CoVanBan" targetRef="Task_GopTrung" name="Có" />
+    <bpmn:sequenceFlow id="f10" sourceRef="Task_GopTrung" targetRef="Task_NapChiTiet" />
+    <bpmn:sequenceFlow id="f11" sourceRef="Task_NapChiTiet" targetRef="Task_LamSach" />
+    <bpmn:sequenceFlow id="f12" sourceRef="Task_LamSach" targetRef="Task_LuuDB" />
+    <bpmn:sequenceFlow id="f13" sourceRef="Task_LuuDB" targetRef="GW_CoSuKien" />
+    <bpmn:sequenceFlow id="f14" sourceRef="GW_CoSuKien" targetRef="Task_DongBo" name="Có" />
+    <bpmn:sequenceFlow id="f15" sourceRef="Task_DongBo" targetRef="Task_Nhung" />
+    <bpmn:sequenceFlow id="f16" sourceRef="Task_Nhung" targetRef="Task_TruyXuat" />
+    <bpmn:sequenceFlow id="f17" sourceRef="Task_TruyXuat" targetRef="Task_LocHieuLuc" />
+    <bpmn:sequenceFlow id="f18" sourceRef="Task_LocHieuLuc" targetRef="Task_SinhBaoCao" />
+    <bpmn:sequenceFlow id="f19" sourceRef="Task_SinhBaoCao" targetRef="Task_DoiChieu" />
+    <bpmn:sequenceFlow id="f20" sourceRef="Task_DoiChieu" targetRef="GW_TrichDan" />
+    <bpmn:sequenceFlow id="f21" sourceRef="GW_TrichDan" targetRef="End_ChanBaoCao" name="Không" />
+    <bpmn:sequenceFlow id="f22" sourceRef="GW_TrichDan" targetRef="Task_XuatPDF" name="Có" />
+    <bpmn:sequenceFlow id="f23" sourceRef="Task_XuatPDF" targetRef="Task_ThongBao" />
+    <bpmn:sequenceFlow id="f24" sourceRef="Task_ThongBao" targetRef="Task_SaoLuu" />
+    <bpmn:sequenceFlow id="f25" sourceRef="Task_SaoLuu" targetRef="End_HoanTat" />
+    <bpmn:sequenceFlow id="f26" sourceRef="GW_CoSuKien" targetRef="Task_SaoLuu" name="Không có gì mới" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_1">
+    <bpmndi:BPMNPlane id="Plane_1" bpmnElement="Collab_1">
+      <bpmndi:BPMNShape id="Shape_Pool" bpmnElement="Pool_HeThong" isHorizontal="true">
+        <dc:Bounds x="160" y="80" width="3700" height="920" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_ThuThap" bpmnElement="Lane_ThuThap" isHorizontal="true">
+        <dc:Bounds x="190" y="80" width="3670" height="300" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_XuLy" bpmnElement="Lane_XuLy" isHorizontal="true">
+        <dc:Bounds x="190" y="380" width="3670" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_TruyXuat" bpmnElement="Lane_TruyXuat" isHorizontal="true">
+        <dc:Bounds x="190" y="580" width="3670" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_PhatHanh" bpmnElement="Lane_PhatHanh" isHorizontal="true">
+        <dc:Bounds x="190" y="800" width="3670" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Start_HangNgay" bpmnElement="Start_HangNgay">
+        <dc:Bounds x="230" y="142" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="190" y="182" width="116" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_Khoa" bpmnElement="Task_Khoa">
+        <dc:Bounds x="320" y="120" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_GW_Quet_Split" bpmnElement="GW_Quet_Split">
+        <dc:Bounds x="520" y="135" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_QuetTVPL" bpmnElement="Task_QuetTVPL">
+        <dc:Bounds x="620" y="80" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_QuetMOJ" bpmnElement="Task_QuetMOJ">
+        <dc:Bounds x="620" y="200" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_GW_Quet_Join" bpmnElement="GW_Quet_Join">
+        <dc:Bounds x="830" y="135" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_GW_CoVanBan" bpmnElement="GW_CoVanBan">
+        <dc:Bounds x="930" y="135" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="890" y="189" width="130" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_End_NguonChet" bpmnElement="End_NguonChet">
+        <dc:Bounds x="1010" y="272" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="970" y="312" width="116" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_GopTrung" bpmnElement="Task_GopTrung">
+        <dc:Bounds x="1030" y="440" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_NapChiTiet" bpmnElement="Task_NapChiTiet">
+        <dc:Bounds x="1220" y="440" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_LamSach" bpmnElement="Task_LamSach">
+        <dc:Bounds x="1410" y="440" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_LuuDB" bpmnElement="Task_LuuDB">
+        <dc:Bounds x="1600" y="440" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_GW_CoSuKien" bpmnElement="GW_CoSuKien">
+        <dc:Bounds x="1810" y="455" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1770" y="509" width="130" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_DongBo" bpmnElement="Task_DongBo">
+        <dc:Bounds x="1900" y="650" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_Nhung" bpmnElement="Task_Nhung">
+        <dc:Bounds x="2090" y="650" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_TruyXuat" bpmnElement="Task_TruyXuat">
+        <dc:Bounds x="2280" y="650" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_LocHieuLuc" bpmnElement="Task_LocHieuLuc">
+        <dc:Bounds x="2470" y="650" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_SinhBaoCao" bpmnElement="Task_SinhBaoCao">
+        <dc:Bounds x="2660" y="650" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_DoiChieu" bpmnElement="Task_DoiChieu">
+        <dc:Bounds x="2850" y="650" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_GW_TrichDan" bpmnElement="GW_TrichDan">
+        <dc:Bounds x="3060" y="665" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3020" y="719" width="130" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_End_ChanBaoCao" bpmnElement="End_ChanBaoCao">
+        <dc:Bounds x="3150" y="742" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3110" y="782" width="116" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_XuatPDF" bpmnElement="Task_XuatPDF">
+        <dc:Bounds x="3160" y="860" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_ThongBao" bpmnElement="Task_ThongBao">
+        <dc:Bounds x="3350" y="860" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_SaoLuu" bpmnElement="Task_SaoLuu">
+        <dc:Bounds x="3540" y="860" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_End_HoanTat" bpmnElement="End_HoanTat">
+        <dc:Bounds x="3760" y="882" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3720" y="922" width="116" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Edge_f01" bpmnElement="f01">
+        <di:waypoint x="266" y="160" />
+        <di:waypoint x="320" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f02" bpmnElement="f02">
+        <di:waypoint x="470" y="160" />
+        <di:waypoint x="520" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f03" bpmnElement="f03">
+        <di:waypoint x="570" y="160" />
+        <di:waypoint x="595" y="160" />
+        <di:waypoint x="595" y="120" />
+        <di:waypoint x="620" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f04" bpmnElement="f04">
+        <di:waypoint x="570" y="160" />
+        <di:waypoint x="595" y="160" />
+        <di:waypoint x="595" y="240" />
+        <di:waypoint x="620" y="240" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f05" bpmnElement="f05">
+        <di:waypoint x="770" y="120" />
+        <di:waypoint x="800" y="120" />
+        <di:waypoint x="800" y="160" />
+        <di:waypoint x="830" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f06" bpmnElement="f06">
+        <di:waypoint x="770" y="240" />
+        <di:waypoint x="800" y="240" />
+        <di:waypoint x="800" y="160" />
+        <di:waypoint x="830" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f07" bpmnElement="f07">
+        <di:waypoint x="880" y="160" />
+        <di:waypoint x="930" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f08" bpmnElement="f08">
+        <di:waypoint x="980" y="160" />
+        <di:waypoint x="1000" y="160" />
+        <di:waypoint x="1000" y="290" />
+        <di:waypoint x="1010" y="290" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="940" y="264" width="120" height="24" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f09" bpmnElement="f09">
+        <di:waypoint x="980" y="160" />
+        <di:waypoint x="1005" y="160" />
+        <di:waypoint x="1005" y="480" />
+        <di:waypoint x="1030" y="480" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="945" y="454" width="120" height="24" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f10" bpmnElement="f10">
+        <di:waypoint x="1180" y="480" />
+        <di:waypoint x="1220" y="480" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f11" bpmnElement="f11">
+        <di:waypoint x="1370" y="480" />
+        <di:waypoint x="1410" y="480" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f12" bpmnElement="f12">
+        <di:waypoint x="1560" y="480" />
+        <di:waypoint x="1600" y="480" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f13" bpmnElement="f13">
+        <di:waypoint x="1750" y="480" />
+        <di:waypoint x="1810" y="480" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f14" bpmnElement="f14">
+        <di:waypoint x="1860" y="480" />
+        <di:waypoint x="1880" y="480" />
+        <di:waypoint x="1880" y="690" />
+        <di:waypoint x="1900" y="690" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1820" y="664" width="120" height="24" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f15" bpmnElement="f15">
+        <di:waypoint x="2050" y="690" />
+        <di:waypoint x="2090" y="690" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f16" bpmnElement="f16">
+        <di:waypoint x="2240" y="690" />
+        <di:waypoint x="2280" y="690" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f17" bpmnElement="f17">
+        <di:waypoint x="2430" y="690" />
+        <di:waypoint x="2470" y="690" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f18" bpmnElement="f18">
+        <di:waypoint x="2620" y="690" />
+        <di:waypoint x="2660" y="690" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f19" bpmnElement="f19">
+        <di:waypoint x="2810" y="690" />
+        <di:waypoint x="2850" y="690" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f20" bpmnElement="f20">
+        <di:waypoint x="3000" y="690" />
+        <di:waypoint x="3060" y="690" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f21" bpmnElement="f21">
+        <di:waypoint x="3110" y="690" />
+        <di:waypoint x="3130" y="690" />
+        <di:waypoint x="3130" y="760" />
+        <di:waypoint x="3150" y="760" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3070" y="734" width="120" height="24" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f22" bpmnElement="f22">
+        <di:waypoint x="3110" y="690" />
+        <di:waypoint x="3135" y="690" />
+        <di:waypoint x="3135" y="900" />
+        <di:waypoint x="3160" y="900" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3075" y="874" width="120" height="24" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f23" bpmnElement="f23">
+        <di:waypoint x="3310" y="900" />
+        <di:waypoint x="3350" y="900" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f24" bpmnElement="f24">
+        <di:waypoint x="3500" y="900" />
+        <di:waypoint x="3540" y="900" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f25" bpmnElement="f25">
+        <di:waypoint x="3690" y="900" />
+        <di:waypoint x="3760" y="900" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_f26" bpmnElement="f26">
+        <di:waypoint x="1860" y="480" />
+        <di:waypoint x="2700" y="480" />
+        <di:waypoint x="2700" y="900" />
+        <di:waypoint x="3540" y="900" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2640" y="874" width="120" height="24" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

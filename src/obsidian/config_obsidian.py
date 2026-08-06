@@ -6,19 +6,10 @@ from src.config import PROJECT_ROOT
 
 VAULT_DIR = PROJECT_ROOT / "Legal-Vault"
 
-INDUSTRY_MAP = {
-    "Công nghệ thông tin": ["phần mềm", "công nghệ thông tin", "mạng", "viễn thông", "internet", "dữ liệu", "chữ ký số"],
-    "Xây dựng & Bất động sản": ["xây dựng", "bất động sản", "nhà ở", "đất đai", "quy hoạch", "kiến trúc"],
-    "Y tế & Dược phẩm": ["y tế", "dược", "khám bệnh", "chữa bệnh", "thuốc", "bệnh viện"],
-    "Tài chính & Ngân hàng": ["tài chính", "ngân hàng", "tín dụng", "ngân quỹ", "cho vay", "tiền tệ"],
-    "Giáo dục & Đào tạo": ["giáo dục", "đào tạo", "trường học", "giáo viên", "học sinh", "sinh viên", "đại học"],
-    "Nông nghiệp & Thủy sản": ["nông nghiệp", "thủy sản", "trồng trọt", "chăn nuôi", "lâm nghiệp", "nông thôn"],
-    "Giao thông & Vận tải": ["giao thông", "vận tải", "đường bộ", "đường sắt", "hàng không", "hàng hải", "đường thủy"],
-    "Năng lượng & Môi trường": ["năng lượng", "môi trường", "điện", "khí", "nước", "chất thải", "khoáng sản"],
-    "Sản xuất & Gia công": ["sản xuất", "gia công", "nhà máy", "công nghiệp", "chế biến"],
-    "Thương mại & Dịch vụ": ["thương mại", "dịch vụ", "bán lẻ", "xuất nhập khẩu", "phân phối", "quảng cáo"],
-}
-
+# Danh mục ngành theo Hệ thống ngành kinh tế Việt Nam (VSIC) cấp 1 — Quyết định
+# 27/2018/QĐ-TTg. Thay cho 10 nhóm ngành tự đặt trước đây, để báo cáo dùng đúng
+# mã ngành ghi trên giấy đăng ký kinh doanh của doanh nghiệp.
+from src.obsidian.vsic import INDUSTRY_MAP, VSIC_LEVEL1, code_of, official_name  # noqa: F401
 OBSIDIAN_TEMPLATE = """---
 doc_num: "{doc_num}"
 title: "{title}"

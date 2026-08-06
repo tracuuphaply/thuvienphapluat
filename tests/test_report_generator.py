@@ -24,13 +24,14 @@ class TestLoadSystemPrompt:
 
     def test_mau_prompt_co_du_cac_muc_bat_buoc(self):
         prompt = rg.load_system_prompt()
-        for muc in ("CẤU TRÚC BÁO CÁO BẮT BUỘC", "QUY TẮC TRÍCH DẪN", "ĐIỀU CẤM"):
+        for muc in ("CẤU TRÚC BẮT BUỘC", "QUY ƯỚC MARKDOWN", "ĐIỀU CẤM"):
             assert muc in prompt, f"thiếu mục {muc}"
 
     def test_thieu_mau_thi_bao_loi_chu_khong_im_lang(self, tmp_path, monkeypatch):
         """Sinh báo cáo bằng prompt rút gọn mà không báo gì là tệ hơn thất bại."""
         monkeypatch.setenv("REPORT_PROMPT_PATH", str(tmp_path / "khong-ton-tai.md"))
         monkeypatch.setattr(rg, "REPO_PROMPT_PATH", tmp_path / "cung-khong-co.md")
+        monkeypatch.setattr(rg, "LEGACY_PROMPT_PATH", tmp_path / "cu-cung-khong-co.md")
         with pytest.raises(rg.PromptTemplateMissing):
             rg.load_system_prompt()
 
@@ -93,7 +94,7 @@ class TestEffStatusKhongBiBia:
 
         monkeypatch.setenv("V98_API_KEY", "test-key")
         with patch("httpx.post", side_effect=fake_post):
-            rg.generate_compliance_report(rag_db, industry="Y tế & Dược phẩm")
+            rg.generate_compliance_report(rag_db, industry="Y tế và trợ giúp xã hội")
 
         user_msg = captured["payload"]["messages"][1]["content"]
         assert '"eff_status": "Chưa xác định"' in user_msg
@@ -123,7 +124,7 @@ class TestEffStatusKhongBiBia:
         monkeypatch.setenv("V98_API_KEY", "test-key")
         with patch("httpx.post", side_effect=lambda url, headers=None, json=None, timeout=None: (
             captured.update(payload=json), FakeResp())[1]):
-            rg.generate_compliance_report(rag_db, industry="Y tế & Dược phẩm")
+            rg.generate_compliance_report(rag_db, industry="Y tế và trợ giúp xã hội")
 
         user_msg = captured["payload"]["messages"][1]["content"]
         assert "han_che_du_lieu" in user_msg
@@ -145,7 +146,7 @@ class TestTruncationDetection:
 
         monkeypatch.setenv("V98_API_KEY", "test-key")
         with patch("httpx.post", return_value=FakeResp()):
-            out = rg.generate_compliance_report(rag_db, industry="Y tế & Dược phẩm")
+            out = rg.generate_compliance_report(rag_db, industry="Y tế và trợ giúp xã hội")
         assert "bị cắt" in out.lower()
 
     def test_bao_cao_du_thi_khong_them_canh_bao(self, rag_db, chunk_factory, monkeypatch):
@@ -161,7 +162,7 @@ class TestTruncationDetection:
 
         monkeypatch.setenv("V98_API_KEY", "test-key")
         with patch("httpx.post", return_value=FakeResp()):
-            out = rg.generate_compliance_report(rag_db, industry="Y tế & Dược phẩm")
+            out = rg.generate_compliance_report(rag_db, industry="Y tế và trợ giúp xã hội")
         assert "bị cắt" not in out.lower()
 
 
@@ -175,3 +176,36 @@ class TestGraphDuocDungThatSu:
         src = Path("src/rag/report_generator.py").read_text(encoding="utf-8")
         assert "DocumentReference.target_doc_num == doc.doc_num" in src, \
             "thiếu truy vấn chiều ngược: không biết văn bản bị ai tác động"
+
+
+class TestKhongConCTA:
+    """CTA đã được gỡ khỏi mẫu báo cáo pháp lý theo yêu cầu.
+
+    Báo cáo giữ đúng vai trò tài liệu pháp lý; phần mời gọi chuyển sang nội dung
+    email chứ không nằm trong file PDF.
+    """
+
+    def test_bo_render_khong_con_ham_cta(self):
+        import src.utils.report_pdf as rp
+        assert not hasattr(rp, "_cta")
+
+    def test_script_khong_con_cta_block(self):
+        import scripts.generate_industry_reports as g
+        assert not hasattr(g, "cta_block")
+
+    def test_ReportMeta_khong_con_truong_cta(self):
+        from dataclasses import fields
+        from src.utils.report_pdf import ReportMeta
+        ten = {f.name for f in fields(ReportMeta)}
+        assert not (ten & {"cta_title", "cta_body", "website", "email", "phone"})
+
+    def test_thong_tin_lien_he_van_o_chan_trang(self):
+        """Gỡ CTA không được làm mất luôn thông tin liên hệ ở chân trang."""
+        from dataclasses import fields
+        from src.utils.report_pdf import ReportMeta
+        assert "contact" in {f.name for f in fields(ReportMeta)}
+
+    def test_prompt_cam_mo_hinh_tu_viet_khoi_moi_goi(self):
+        """Gỡ CTA ở tầng dựng PDF là chưa đủ — mô hình vẫn có thể tự viết ra."""
+        prompt = rg.load_system_prompt()
+        assert "Không viết khối kêu gọi liên hệ" in prompt

@@ -47,16 +47,16 @@ class TestSearchFts:
 
 
 class TestIndustrySearch:
-    def test_ten_nganh_co_amp_van_ra_ket_qua(self, rag_db, chunk_factory):
+    def test_ten_nganh_dai_van_ra_ket_qua(self, rag_db, chunk_factory):
         chunk_factory("03/2026/TT-BYT", "Quy định về khám bệnh, chữa bệnh tại bệnh viện")
         chunk_factory("04/2026/TT-BYT", "Quy định đăng ký lưu hành thuốc và dược phẩm", chunk_index=1)
-        ket_qua = industry_search(rag_db, "Y tế & Dược phẩm", limit=20)
+        ket_qua = industry_search(rag_db, "Y tế và trợ giúp xã hội", limit=20)
         assert len(ket_qua) >= 2, "phải tìm được qua từ khoá ngành dù tên ngành có '&'"
 
     def test_mo_rong_bang_tu_khoa_chu_khong_chi_ten_nganh(self, rag_db, chunk_factory):
         # Không đoạn nào chứa đủ cụm "Nông nghiệp & Thủy sản", chỉ chứa từ khoá con.
         chunk_factory("05/2026/NĐ-CP", "Chính sách hỗ trợ hoạt động chăn nuôi quy mô trang trại")
-        ket_qua = industry_search(rag_db, "Nông nghiệp & Thủy sản", limit=20)
+        ket_qua = industry_search(rag_db, "Nông nghiệp, lâm nghiệp và thuỷ sản", limit=20)
         assert len(ket_qua) == 1
 
     def test_nganh_la_khong_lam_sap(self, rag_db, chunk_factory):
@@ -66,7 +66,7 @@ class TestIndustrySearch:
     def test_khong_tra_ve_chunk_trung_lap(self, rag_db, chunk_factory):
         """Một đoạn khớp nhiều từ khoá vẫn chỉ được xuất hiện một lần."""
         chunk_factory("07/2026/NĐ-CP", "Quy định về y tế, dược, thuốc, bệnh viện, khám bệnh")
-        ket_qua = industry_search(rag_db, "Y tế & Dược phẩm", limit=20)
+        ket_qua = industry_search(rag_db, "Y tế và trợ giúp xã hội", limit=20)
         assert len({r.id for r in ket_qua}) == len(ket_qua)
 
 

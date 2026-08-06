@@ -23,7 +23,8 @@ logger = logging.getLogger(__name__)
 # Mẫu prompt nằm trong repo là bản chuẩn; cho phép trỏ ra ngoài bằng biến môi
 # trường thay vì hardcode đường dẫn máy cá nhân (bản cũ trỏ tới ~/Downloads nên
 # trên bất kỳ máy nào khác cũng rơi về fallback).
-REPO_PROMPT_PATH = PROJECT_ROOT / "src" / "rag" / "prompts" / "prompt_report.md"
+REPO_PROMPT_PATH = PROJECT_ROOT / "src" / "rag" / "prompts" / "prompt_bao_cao_v98.md"
+LEGACY_PROMPT_PATH = PROJECT_ROOT / "src" / "rag" / "prompts" / "prompt_report.md"
 
 
 class PromptTemplateMissing(RuntimeError):
@@ -54,6 +55,7 @@ def load_system_prompt() -> str:
     override = os.getenv("REPORT_PROMPT_PATH")
     candidates = [Path(override)] if override else []
     candidates.append(REPO_PROMPT_PATH)
+    candidates.append(LEGACY_PROMPT_PATH)
 
     for path in candidates:
         try:
@@ -61,8 +63,12 @@ def load_system_prompt() -> str:
         except OSError:
             continue
         # Extract system prompt section (starting from ## 1. VAI TRÒ)
+        # Cắt từ "## 1. VAI TRÒ" tới trước mục 9 (hợp đồng dữ liệu) — phần sau
+        # là tài liệu cho người vận hành, không phải chỉ dẫn cho mô hình.
         if "## 1. VAI TRÒ" in content:
-            return content[content.find("## 1. VAI TRÒ"):]
+            body = content[content.find("## 1. VAI TRÒ"):]
+            cut = body.find("## 9. HỢP ĐỒNG DỮ LIỆU")
+            return body[:cut].rstrip() if cut > 0 else body
         return content
 
     raise PromptTemplateMissing(
@@ -79,6 +85,7 @@ def generate_compliance_report(
     desired_length: str = "Báo cáo chuyên sâu (8–15 trang)",
     model: str = "",
     embedder=None,
+    context_sink: dict | None = None,
 ) -> str:
     """
     Generate a full professional Legal Compliance Report for an industry following the system prompt template.
@@ -223,6 +230,11 @@ def generate_compliance_report(
         "chi_tiet_dieu_khoan_chunks": chunks_detail,
         "do_thi_quan_he_van_ban_edges": graph_edges
     }
+
+    # Trả ngữ cảnh ra ngoài để dựng biểu đồ từ đúng bộ văn bản đã đưa vào báo
+    # cáo, thay vì truy xuất lần hai (vừa tốn tiền nhúng vừa có thể lệch kết quả).
+    if context_sink is not None:
+        context_sink.update(data_payload)
 
     system_prompt = load_system_prompt()
 

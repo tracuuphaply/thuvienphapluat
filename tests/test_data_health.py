@@ -114,8 +114,15 @@ class TestMetadataRagIndex:
             for name in _json.loads(row["industries"] or "[]"):
                 docs_per_industry.setdefault(name, set()).add(row["doc_num"])
 
-        rong = [n for n, d in docs_per_industry.items() if not d]
-        assert not rong, f"ngành không có văn bản nào: {rong}"
+        # Vài nhóm VSIC hầu như không có văn bản quy phạm pháp luật riêng trong
+        # một kho hướng doanh nghiệp — rỗng là đúng, không phải lỗi phân loại.
+        # Danh sách này cố ý hẹp: ngành nào rơi ra ngoài mà rỗng là có vấn đề.
+        RONG_HOP_LE = {
+            "Lao động trong hộ gia đình",  # T — kho không có luật về giúp việc gia đình
+        }
+        rong = {n for n, d in docs_per_industry.items() if not d}
+        bat_thuong = rong - RONG_HOP_LE
+        assert not bat_thuong, f"ngành không có văn bản nào: {sorted(bat_thuong)}"
 
     def test_ty_le_doan_duoc_gan_nganh_hop_ly(self):
         with _conn(RAG_DB) as c:

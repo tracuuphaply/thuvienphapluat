@@ -64,11 +64,20 @@ def _register_fonts():
 _register_fonts()
 
 
+# Chữ chạy ở đầu/chân trang. Ghi đè bằng tham số `branding` của convert_md_to_pdf
+# để gắn tên công ty và thông tin liên hệ khi gửi báo cáo cho khách.
+DEFAULT_HEADER = "BÁO CÁO PHÁP LÝ CHUYÊN ĐỀ DÀNH CHO DOANH NGHIỆP"
+DEFAULT_FOOTER = "Dữ liệu trích xuất từ Hệ thống Quản trị Pháp lý Doanh nghiệp"
+
+
 class NumberedCanvas(canvas.Canvas):
     """Two-pass canvas to dynamically compute and draw page numbers 'Trang X / Y'."""
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, header_text: str = DEFAULT_HEADER,
+                 footer_text: str = DEFAULT_FOOTER, **kwargs):
         super().__init__(*args, **kwargs)
         self._saved_page_states = []
+        self._header_text = header_text
+        self._footer_text = footer_text
 
     def showPage(self):
         self._saved_page_states.append(dict(self.__dict__))
@@ -86,10 +95,10 @@ class NumberedCanvas(canvas.Canvas):
         self.saveState()
         self.setFont(FONT_NAME, 8)
         self.setFillColor(colors.HexColor("#6B7280"))
-        
+
         # Header (on pages after cover page)
         if self._pageNumber > 1:
-            self.drawString(54, 800, "BÁO CÁO PHÁP LÝ CHUYÊN ĐỀ DÀNH CHO DOANH NGHIỆP")
+            self.drawString(54, 800, self._header_text)
             self.setStrokeColor(colors.HexColor("#E5E7EB"))
             self.setLineWidth(0.5)
             self.line(54, 792, 541, 792)
@@ -97,15 +106,19 @@ class NumberedCanvas(canvas.Canvas):
         # Footer (all pages)
         page_text = f"Trang {self._pageNumber} / {page_count}"
         self.drawRightString(541, 36, page_text)
-        self.drawString(54, 36, "🔒 Dữ liệu trích xuất từ Hệ thống Quản trị Pháp lý Doanh nghiệp")
+        # Chân trang có thể dài (tên công ty + email + điện thoại) nên cắt bớt
+        # để không đè lên số trang.
+        self.drawString(54, 36, self._footer_text[:110])
         self.setStrokeColor(colors.HexColor("#E5E7EB"))
         self.setLineWidth(0.5)
         self.line(54, 48, 541, 48)
-        
+
         self.restoreState()
 
 
-def convert_md_to_pdf(md_text: str, output_path: Optional[Path] = None, report_title: str = "BÁO CÁO PHÁP LÝ CHUYÊN ĐỀ") -> Path:
+def convert_md_to_pdf(md_text: str, output_path: Optional[Path] = None,
+                      report_title: str = "BÁO CÁO PHÁP LÝ CHUYÊN ĐỀ",
+                      branding: Optional[dict] = None) -> Path:
     """
     Convert Markdown report string into a professionally styled PDF file.
     """
@@ -335,7 +348,16 @@ def convert_md_to_pdf(md_text: str, output_path: Optional[Path] = None, report_t
         _add_table_to_story(story, table_rows, table_header_style, table_cell_style, BORDER_COLOR, PRIMARY_COLOR)
 
     # Build PDF
-    doc.build(story, canvasmaker=NumberedCanvas)
+    # Gắn tên công ty vào đầu trang và thông tin liên hệ vào chân trang.
+    brand = branding or {}
+    header_text = brand.get("header") or DEFAULT_HEADER
+    footer_text = brand.get("footer") or DEFAULT_FOOTER
+
+    def _canvasmaker(*args, **kwargs):
+        return NumberedCanvas(*args, header_text=header_text,
+                              footer_text=footer_text, **kwargs)
+
+    doc.build(story, canvasmaker=_canvasmaker)
     logger.info(f"Generated PDF report at: {output_path}")
     return output_path
 
