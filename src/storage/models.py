@@ -34,7 +34,17 @@ class Document(Base):
     __tablename__ = "documents"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    doc_num = Column(String(100), unique=True, nullable=False, comment="Số hiệu VB")
+    # Số hiệu KHÔNG duy nhất toàn quốc: 63 tỉnh đánh số độc lập nên
+    # "67/2026/QĐ-UBND" tồn tại ở 18 tỉnh khác nhau. Ràng buộc UNIQUE cũ khiến
+    # bản thứ hai trở đi bị coi là "đã biết" và bị bỏ qua im lặng — đo trên một
+    # lần quét 6.906 văn bản thì 4.211 bản sẽ bị nuốt.
+    doc_num = Column(String(100), nullable=False, comment="Số hiệu VB")
+    doc_key = Column(
+        String(300),
+        unique=True,
+        nullable=False,
+        comment="Định danh thật: số hiệu + cơ quan ban hành",
+    )
     title = Column(Text, nullable=False)
     doc_type = Column(String(100), comment="Loại VB: Nghị định, Thông tư…")
     issue_date = Column(Date, comment="Ngày ban hành")
@@ -76,6 +86,11 @@ class Document(Base):
     lark_folder_token = Column(String(100))
 
 
+    # Phase 2: Obsidian
+    industries = Column(String(500), comment="Phân loại ngành nghề")
+    obsidian_path = Column(Text, comment="Đường dẫn file Obsidian")
+    obsidian_hash = Column(String(64), comment="SHA-256 nội dung Obsidian để sync")
+
     # Event tracking
     event_type = Column(
         String(1), comment="A=mới, B=đổi hiệu lực, C=sửa/thay thế"
@@ -100,6 +115,11 @@ class Document(Base):
         Index("idx_documents_issue_date", "issue_date"),
         Index("idx_documents_field_code", "field_code"),
         Index("idx_documents_event_type", "event_type"),
+        # Tra theo id nguồn là đường dedupe chính khi upsert; thiếu index thì
+        # mỗi văn bản mới phải quét toàn bảng.
+        Index("idx_documents_moj_id", "moj_id"),
+        Index("idx_documents_tvpl_id", "tvpl_id"),
+        Index("idx_documents_eff_status", "eff_status"),
     )
 
 

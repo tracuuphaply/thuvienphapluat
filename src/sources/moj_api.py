@@ -149,6 +149,19 @@ def get_field_name(doc: dict) -> str:
     return names[0] if names else "Khác"
 
 
+def _resolve_agency(doc_num: str, reported: str) -> str:
+    """Cơ quan ban hành cuối cùng: hậu tố số hiệu thắng khi mâu thuẫn với nguồn."""
+    derived = agency_from_doc_num(doc_num)
+    if not derived:
+        return reported
+    if reported and reported != derived:
+        logger.info(
+            "Cơ quan ban hành của %s: nguồn ghi %r, suy từ số hiệu là %r — dùng %r",
+            doc_num, reported, derived, derived,
+        )
+    return derived
+
+
 def parse_doc_summary(doc: dict) -> dict[str, Any]:
     """
     Parse a document from the list API into a normalized dict
@@ -168,7 +181,16 @@ def parse_doc_summary(doc: dict) -> dict[str, Any]:
         "eff_from": _parse_date(data.get("effFrom")),
         "eff_to": _parse_date(data.get("effTo")),
         "eff_status": eff_status_obj.get("name", ""),
-        "agency_name": org_obj.get("name", "") or data.get("agencyName", ""),
+        # `agencyName` là CƠ QUAN BAN HÀNH; `organization.name` chỉ là đơn vị
+        # quản lý bản ghi trên hệ thống Bộ Tư pháp. Ưu tiên nhầm thứ tự khiến
+        # mọi đạo Luật bị ghi là do một Bộ ban hành thay vì Quốc hội, và mọi
+        # Nghị định do Bộ thay vì Chính phủ — sai dữ kiện pháp lý ngay ở bảng
+        # kiểm hiệu lực của báo cáo. Với văn bản cấp tỉnh, `agencyName` còn cụ
+        # thể hơn ("UBND Tỉnh Quảng Ngãi" so với chỉ "Quảng Ngãi").
+        "agency_name": _resolve_agency(
+            (data.get("docNum") or "").strip(),
+            (data.get("agencyName") or "").strip() or org_obj.get("name", ""),
+        ),
         "signer": data.get("signer", ""),
         "field_name": get_field_name(data),
         "field_code": _get_primary_field_code(data),
@@ -177,18 +199,65 @@ def parse_doc_summary(doc: dict) -> dict[str, Any]:
     }
 
 
-# referenceType của gateway vbpl-bientap → nhãn quan hệ tiếng Việt
+# referenceType của gateway vbpl-bientap → nhãn quan hệ tiếng Việt.
+#
+# Bảng cũ được đặt bằng suy đoán và đã gán sai nghiêm trọng: mã 3 (chiếm 82%
+# tổng số cạnh) thực chất là "Căn cứ" nhưng bị ghi thành "Bãi bỏ", khiến hàng
+# trăm văn bản cấp tỉnh trông như đang bãi bỏ luật Quốc hội.
+#
+# Bảng hiện tại được suy ra từ hai tín hiệu độc lập (scripts/probe_reference_types.py):
+#   (a) động từ quan hệ đứng ngay trước số hiệu đích trong toàn văn văn bản nguồn
+#   (b) tỷ lệ văn bản đích đã có effTo — quan hệ chấm dứt hiệu lực thì đích phải hết hiệu lực
+#
+#   mã 1  : (a) "bãi bỏ" 44% + "hết hiệu lực" 7%, n=174   (b) 66% đích hết hiệu lực
+#   mã 3  : (a) "căn cứ" 84%, n=1188                      (b)  5% đích hết hiệu lực
+#   mã 9  : (a) "căn cứ" 83%, n=41                        (b)  9% đích hết hiệu lực
+#   mã 10 : (a) "sửa đổi, bổ sung" 95%, n=284             (b)  0% đích hết hiệu lực
+#   mã 12 : (a) "thay thế" 75%, n=65                      (b) 95% đích hết hiệu lực
+#
+# Các mã 4, 5, 7, 8, 11 chưa đủ mẫu (n ≤ 11) nên KHÔNG đoán — chúng nhận nhãn
+# "Chưa xác định" để lộ ra là chưa biết, thay vì bị gán nhầm một quan hệ có thật.
+# Chạy lại script dò khi kho văn bản lớn hơn để chốt nốt các mã này.
 REFERENCE_TYPE_LABELS: dict[int, str] = {
-    1: "Sửa đổi, bổ sung",
-    2: "Thay thế",
-    3: "Bãi bỏ",
-    4: "Hủy bỏ",
-    5: "Đình chỉ",
-    6: "Hướng dẫn",
-    7: "Quy định chi tiết",
-    8: "Căn cứ",
-    9: "Dẫn chiếu",
+    1: "Bãi bỏ",
+    3: "Căn cứ",
+    9: "Căn cứ",
+    10: "Sửa đổi, bổ sung",
+    12: "Thay thế",
 }
+
+# Nhãn dùng khi gateway trả về mã chưa được kiểm chứng. Giữ lại mã gốc để dò tiếp.
+UNVERIFIED_RELATION = "Chưa xác định"
+
+
+def relation_label(reference_type: Any) -> str:
+    """Nhãn quan hệ cho một referenceType; mã lạ trả về nhãn 'chưa xác định'."""
+    if reference_type in REFERENCE_TYPE_LABELS:
+        return REFERENCE_TYPE_LABELS[reference_type]
+    return f"{UNVERIFIED_RELATION} (mã {reference_type})"
+
+
+# Số hiệu văn bản QPPL mã hoá sẵn cơ quan ban hành, và đây là quy tắc pháp lý
+# chứ không phải quy ước dữ liệu: Luật luôn do Quốc hội ban hành, Nghị định luôn
+# do Chính phủ. Dữ liệu Bộ Tư pháp có chỗ ghi sai (Luật Xây dựng 135/2025/QH15
+# bị ghi do "Bộ Xây dựng" ban hành), nên khi số hiệu và trường agencyName mâu
+# thuẫn thì số hiệu thắng.
+_AGENCY_BY_SUFFIX: tuple[tuple[re.Pattern[str], str], ...] = (
+    # "28/2005/PL-UBTVQH11" (pháp lệnh) và "01/2018/UBTVQH14" đều là UBTVQH.
+    (re.compile(r"/(PL-)?UBTVQH\d*\s*$", re.I), "Ủy ban Thường vụ Quốc hội"),
+    (re.compile(r"/QH\d*\s*$", re.I), "Quốc hội"),
+    (re.compile(r"/NĐ-CP\s*$", re.I), "Chính phủ"),
+    (re.compile(r"/(QĐ|CT)-TTg\s*$", re.I), "Thủ tướng Chính phủ"),
+)
+
+
+def agency_from_doc_num(doc_num: str) -> str:
+    """Cơ quan ban hành suy từ hậu tố số hiệu; rỗng nếu hậu tố không xác định."""
+    text = (doc_num or "").strip()
+    for pattern, agency in _AGENCY_BY_SUFFIX:
+        if pattern.search(text):
+            return agency
+    return ""
 
 
 def parse_doc_detail(detail_resp: dict) -> dict[str, Any]:
@@ -214,7 +283,7 @@ def parse_doc_detail(detail_resp: dict) -> dict[str, Any]:
         ).strip()
         rel_type = ref.get("type") or ref.get("relationType")
         if not rel_type:
-            rel_type = REFERENCE_TYPE_LABELS.get(ref.get("referenceType"), "Liên quan")
+            rel_type = relation_label(ref.get("referenceType"))
         if target_num:
             references.append({
                 "target_doc_num": target_num,
@@ -323,6 +392,15 @@ def search_by_doc_num(doc_num: str, title_hint: str = "") -> dict[str, Any] | No
     bản khác nhau), nên khi có nhiều ứng viên thì dùng `title_hint` (tiêu đề từ
     TVPL) để chọn: bản khớp nhất phải vượt ngưỡng và phải cách biệt rõ so với
     bản nhì, nếu không thì bỏ qua còn hơn gán nhầm văn bản của tỉnh khác.
+
+    CẢNH BÁO — hàm này hiện gần như luôn trả None. Endpoint /doc/all **bỏ qua
+    mọi tham số lọc**: đã thử keyword, docNum, searchText, q, filter, text,
+    soHieu — tất cả đều trả về đúng danh sách mặc định sắp theo issueDate desc.
+    Vì vậy văn bản chỉ được tìm thấy khi tình cờ nằm trong 50 bản mới nhất.
+
+    Muốn lấy một văn bản cụ thể, hãy dùng `targetDocument.id` có sẵn trong
+    payload quan hệ rồi gọi `fetch_doc_detail(id)` — xem
+    scripts/backfill_cited_documents.py.
     """
     from src.pipeline.deduplicator import normalize_doc_num
 

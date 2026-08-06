@@ -26,3 +26,12 @@ dev = [
 [build-system]
 requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "data: chạy trên kho dữ liệu thật trong data/ và Legal-Vault/ (bỏ qua nếu chưa có dữ liệu)",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:telegram.*",
+]

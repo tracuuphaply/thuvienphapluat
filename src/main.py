@@ -20,16 +20,21 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import fcntl
 import logging
+import os
 import sys
 import time
-from datetime import datetime
-from typing import Any
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from logging.handlers import TimedRotatingFileHandler
+from typing import Any, Generator
 
 from pathlib import Path
 
 from src.config import (
     AUTO_CLEANUP_LOCAL_FILES,
+    DATA_DIR,
     LARK_APP_ID,
     TVPL_DOWNLOAD_ENABLED,
 )
@@ -52,6 +57,7 @@ from src.storage.database import (
     create_crawl_run,
     finish_crawl_run,
     get_document_by_doc_num,
+    resolve_existing_document,
     get_session,
     init_db,
     insert_references,
@@ -148,13 +154,63 @@ def detect_affected_documents(
 
 
 def setup_logging() -> None:
-    """Configure structured logging."""
+    """Configure structured logging.
+
+    Ghi ra cả stdout lẫn file: chỉ có StreamHandler thì chạy tay xong đóng
+    terminal là mất sạch log, không còn gì để điều tra khi pipeline hỏng.
+    """
+    log_dir = DATA_DIR / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout)]
+    file_handler = TimedRotatingFileHandler(
+        log_dir / "pipeline.log",
+        when="midnight",
+        backupCount=30,
+        encoding="utf-8",
+    )
+    file_handler.suffix = "%Y-%m-%d"
+    handlers.append(file_handler)
+
+    # force=True: basicConfig là no-op nếu root logger đã có handler, nên chỉ
+    # cần một thư viện gọi logging trước là file handler không bao giờ được gắn.
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
-        handlers=[logging.StreamHandler(sys.stdout)],
+        handlers=handlers,
+        force=True,
     )
+    # httpx log mỗi request một dòng, lấn át log nghiệp vụ trong file.
+    for noisy in ("httpx", "httpcore", "urllib3"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+
+
+@contextmanager
+def pipeline_lock() -> Generator[None, None, None]:
+    """Chặn hai lần chạy chồng lên nhau.
+
+    Hai tiến trình cùng chạy sẽ đua ghi SQLite, đua ghi 314 file vault và tiêu
+    gấp đôi hạn mức tải TVPL. Lệnh /sync trên Telegram khiến tình huống này rất
+    dễ xảy ra.
+    """
+    lock_path = DATA_DIR / "pipeline.lock"
+    lock_file = open(lock_path, "w")
+    try:
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise RuntimeError(
+                f"Một lần chạy khác đang giữ {lock_path}. Bỏ qua lần chạy này."
+            )
+        lock_file.write(str(os.getpid()))
+        lock_file.flush()
+        yield
+    finally:
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+        finally:
+            lock_file.close()
 
 
 def run_pipeline(
@@ -211,13 +267,24 @@ def run_pipeline(
                 logger.error("MOJ scan failed: %s", e)
 
             if not tvpl_items and not moj_items:
-                logger.warning("No items from any source. Possible issue.")
+                # Mất nguồn hoàn toàn (Cloudflare chặn, API đổi, hết phiên) trông
+                # y hệt một ngày yên tĩnh nếu vẫn ghi SUCCESS. Phải báo FAILED và
+                # cảnh báo, nếu không hệ thống có thể chết hàng tuần mà không ai biết.
+                msg = (
+                    "Cả TVPL lẫn MOJ đều không trả về văn bản nào — nhiều khả năng "
+                    "nguồn đã hỏng chứ không phải không có văn bản mới."
+                )
+                logger.error(msg)
                 finish_crawl_run(
-                    session, crawl_run, status="SUCCESS",
-                    error_message="No items from any source",
+                    session, crawl_run, status="FAILED",
+                    error_message=msg,
                     **metrics,
                 )
                 session.commit()
+                try:
+                    send_error_alert(msg)
+                except Exception as e:
+                    logger.error("Không gửi được cảnh báo: %s", e)
                 return metrics
 
             # ── Step 2: Merge & dedupe across sources ──
@@ -244,7 +311,10 @@ def run_pipeline(
                     skipped_known += 1
                     continue
 
-                existing = get_document_by_doc_num(session, doc_num)
+                # Dùng resolver đầy đủ (moj_id → tvpl_id → doc_key) thay vì tra
+                # theo số hiệu: số hiệu trùng giữa các tỉnh sẽ trả None và làm
+                # văn bản đã có bị báo nhầm là mới.
+                existing = resolve_existing_document(session, candidate)
                 if existing is None:
                     candidate["event_type"] = "A"  # New document
                     new_docs.append(candidate)
@@ -501,9 +571,7 @@ def run_pipeline(
                         if uploaded_any:
                             doc_data.update(drive_result)
                             # Update DB with Drive links
-                            existing = get_document_by_doc_num(
-                                session, doc_data["doc_num"]
-                            )
+                            existing = resolve_existing_document(session, doc_data)
                             if existing:
                                 existing.gdrive_docx_link = drive_result.get("gdrive_docx_link")
                                 existing.gdrive_folder_id = drive_result.get("gdrive_folder_id")
@@ -545,11 +613,9 @@ def run_pipeline(
                 success = send_daily_digest(saved_docs)
                 if success:
                     # Mark documents as notified
-                    now = datetime.utcnow()
+                    now = datetime.now(timezone.utc)
                     for doc_data in saved_docs:
-                        existing = get_document_by_doc_num(
-                            session, doc_data["doc_num"]
-                        )
+                        existing = resolve_existing_document(session, doc_data)
                         if existing:
                             existing.notified_at = now
                     session.commit()
@@ -628,6 +694,25 @@ def run_upload_only() -> dict[str, int]:
             session.commit()
 
     logger.info("Đã upload %d/%d văn bản.", metrics["gdrive_uploaded"], metrics["total_new"])
+
+    # Step 8.1: Sync to Obsidian Vault (Phase 2)
+    try:
+        from src.obsidian.vault_syncer import sync as sync_vault
+        sync_vault()
+        logger.info("Obsidian Vault sync completed.")
+    except Exception as e:
+        logger.warning("Obsidian Vault sync failed: %s", e)
+
+    # Step 8.2: Index into RAG DB (Phase 3)
+    try:
+        from src.rag.db_rag import RAGDatabase
+        from src.rag.rag_indexer import index_from_phase1
+        rag_db = RAGDatabase()
+        index_from_phase1(None, rag_db)
+        logger.info("RAG Index sync completed.")
+    except Exception as e:
+        logger.warning("RAG Index sync failed: %s", e)
+
     return metrics
 
 
@@ -662,6 +747,16 @@ def main() -> None:
         action="store_true",
         help="Chỉ upload lại các văn bản đã có trong DB nhưng chưa lên Lark Drive",
     )
+    parser.add_argument(
+        "--sync-vault-only",
+        action="store_true",
+        help="Chỉ đồng bộ Obsidian Vault từ dữ liệu hiện có",
+    )
+    parser.add_argument(
+        "--sync-rag-only",
+        action="store_true",
+        help="Chỉ đồng bộ RAG Database từ dữ liệu hiện có",
+    )
     args = parser.parse_args()
 
     setup_logging()
@@ -670,15 +765,35 @@ def main() -> None:
         run_upload_only()
         return
 
+    if args.sync_vault_only:
+        from src.obsidian.vault_syncer import sync as sync_vault
+        sync_vault()
+        logger.info("Obsidian Vault sync complete.")
+        return
+
+    if args.sync_rag_only:
+        from src.rag.db_rag import RAGDatabase
+        from src.rag.rag_indexer import index_from_phase1
+        rag_db = RAGDatabase()
+        index_from_phase1(None, rag_db)
+        logger.info("RAG Index complete.")
+        return
+
     logger.info("Pipeline starting at %s", datetime.now().isoformat())
 
     start_time = time.time()
-    metrics = run_pipeline(
-        dry_run=args.dry_run,
-        moj_only=args.moj_only,
-        skip_gdrive=args.skip_gdrive,
-        limit=args.limit,
-    )
+    try:
+        with pipeline_lock():
+            metrics = run_pipeline(
+                dry_run=args.dry_run,
+                moj_only=args.moj_only,
+                skip_gdrive=args.skip_gdrive,
+                limit=args.limit,
+            )
+    except RuntimeError as e:
+        # Lần chạy khác đang giữ khoá — thoát yên lặng, không phải lỗi.
+        logger.warning("%s", e)
+        return
     elapsed = time.time() - start_time
 
     logger.info("=" * 60)
@@ -689,3 +804,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+

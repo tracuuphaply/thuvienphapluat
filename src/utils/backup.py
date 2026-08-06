@@ -10,15 +10,38 @@ import gzip
 import json
 import logging
 import shutil
+import sqlite3
 import subprocess
 from datetime import date, timedelta
 from pathlib import Path
 
-from src.config import BACKUPS_DIR, DATA_DIR, DATABASE_URL
+from src.config import BACKUPS_DIR, DATA_DIR, DATABASE_URL, PROJECT_ROOT
 
 logger = logging.getLogger(__name__)
 
 RETENTION_DAYS = 30  # Keep 30 days of backups
+
+
+def _snapshot_sqlite(src: Path, dest_gz: Path) -> None:
+    """Sao lưu SQLite an toàn rồi nén.
+
+    Copy byte thô một file .db đang mở có thể tạo bản sao rách, và bỏ quên
+    file -wal thì mất toàn bộ giao dịch đã commit nhưng chưa checkpoint.
+    VACUUM INTO tạo bản sao nhất quán, đã gộp sẵn WAL.
+    """
+    tmp = dest_gz.with_suffix(".tmp.db")
+    if tmp.exists():
+        tmp.unlink()
+    conn = sqlite3.connect(f"file:{src}?mode=ro", uri=True)
+    try:
+        conn.execute("VACUUM INTO ?", (str(tmp),))
+    finally:
+        conn.close()
+    try:
+        with open(tmp, "rb") as f_in, gzip.open(dest_gz, "wb") as f_out:
+            shutil.copyfileobj(f_in, f_out)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def backup_database() -> str | None:
@@ -38,11 +61,17 @@ def backup_database() -> str | None:
             return None
 
         backup_path = BACKUPS_DIR / f"db_{today}.sqlite.gz"
-        with open(db_file, "rb") as f_in:
-            with gzip.open(backup_path, "wb") as f_out:
-                shutil.copyfileobj(f_in, f_out)
-
+        _snapshot_sqlite(db_file, backup_path)
         logger.info("SQLite backup saved: %s", backup_path)
+
+        # rag.db là tài sản đắt nhất (đã trả tiền nhúng) nhưng trước đây không
+        # nằm trong bất kỳ bản sao lưu nào.
+        rag_db = DATA_DIR / "rag.db"
+        if rag_db.exists():
+            rag_backup = BACKUPS_DIR / f"rag_{today}.sqlite.gz"
+            _snapshot_sqlite(rag_db, rag_backup)
+            logger.info("RAG DB backup saved: %s", rag_backup)
+
         return str(backup_path)
 
     elif "postgresql" in DATABASE_URL:
@@ -65,19 +94,26 @@ def backup_database() -> str | None:
     return None
 
 
+# Phạm vi sao lưu file. Bản cũ chỉ có tvpl (0 file) và moj, bỏ ngoài toàn bộ
+# sản phẩm đã xử lý: metadata, toàn văn đã làm sạch, chunk và cả vault Obsidian.
+BACKUP_TARGETS = (
+    DATA_DIR / "tvpl",
+    DATA_DIR / "moj",
+    DATA_DIR / "metadata",
+    DATA_DIR / "clean_text",
+    DATA_DIR / "chunks",
+    PROJECT_ROOT / "Legal-Vault",
+)
+
+
 def backup_files() -> str | None:
-    """Backup data/tvpl and data/moj directories."""
+    """Backup toàn bộ dữ liệu nguồn và sản phẩm đã xử lý."""
     today = date.today().isoformat()
     backup_path = BACKUPS_DIR / f"files_{today}.tar.gz"
 
-    tvpl_dir = DATA_DIR / "tvpl"
-    moj_dir = DATA_DIR / "moj"
-
-    dirs_to_backup = []
-    if tvpl_dir.exists() and any(tvpl_dir.iterdir()):
-        dirs_to_backup.append(str(tvpl_dir))
-    if moj_dir.exists() and any(moj_dir.iterdir()):
-        dirs_to_backup.append(str(moj_dir))
+    dirs_to_backup = [
+        str(d) for d in BACKUP_TARGETS if d.exists() and any(d.iterdir())
+    ]
 
     if not dirs_to_backup:
         logger.info("No files to backup.")

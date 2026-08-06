@@ -1,29 +1,43 @@
 #!/bin/bash
-# Daily pipeline runner — designed for crontab
-# Crontab entry:  0 6 * * * /path/to/thuvienphapluat/scripts/run_daily.sh
+# Chạy pipeline hằng ngày. Được gọi bởi launchd (xem scripts/install_scheduler.sh).
+#
+# Không dùng `set -e`: bước sao lưu PHẢI chạy kể cả khi pipeline hỏng — bản cũ
+# dùng `set -euo pipefail` nên pipeline lỗi là bỏ luôn backup, đúng lúc cần nó nhất.
+# Log do setup_logging() ghi thẳng vào data/logs/pipeline.log, không cần tee.
 
-set -euo pipefail
+set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-LOG_DIR="$PROJECT_DIR/data/logs"
-LOG_FILE="$LOG_DIR/$(date +%Y-%m-%d).log"
 
-mkdir -p "$LOG_DIR"
+mkdir -p "$PROJECT_DIR/data/logs"
+cd "$PROJECT_DIR" || exit 1
 
-cd "$PROJECT_DIR"
-
-# Activate virtual environment if exists
-if [ -f ".venv/bin/activate" ]; then
-    source .venv/bin/activate
+if [ -x ".venv/bin/python" ]; then
+    PY=".venv/bin/python"
+else
+    PY="python3"
 fi
 
-echo "=== Pipeline started at $(date) ===" >> "$LOG_FILE"
+echo "=== Pipeline bắt đầu lúc $(date) ==="
 
-# Run the pipeline (MOJ-only if no TVPL credentials configured)
-python -m src.main --skip-gdrive 2>&1 | tee -a "$LOG_FILE"
+# 1. Cào và xử lý văn bản mới
+"$PY" -m src.main --skip-gdrive
+PIPELINE_RC=$?
+echo "--- pipeline kết thúc, mã thoát=$PIPELINE_RC ---"
 
-# Run backup after pipeline
-python -m src.utils.backup 2>&1 | tee -a "$LOG_FILE"
+# 2. Đồng bộ Obsidian Vault + RAG index.
+#    run_pipeline() KHÔNG tự làm bước này (nó nằm trong nhánh --upload-only),
+#    nên chỉ chạy src.main thì vault vĩnh viễn không được cập nhật.
+if [ "$PIPELINE_RC" -eq 0 ]; then
+    "$PY" -m src.main --sync-vault-only
+    "$PY" -m src.main --sync-rag-only
+else
+    echo "Bỏ qua đồng bộ vault/RAG vì pipeline lỗi."
+fi
 
-echo "=== Pipeline finished at $(date) ===" >> "$LOG_FILE"
+# 3. Sao lưu — chạy bất kể pipeline thành công hay không.
+"$PY" -m src.utils.backup
+
+echo "=== Pipeline xong lúc $(date) ==="
+exit "$PIPELINE_RC"
