@@ -8,6 +8,12 @@ bổ sung" và "Thay thế" — thì không có trong bảng nên bị dồn h�
 Không thể sửa bằng cách đổi tên nhãn: nhãn "Liên quan" đã trộn lẫn nhiều mã
 khác nhau, không tách ngược ra được. Phải lấy lại quan hệ từ nguồn.
 
+TÁC DỤNG THỨ HAI, nay là lý do chính để chạy: mỗi lần fetch lại đều mang về
+`references[].targetDocument.id`, thứ mà bản parse cũ vứt đi. Không có id đó thì
+crawler bao đóng không có đường tải văn bản được dẫn chiếu — endpoint /doc/all
+bỏ qua mọi tham số lọc nên không tra ngược số hiệu ra id được. Cạnh cũ trong kho
+đều thiếu id, nên phải chạy script này MỘT LẦN trước khi chạy bao đóng.
+
 Chạy:  python -m scripts.rebuild_reference_graph [--dry-run]
 """
 import argparse
@@ -25,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 def rebuild(dry_run: bool = False, sleep: float = 0.25) -> dict:
-    stats = {"van_ban": 0, "loi": 0, "canh_cu": 0, "canh_moi": 0}
+    stats = {"van_ban": 0, "loi": 0, "canh_cu": 0, "quan_he_api_tra": 0}
 
     with get_session() as session:
         docs = (
@@ -56,7 +62,9 @@ def rebuild(dry_run: bool = False, sleep: float = 0.25) -> dict:
                 insert_references(session, doc.id, refs)
 
             stats["van_ban"] += 1
-            stats["canh_moi"] += len(refs)
+            # Số quan hệ THÔ từ API, trước khi insert_references dedupe theo
+            # (nguồn, đích, loại quan hệ) — luôn lớn hơn số cạnh cuối cùng.
+            stats["quan_he_api_tra"] += len(refs)
             if stats["van_ban"] % 25 == 0:
                 logger.info("  ... %d/%d văn bản", stats["van_ban"], len(docs))
                 if not dry_run:

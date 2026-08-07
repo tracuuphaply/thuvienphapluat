@@ -1,8 +1,13 @@
 """
 Google Drive API integration with folder caching & retry logic.
 
-Uses a Service Account to:
-  - Auto-create folder structure: Kho_Van_Ban/{field}/{year}/{month}
+Xác thực bằng OAuth (luồng Desktop app) chứ KHÔNG dùng service account:
+Google cấp cho service account hạn mức lưu trữ 0 GB nên upload vào My Drive
+luôn trả 403 storageQuotaExceeded. Với OAuth, file thuộc sở hữu người dùng
+và hiện ngay trong My Drive của họ.
+
+Chức năng:
+  - Tự dựng cây thư mục: Gốc/{lĩnh vực}/{năm}/Thang_MM/{số hiệu}
   - Upload .docx/.pdf files
   - Return webViewLink for Telegram notifications
   - Share folders with company users
@@ -16,11 +21,19 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from pathlib import Path
 from typing import Any
 
-from src.config import DATA_DIR, GDRIVE_ROOT_FOLDER_ID, GDRIVE_SERVICE_ACCOUNT_FILE
+from src.config import (
+    DATA_DIR,
+    GDRIVE_OAUTH_CLIENT_FILE,
+    GDRIVE_OAUTH_TOKEN_FILE,
+    GDRIVE_ROOT_FOLDER_ID,
+    GDRIVE_ROOT_FOLDER_NAME,
+    GDRIVE_SCOPES,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +69,20 @@ def _save_cache() -> None:
 def _cache_key(parent_id: str, folder_name: str) -> str:
     """Generate a cache key from parent + folder name."""
     return f"{parent_id}/{folder_name}"
+
+
+def _escape_query_value(value: str) -> str:
+    """Thoát ký tự cho ngôn ngữ truy vấn của Drive.
+
+    Drive nhận điều kiện dạng name='...'; tên có dấu nháy đơn sẽ đóng chuỗi
+    sớm và trả HTTP 400 "Invalid Value". Đã gặp thật với 3 văn bản mà số hiệu
+    Bộ Tư pháp trả về bắt đầu bằng dấu nháy — "'18/2024/TT-BCT" — nên chúng
+    không lên được Drive dù mọi văn bản khác đều xong.
+
+    Thoát dấu chéo ngược TRƯỚC, nếu không thì dấu chéo do chính bước sau thêm
+    vào lại bị thoát lần nữa.
+    """
+    return (value or "").replace("\\", "\\\\").replace("'", "\\'")
 
 
 # Initialize cache at import time
@@ -105,32 +132,89 @@ def _retry_api_call(func, *args, max_retries: int = 3, **kwargs) -> Any:
 # ──────────────────────────────────────────────
 # Google Drive API Client
 # ──────────────────────────────────────────────
-def _get_service():
+class GoogleDriveAuthError(RuntimeError):
+    """Chưa cấp quyền hoặc quyền đã mất hiệu lực."""
+
+
+def load_credentials(allow_interactive: bool = False):
+    """Thông tin xác thực OAuth, tự làm mới khi access token hết hạn.
+
+    KHÔNG dùng service account: Google cấp cho service account hạn mức lưu trữ
+    0 GB, nên upload vào My Drive cá nhân luôn trả 403 storageQuotaExceeded và
+    không có cách nào xin thêm quota. Đó là lý do nhánh Drive cũ chưa từng chạy
+    được và run_daily.sh luôn truyền --skip-gdrive.
+
+    Với OAuth, file thuộc sở hữu người dùng và hiện ngay trong My Drive của họ.
+    """
+    from google.auth.transport.requests import Request
+    from google.oauth2.credentials import Credentials
+
+    token_file = Path(GDRIVE_OAUTH_TOKEN_FILE)
+    creds = None
+    if token_file.exists():
+        creds = Credentials.from_authorized_user_file(str(token_file), list(GDRIVE_SCOPES))
+
+    if creds and creds.valid:
+        return creds
+
+    if creds and creds.expired and creds.refresh_token:
+        try:
+            creds.refresh(Request())
+            _save_credentials(creds)
+            return creds
+        except Exception as e:
+            # invalid_grant = token bị thu hồi, đổi mật khẩu, hoặc màn hình chấp
+            # thuận còn ở trạng thái Testing (refresh token hết hạn sau 7 ngày).
+            raise GoogleDriveAuthError(
+                f"Không làm mới được quyền Google Drive: {e}. "
+                f"Chạy lại: python -m scripts.gdrive_check --authorize"
+            ) from e
+
+    if not allow_interactive:
+        raise GoogleDriveAuthError(
+            f"Chưa cấp quyền Google Drive (thiếu {token_file}). "
+            f"Chạy: python -m scripts.gdrive_check --authorize"
+        )
+
+    client_file = Path(GDRIVE_OAUTH_CLIENT_FILE)
+    if not client_file.exists():
+        raise GoogleDriveAuthError(
+            f"Thiếu file OAuth client: {client_file}. Tải từ Google Cloud Console → "
+            f"Google Auth Platform → Clients → Create client → Desktop app."
+        )
+
+    from google_auth_oauthlib.flow import InstalledAppFlow
+
+    flow = InstalledAppFlow.from_client_secrets_file(str(client_file), list(GDRIVE_SCOPES))
+    creds = flow.run_local_server(port=0)
+    _save_credentials(creds)
+    return creds
+
+
+def _save_credentials(creds) -> None:
+    path = Path(GDRIVE_OAUTH_TOKEN_FILE)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(creds.to_json(), encoding="utf-8")
+    # Token là bí mật ngang mật khẩu — không để người khác trên máy đọc được.
+    path.chmod(0o600)
+
+
+def _get_service(allow_interactive: bool = False):
     """Lazily initialize the Google Drive API service."""
     global _service
     if _service is not None:
         return _service
 
-    sa_file = Path(GDRIVE_SERVICE_ACCOUNT_FILE)
-    if not sa_file.exists():
-        logger.warning(
-            "Google Drive service account file not found: %s. "
-            "Drive upload will be skipped.",
-            sa_file,
-        )
-        return None
-
     try:
-        from google.oauth2 import service_account
         from googleapiclient.discovery import build
 
-        creds = service_account.Credentials.from_service_account_file(
-            str(sa_file),
-            scopes=["https://www.googleapis.com/auth/drive"],
-        )
+        creds = load_credentials(allow_interactive=allow_interactive)
         _service = build("drive", "v3", credentials=creds)
         logger.info("Google Drive API client initialized.")
         return _service
+    except GoogleDriveAuthError as e:
+        logger.warning("Google Drive: %s", e)
+        return None
     except Exception as e:
         logger.error("Failed to initialize Google Drive API: %s", e)
         return None
@@ -155,8 +239,8 @@ def ensure_folder(parent_id: str, folder_name: str) -> str | None:
 
     # Cache miss — search via API (with retry)
     query = (
-        f"name='{folder_name}' and "
-        f"'{parent_id}' in parents and "
+        f"name='{_escape_query_value(folder_name)}' and "
+        f"'{_escape_query_value(parent_id)}' in parents and "
         f"mimeType='application/vnd.google-apps.folder' and "
         f"trashed=false"
     )
@@ -191,28 +275,104 @@ def ensure_folder(parent_id: str, folder_name: str) -> str | None:
     return folder_id
 
 
-def ensure_folder_structure(
-    field_name: str, year: int, month: int
-) -> str | None:
+def _looks_like_placeholder(value: str) -> bool:
+    """Giá trị mẫu chép từ .env.example, không phải id thật.
+
+    Id thư mục Drive là chuỗi 28–44 ký tự [A-Za-z0-9_-], không có chữ tiếng Anh
+    dễ đọc. Kiểm bằng mắt thì hiển nhiên, nhưng code cũ chỉ kiểm "khác rỗng" nên
+    "1ABCxyz_your_folder_id_here" lọt qua và mọi lần upload báo 404 File not
+    found — thông báo không hề gợi ý nguyên nhân thật.
     """
-    Ensure the folder path exists:
-      Root / {field_name} / {year} / {month:02d}
-    Returns the leaf folder ID.
+    lowered = value.strip().lower()
+    return any(marker in lowered for marker in
+               ("your", "xxx", "here", "example", "thay-bang", "thay_bang"))
+
+
+def ensure_root_folder() -> str | None:
+    """Thư mục gốc của kho, tạo mới nếu chưa có.
+
+    Phạm vi drive.file chỉ cho ghi vào file và thư mục do CHÍNH ứng dụng tạo,
+    nên không dùng lại được một thư mục người dùng tạo tay. Lần chạy đầu tự tạo
+    rồi in id ra để ghi vào .env.
     """
-    if not GDRIVE_ROOT_FOLDER_ID:
-        logger.warning("GDRIVE_ROOT_FOLDER_ID not configured.")
+    if GDRIVE_ROOT_FOLDER_ID and not _looks_like_placeholder(GDRIVE_ROOT_FOLDER_ID):
+        return GDRIVE_ROOT_FOLDER_ID
+    if GDRIVE_ROOT_FOLDER_ID:
+        logger.warning(
+            "GDRIVE_ROOT_FOLDER_ID=%r trông như giá trị mẫu — bỏ qua và tạo "
+            "thư mục mới.", GDRIVE_ROOT_FOLDER_ID,
+        )
+
+    service = _get_service()
+    if not service:
+        return None
+    try:
+        folder = _retry_api_call(
+            lambda: service.files()
+            .create(
+                body={
+                    "name": GDRIVE_ROOT_FOLDER_NAME,
+                    "mimeType": "application/vnd.google-apps.folder",
+                },
+                fields="id",
+            )
+            .execute()
+        )
+        logger.warning(
+            "Đã tạo thư mục gốc %r trên Google Drive. Ghi vào .env:\n"
+            "  GDRIVE_ROOT_FOLDER_ID=%s",
+            GDRIVE_ROOT_FOLDER_NAME, folder["id"],
+        )
+        return folder["id"]
+    except Exception as e:
+        logger.error("Không tạo được thư mục gốc trên Google Drive: %s", e)
         return None
 
-    field_folder = ensure_folder(GDRIVE_ROOT_FOLDER_ID, field_name)
-    if not field_folder:
+
+def _safe_name(name: str) -> str:
+    """Tên an toàn cho thư mục/file trên Drive."""
+    cleaned = re.sub(r'[\\/:*?"<>|]+', "_", (name or "").strip())
+    return cleaned[:120] or "Khong_ro"
+
+
+def _year_month(doc_data: dict[str, Any]) -> tuple[str, str]:
+    """(năm, tháng) để xếp thư mục, có đường lùi khi thiếu ngày ban hành.
+
+    Bản cũ thoát sớm khi thiếu issue_date nên văn bản không rõ ngày không bao
+    giờ được upload — im lặng mất hẳn khỏi Drive. Lùi dần theo cùng thứ tự mà
+    lark_drive._parse_year_month đã dùng.
+    """
+    for key in ("issue_date", "pub_date", "created_at"):
+        value = doc_data.get(key)
+        if value is None:
+            continue
+        year = getattr(value, "year", None)
+        month = getattr(value, "month", None)
+        if year and month:
+            return str(year), f"Thang_{month:02d}"
+    return "Chua_Phan_Loai", "Chua_Phan_Loai"
+
+
+def ensure_folder_path(doc_data: dict[str, Any]) -> str | None:
+    """Thư mục lá cho một văn bản: Gốc / Lĩnh vực / Năm / Tháng_MM / Số hiệu."""
+    root = ensure_root_folder()
+    if not root:
         return None
 
-    year_folder = ensure_folder(field_folder, str(year))
-    if not year_folder:
-        return None
+    year, month = _year_month(doc_data)
+    parts = [
+        _safe_name(doc_data.get("field_name") or "Chua_Phan_Loai"),
+        year,
+        month,
+        _safe_name(doc_data.get("doc_num") or "Khong_so"),
+    ]
 
-    month_folder = ensure_folder(year_folder, f"{month:02d}")
-    return month_folder
+    folder_id = root
+    for part in parts:
+        folder_id = ensure_folder(folder_id, part)
+        if not folder_id:
+            return None
+    return folder_id
 
 
 def upload_file(
@@ -244,6 +404,7 @@ def upload_file(
         ".pdf": "application/pdf",
         ".html": "text/html",
         ".md": "text/markdown",
+        ".json": "application/json",
     }
     mime_type = mime_map.get(suffix, "application/octet-stream")
 
@@ -287,49 +448,53 @@ def upload_file(
         return None
 
 
-def upload_document_files(
-    doc_data: dict[str, Any],
-) -> dict[str, str]:
+def upload_document_files(doc_data: dict[str, Any]) -> dict[str, Any]:
+    """Đẩy trọn hồ sơ một văn bản lên Google Drive.
+
+    Mỗi văn bản một thư mục riêng gồm bốn file, để mở thư mục là đọc được đầy đủ
+    mà không cần truy cập cơ sở dữ liệu — giống cách nhánh Lark đang làm:
+      {số hiệu}.docx              bản biên tập TVPL (nếu tải được)
+      {số hiệu}_BoTuPhap.html     toàn văn gốc từ Bộ Tư pháp
+      {số hiệu}_BoTuPhap.md       toàn văn đã làm sạch
+      {số hiệu}_metadata.json     hồ sơ dữ kiện
+
+    Trả về cả `failed` để bên gọi biết file nào cần xếp vào hàng đợi thử lại,
+    thay vì lặng lẽ coi như xong.
     """
-    Upload a document's files (.docx, .pdf) to the appropriate Drive folder.
-    Returns dict with gdrive_docx_link and gdrive_pdf_link.
-    """
-    result = {
+    result: dict[str, Any] = {
         "gdrive_docx_link": None,
-        "gdrive_pdf_link": None,
+        "gdrive_fulltext_link": None,
         "gdrive_folder_id": None,
+        "uploaded": [],
+        "failed": [],
     }
 
-    field_name = doc_data.get("field_name", "Khac")
-    issue_date = doc_data.get("issue_date")
-    if not issue_date:
-        return result
-
-    year = issue_date.year if hasattr(issue_date, "year") else 2026
-    month = issue_date.month if hasattr(issue_date, "month") else 1
-
-    folder_id = ensure_folder_structure(field_name, year, month)
+    folder_id = ensure_folder_path(doc_data)
     if not folder_id:
+        result["failed"] = ["folder"]
         return result
 
     result["gdrive_folder_id"] = folder_id
-    doc_num = doc_data.get("doc_num", "unknown")
-    # Sanitize filename
-    safe_name = doc_num.replace("/", "_").replace("\\", "_")
+    safe = _safe_name(doc_data.get("doc_num") or "Khong_so")
 
-    # Upload .docx
-    docx_path = doc_data.get("docx_path")
-    if docx_path and Path(docx_path).exists():
-        upload_result = upload_file(docx_path, folder_id, f"{safe_name}.docx")
-        if upload_result:
-            result["gdrive_docx_link"] = upload_result["webViewLink"]
+    plan: list[tuple[str, Any, str, str]] = [
+        ("docx", doc_data.get("docx_path"), f"{safe}.docx", "gdrive_docx_link"),
+        ("fulltext", doc_data.get("fulltext_path"), f"{safe}_BoTuPhap.html",
+         "gdrive_fulltext_link"),
+        ("clean_text", doc_data.get("clean_text_path"), f"{safe}_BoTuPhap.md", ""),
+        ("metadata", doc_data.get("metadata_path"), f"{safe}_metadata.json", ""),
+    ]
 
-    # Upload .pdf
-    pdf_path = doc_data.get("pdf_path")
-    if pdf_path and Path(pdf_path).exists():
-        upload_result = upload_file(pdf_path, folder_id, f"{safe_name}.pdf")
-        if upload_result:
-            result["gdrive_pdf_link"] = upload_result["webViewLink"]
+    for kind, local_path, filename, link_key in plan:
+        if not local_path or not Path(local_path).exists():
+            continue
+        uploaded = upload_file(local_path, folder_id, filename)
+        if uploaded:
+            result["uploaded"].append(kind)
+            if link_key:
+                result[link_key] = uploaded["webViewLink"]
+        else:
+            result["failed"].append(kind)
 
     return result
 

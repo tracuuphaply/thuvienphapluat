@@ -11,7 +11,20 @@ from typing import List, Dict, Any, Optional
 
 import httpx
 
-from src.config import DATA_DIR, PROJECT_ROOT
+from src.config import (
+    DATA_DIR,
+    PROJECT_ROOT,
+    llm_api_key,
+    openai_api_base,
+    report_max_tokens,
+    report_model,
+    report_prompt_path,
+)
+from src.legal import effectivity
+from src.legal.hierarchy import LEVEL_NON_NORMATIVE
+from src.legal.provinces import province_name
+from src.obsidian.config_obsidian import HIERARCHY_LABELS
+from src.obsidian.vsic import code_of
 from src.rag.db_rag import RAGDatabase
 from src.rag.hybrid_search import hybrid_search, industry_search, SearchResult
 from src.rag.graph_traversal import cascade_retrieve, validate_results, impact_analysis
@@ -52,7 +65,7 @@ def load_system_prompt() -> str:
     cáo vẫn được sinh ra — mất toàn bộ cấu trúc bắt buộc, quy tắc trích dẫn và
     điều cấm, mà người dùng không hề biết. Giờ thiếu mẫu là lỗi cứng.
     """
-    override = os.getenv("REPORT_PROMPT_PATH")
+    override = report_prompt_path()
     candidates = [Path(override)] if override else []
     candidates.append(REPO_PROMPT_PATH)
     candidates.append(LEGACY_PROMPT_PATH)
@@ -82,7 +95,11 @@ def generate_compliance_report(
     days: int = 250,
     scope: str = "",
     target_audience: str = "",
-    desired_length: str = "Báo cáo chuyên sâu (8–15 trang)",
+    # Mục 4 của prompt quy định 4–6 trang và giải thích rõ lý do: "một bản 4
+    # trang được đọc hết có giá trị hơn một bản 15 trang bị bỏ qua". Mặc định
+    # cũ là 8–15 trang, mâu thuẫn ngay với prompt hệ thống — script sinh báo
+    # cáo có ghi đè, còn Telegram và CLI thì không.
+    desired_length: str = "Báo cáo chuyên đề (4–6 trang)",
     model: str = "",
     embedder=None,
     context_sink: dict | None = None,
@@ -146,14 +163,31 @@ def generate_compliance_report(
                 if not doc.eff_status:
                     thieu_trang_thai.append(doc.doc_num)
 
+                # Cấp hiệu lực và phạm vi lãnh thổ là dữ kiện mô hình BẮT BUỘC
+                # phải có: Mục 3 Bước 3 của prompt yêu cầu xử lý mâu thuẫn giữa
+                # các văn bản theo thứ bậc, mà trước đây nó chỉ nhận được chuỗi
+                # doc_type nên phải tự đoán cái nào cao hơn cái nào.
+                level = doc.hierarchy_level
+                level = LEVEL_NON_NORMATIVE if level is None else int(level)
                 docs_metadata.append({
                     "doc_num": doc.doc_num,
                     "title": doc.title,
                     "doc_type": doc.doc_type,
+                    "cap_hieu_luc_phap_ly": level,
+                    "cap_hieu_luc_dien_giai": HIERARCHY_LABELS.get(
+                        level, HIERARCHY_LABELS[LEVEL_NON_NORMATIVE]
+                    ),
+                    "la_van_ban_qppl": bool(doc.is_vbqppl),
+                    "pham_vi_lanh_tho": doc.territorial_scope or "khong_xac_dinh",
+                    "dia_ban_ap_dung": province_name(doc.province_code_current),
                     "issue_date": str(doc.issue_date) if doc.issue_date else "",
                     "eff_from": str(doc.eff_from) if doc.eff_from else "",
                     "eff_to": str(doc.eff_to) if doc.eff_to else "",
                     "eff_status": eff_status,
+                    "tinh_trang_hieu_luc_chuan_hoa": doc.eff_state or effectivity.KHONG_RO,
+                    "hieu_luc_tinh_den_ngay": (
+                        str(doc.eff_state_as_of) if doc.eff_state_as_of else ""
+                    ),
                     "agency_name": doc.agency_name or "",
                     "field_name": doc.field_name or "",
                     "industries": doc.industries or ""
@@ -238,10 +272,18 @@ def generate_compliance_report(
 
     system_prompt = load_system_prompt()
 
+    # Mục 2 và mục 9 của prompt tham chiếu {{MA_NGANH}}, nhưng bản cũ chỉ gửi
+    # tên ngành — mã ngành CHƯA BAO GIỜ tới tay mô hình, trong khi đó chính là
+    # mã ghi trên giấy đăng ký kinh doanh của doanh nghiệp.
+    ma_nganh = code_of(industry)
+    industry_label = (
+        f"{industry} (VSIC cấp 1, mã {ma_nganh})" if ma_nganh else industry
+    )
+
     user_prompt = f"""
 Soạn Báo cáo pháp lý chuyên đề theo đúng mẫu hệ thống đã được quy định.
 
-NGANH      : {industry}
+NGANH      : {industry_label}
 PHAM_VI    : {scope}
 KY_BAO_CAO : {period_str}
 MOC_CAT    : {cut_off_date_str}
@@ -261,10 +303,15 @@ LƯU Ý QUAN TRỌNG:
    hạn chế dữ liệu ở cuối báo cáo theo Mục 6 và Mục 8.
 5. Kho dữ liệu không lọc theo kỳ báo cáo — tự đối chiếu issue_date của từng văn
    bản trước khi khẳng định nó phát sinh trong kỳ.
+6. Khi hai văn bản mâu thuẫn, dùng `cap_hieu_luc_phap_ly` để xử lý theo Mục 3
+   Bước 3: SỐ NHỎ HƠN LÀ HIỆU LỰC CAO HƠN. Văn bản có `la_van_ban_qppl` = false
+   KHÔNG được dùng làm căn cứ pháp lý, chỉ được nhắc như thông tin tham khảo.
+7. Văn bản có `pham_vi_lanh_tho` = "tinh" chỉ áp dụng trong `dia_ban_ap_dung`.
+   Không được trình bày như quy định áp dụng toàn quốc.
 """
 
-    api_key = os.getenv("V98_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("GEMINI_API_KEY")
-    api_base = os.getenv("OPENAI_API_BASE", "https://v98store.com/v1")
+    api_key = llm_api_key()
+    api_base = openai_api_base()
 
     if not api_key:
         logger.warning("No API Key configured. Returning fallback report.")
@@ -279,9 +326,9 @@ LƯU Ý QUAN TRỌNG:
 
         # Danh sách model không còn hardcode: gpt-4o là mặc định cũ, nhưng khoá
         # cứng khiến không đổi được model qua cấu hình.
-        model_name = model or os.getenv("REPORT_MODEL", "gpt-4o")
+        model_name = model or report_model()
         # 8–15 trang tiếng Việt vượt xa 8000 token; mức cũ luôn cắt giữa chừng.
-        max_tokens = int(os.getenv("REPORT_MAX_TOKENS", "16000"))
+        max_tokens = report_max_tokens()
 
         payload = {
             "model": model_name,

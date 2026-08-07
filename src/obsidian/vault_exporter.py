@@ -1,13 +1,19 @@
 """
 Export legal documents from SQLite/JSON to Obsidian Markdown format.
 """
-import json
 import re
 from pathlib import Path
 from typing import List, Dict, Any
 import structlog
 
-from src.obsidian.config_obsidian import VAULT_DIR, OBSIDIAN_TEMPLATE
+from src.legal import effectivity
+from src.legal.hierarchy import LEVEL_NON_NORMATIVE
+from src.legal.provinces import province_name
+from src.obsidian.config_obsidian import (
+    HIERARCHY_LABELS,
+    OBSIDIAN_TEMPLATE,
+    VAULT_DIR,
+)
 from src.obsidian.industry_classifier import classify_industries
 from src.storage.database import get_session
 from src.storage.models import Document, DocumentReference
@@ -54,6 +60,27 @@ def load_clean_text(doc_data: Dict[str, Any], clean_dir: Path) -> str:
     logger.warning("khong_tim_thay_toan_van", doc_num=doc_data.get("doc_num"))
     return ""
 
+# Các trường mà template và load_clean_text() cần. Lấy thẳng từ ORM thay vì đọc
+# data/metadata/*.json: các file đó là bản sao được ghi lúc cào, nên mọi lần sửa
+# dữ liệu trong cơ sở dữ liệu đều không bao giờ tới được vault. Đúng lỗi đã làm
+# 1015/1015 note render "[Bộ Tư pháp]()" dù cột moj_url đã được điền đủ.
+_EXPORT_FIELDS = (
+    "doc_num", "doc_key", "title", "doc_type", "issue_date", "pub_date",
+    "eff_from", "eff_to", "eff_status", "agency_name", "signer",
+    "field_name", "field_code", "source_tvpl", "source_moj",
+    "tvpl_id", "moj_id", "tvpl_url", "moj_url",
+    "clean_text_path", "public_slug", "industries",
+    "hierarchy_level", "doc_type_norm", "is_vbqppl",
+    "territorial_scope", "province_code_raw", "province_code_current",
+    "eff_state", "eff_state_as_of",
+)
+
+
+def document_to_export_dict(doc: Document) -> Dict[str, Any]:
+    """Bản ghi ORM → dict mà export_document_to_md() và load_clean_text() dùng."""
+    return {field: getattr(doc, field, None) for field in _EXPORT_FIELDS}
+
+
 def format_yaml_list(items: List[str]) -> str:
     """Format a list of strings into a YAML list."""
     if not items:
@@ -61,7 +88,27 @@ def format_yaml_list(items: List[str]) -> str:
     formatted = [f'"{item}"' for item in items]
     return f"[{', '.join(formatted)}]"
 
-def export_document_to_md(doc_data: Dict[str, Any], content: str, references: List[Dict[str, Any]]) -> str:
+def build_link_resolver(session) -> Dict[str, str]:
+    """Bảng tra số hiệu → tên note, để wikilink trỏ đúng file.
+
+    Chỉ nhận số hiệu duy nhất trong kho. Số hiệu xuất hiện ở nhiều tỉnh thì bản
+    thân dẫn chiếu đã mơ hồ — không có căn cứ để chọn tỉnh nào, nên để link ở
+    dạng chưa phân giải thay vì đoán và trỏ nhầm sang văn bản của tỉnh khác.
+    """
+    counts: Dict[str, int] = {}
+    slugs: Dict[str, str] = {}
+    for doc_num, slug in session.query(Document.doc_num, Document.public_slug).all():
+        counts[doc_num] = counts.get(doc_num, 0) + 1
+        slugs[doc_num] = slug or sanitize_filename(doc_num)
+    return {num: slug for num, slug in slugs.items() if counts[num] == 1}
+
+
+def export_document_to_md(
+    doc_data: Dict[str, Any],
+    content: str,
+    references: List[Dict[str, Any]],
+    link_resolver: Dict[str, str] | None = None,
+) -> str:
     """
     Format a document's data and content into an Obsidian Markdown string.
     """
@@ -97,16 +144,44 @@ def export_document_to_md(doc_data: Dict[str, Any], content: str, references: Li
             rel_type = ref.get("relation_type", "Liên quan")
             target = ref.get("target_doc_num", "")
             if target:
-                safe_target = sanitize_filename(target)
+                # Tên note của văn bản đích, không phải số hiệu đã làm sạch:
+                # note của văn bản cấp tỉnh đặt theo public_slug nên link theo
+                # số hiệu trần sẽ trỏ vào một file không tồn tại.
+                safe_target = (link_resolver or {}).get(target) or sanitize_filename(target)
                 refs_lines.append(f"- {rel_type}: [[{safe_target}]]")
         refs_md = "\n".join(refs_lines)
     else:
         refs_md = "- Không có văn bản liên quan"
         
+    # Dữ kiện pháp lý suy được. Trước đây note chỉ có chuỗi doc_type, nên người
+    # đọc (và mô hình sinh báo cáo) phải tự đoán văn bản nào có hiệu lực cao hơn.
+    level = doc_data.get("hierarchy_level")
+    level = LEVEL_NON_NORMATIVE if level is None else int(level)
+    eff_state = doc_data.get("eff_state") or effectivity.KHONG_RO
+    scope = doc_data.get("territorial_scope") or "khong_xac_dinh"
+    province = province_name(doc_data.get("province_code_current"))
+
+    if scope == "tinh":
+        scope_label = f"Địa phương — {province}" if province else "Địa phương (chưa rõ tỉnh)"
+    elif scope == "trung_uong":
+        scope_label = "Toàn quốc"
+    else:
+        scope_label = "Chưa xác định"
+
     md_content = OBSIDIAN_TEMPLATE.format(
         doc_num=doc_num,
         title=safe_title,
         doc_type=doc_data.get("doc_type") or "",
+        doc_type_norm=doc_data.get("doc_type_norm") or "",
+        hierarchy_level=level,
+        hierarchy_label=HIERARCHY_LABELS.get(level, HIERARCHY_LABELS[LEVEL_NON_NORMATIVE]),
+        is_vbqppl=str(bool(doc_data.get("is_vbqppl"))).lower(),
+        territorial_scope=scope,
+        province=province,
+        scope_label=scope_label,
+        eff_state=eff_state,
+        eff_state_label=effectivity.label(eff_state),
+        eff_state_as_of=doc_data.get("eff_state_as_of") or "",
         issue_date=doc_data.get("issue_date") or "",
         eff_from=doc_data.get("eff_from") or "",
         eff_to=doc_data.get("eff_to") or "",
@@ -129,53 +204,54 @@ def export_document_to_md(doc_data: Dict[str, Any], content: str, references: Li
     return md_content
 
 def export_all(vault_dir: Path = VAULT_DIR) -> None:
-    """Export all documents from the database to the Obsidian vault."""
+    """Dựng lại toàn bộ vault từ cơ sở dữ liệu.
+
+    Duyệt bảng documents chứ không duyệt data/metadata/*.json: văn bản chưa kịp
+    ghi file metadata vẫn phải có note, và metadata trên đĩa là bản sao có thể
+    đã cũ so với cơ sở dữ liệu.
+    """
     docs_dir = vault_dir / "Documents"
     docs_dir.mkdir(parents=True, exist_ok=True)
-    
-    meta_dir = DATA_DIR / "metadata"
+
     clean_dir = DATA_DIR / "clean_text"
-    
-    if not meta_dir.exists():
-        logger.warning("Metadata directory not found", dir=str(meta_dir))
-        return
-        
     count = 0
+
     with get_session() as session:
-        for meta_file in meta_dir.glob("*.json"):
+        link_resolver = build_link_resolver(session)
+        for db_doc in session.query(Document).order_by(Document.id).all():
             try:
-                with open(meta_file, "r", encoding="utf-8") as f:
-                    doc_data = json.load(f)
-                    
-                doc_num = doc_data.get("doc_num")
-                if not doc_num:
-                    continue
-                    
+                doc_data = document_to_export_dict(db_doc)
                 content = load_clean_text(doc_data, clean_dir)
-                        
-                # Get references from DB
-                db_doc = session.query(Document).filter(Document.doc_num == doc_num).first()
-                references = []
-                if db_doc:
-                    db_refs = session.query(DocumentReference).filter(
-                        DocumentReference.source_doc_id == db_doc.id
-                    ).all()
-                    references = [{"relation_type": r.relation_type, "target_doc_num": r.target_doc_num} for r in db_refs]
-                
-                md_content = export_document_to_md(doc_data, content, references)
-                
-                safe_name = sanitize_filename(doc_num)
-                out_path = docs_dir / f"{safe_name}.md"
-                
-                with open(out_path, "w", encoding="utf-8") as f:
-                    f.write(md_content)
-                    
+
+                db_refs = session.query(DocumentReference).filter(
+                    DocumentReference.source_doc_id == db_doc.id
+                ).all()
+                references = [
+                    {"relation_type": r.relation_type, "target_doc_num": r.target_doc_num}
+                    for r in db_refs
+                ]
+
+                md_content = export_document_to_md(
+                    doc_data, content, references, link_resolver
+                )
+                out_path = docs_dir / f"{note_filename(db_doc)}.md"
+                out_path.write_text(md_content, encoding="utf-8")
                 count += 1
-                
+
             except Exception as e:
-                logger.error("Failed to export document", file=meta_file.name, error=str(e))
-                
+                logger.error("Failed to export document", doc_num=db_doc.doc_num, error=str(e))
+
     logger.info("Exported documents to Obsidian vault", count=count, vault_dir=str(vault_dir))
+
+
+def note_filename(doc: Document) -> str:
+    """Tên file note của một văn bản, không đuôi.
+
+    Ưu tiên public_slug vì số hiệu trần đụng nhau giữa các tỉnh — hai văn bản
+    "40/2026/QĐ-UBND" của hai tỉnh sẽ ra cùng một file và bản sau ghi đè bản
+    trước mà không báo gì. Lùi về số hiệu khi slug chưa được điền.
+    """
+    return doc.public_slug or sanitize_filename(doc.doc_num)
 
 if __name__ == "__main__":
     export_all()

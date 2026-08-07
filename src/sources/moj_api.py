@@ -196,7 +196,22 @@ def parse_doc_summary(doc: dict) -> dict[str, Any]:
         "field_code": _get_primary_field_code(data),
         "source_moj": True,
         "moj_id": str(data.get("id", "")),
+        "moj_url": doc_source_url(data.get("id")),
     }
+
+
+def doc_source_url(moj_id: Any) -> str:
+    """Địa chỉ công khai của bản ghi gốc trên hệ thống Bộ Tư pháp.
+
+    Trỏ thẳng vào endpoint dữ liệu vì đó đúng là nơi kho này lấy văn bản về:
+    ai mở link cũng thấy đúng bản ghi đã dùng, không qua trung gian nào.
+
+    Không dùng vbpl.vn được dù nó là giao diện tra cứu chính thức: không gian id
+    của nó khác hẳn (đã đối chiếu id 140432 — không ra văn bản tương ứng), và
+    trang tìm kiếm chạy bằng postback ASPX nên không có URL tra cứu theo số hiệu.
+    """
+    doc_id = str(moj_id or "").strip()
+    return f"{MOJ_BASE_URL}/doc/{doc_id}" if doc_id else ""
 
 
 # referenceType của gateway vbpl-bientap → nhãn quan hệ tiếng Việt.
@@ -275,12 +290,18 @@ def parse_doc_detail(detail_resp: dict) -> dict[str, Any]:
         if not isinstance(ref, dict):
             continue
         target = ref.get("targetDocument") or {}
+        if not isinstance(target, dict):
+            target = {}
         target_num = (
-            (target.get("docNum") if isinstance(target, dict) else "")
+            target.get("docNum")
             or ref.get("docNum")
             or ref.get("refDocNum")
             or ""
         ).strip()
+        # id của văn bản đích nằm sẵn ở đây và trước đây bị vứt đi. Vì /doc/all
+        # bỏ qua mọi tham số lọc nên không tra ngược số hiệu ra id được — mất id
+        # là mất luôn đường tải văn bản được dẫn chiếu mà kho chưa có.
+        target_moj_id = str(target.get("id") or "").strip()
         rel_type = ref.get("type") or ref.get("relationType")
         if not rel_type:
             rel_type = relation_label(ref.get("referenceType"))
@@ -288,6 +309,7 @@ def parse_doc_detail(detail_resp: dict) -> dict[str, Any]:
             references.append({
                 "target_doc_num": target_num,
                 "relation_type": str(rel_type).strip(),
+                "target_moj_id": target_moj_id or None,
             })
 
     # Extract full text content (HTML) — gateway lồng trong documentContent.content
@@ -302,21 +324,27 @@ def parse_doc_detail(detail_resp: dict) -> dict[str, Any]:
     return summary
 
 
-def scan_incremental(window_days: int = MOJ_WINDOW_DAYS) -> list[dict[str, Any]]:
-    """
-    Scan MOJ for business documents within a sliding window.
-    Returns list of parsed document summaries (already filtered for business fields).
+def scan_incremental(
+    window_days: int = MOJ_WINDOW_DAYS,
+    cutoff: date | None = None,
+) -> list[dict[str, Any]]:
+    """Quét MOJ lùi tới `cutoff`.
 
-    Uses issueDate sorting + dedupe by id to handle unstable pagination.
+    Truyền `cutoff` từ watermark bền vững (database.get_crawl_cutoff) thay vì
+    để hàm tự tính `today - window_days`: cửa sổ trượt quét lại toàn bộ cửa sổ
+    mỗi lần chạy, và máy tắt lâu hơn cửa sổ là mất hẳn phần ở giữa. Tham số
+    window_days chỉ còn là đường lùi khi chưa có watermark.
+
+    Sắp theo issueDate + dedupe theo id để chịu được phân trang không ổn định.
     """
-    cutoff = date.today() - timedelta(days=window_days)
+    if cutoff is None:
+        cutoff = date.today() - timedelta(days=window_days)
     seen_ids: set[str] = set()
     results: list[dict[str, Any]] = []
     page = 1
 
-    logger.info(
-        "MOJ scan started: window=%d days, cutoff=%s", window_days, cutoff
-    )
+    newest_seen: date | None = None
+    logger.info("MOJ scan started: cutoff=%s", cutoff)
 
     while page <= MOJ_MAX_PAGES:
         try:
@@ -350,6 +378,9 @@ def scan_incremental(window_days: int = MOJ_WINDOW_DAYS) -> list[dict[str, Any]]
             # Toàn bộ văn bản trong cửa sổ được giữ lại làm chỉ mục để đối chiếu
             # với TVPL (bước merge); việc lọc lĩnh vực cho văn bản chỉ-có-ở-MOJ
             # do merge_triggers đảm nhiệm sau khi đã bổ sung chi tiết.
+            if issue_date and (newest_seen is None or issue_date > newest_seen):
+                newest_seen = issue_date
+
             parsed = parse_doc_summary(doc_data)
             if parsed["doc_num"]:
                 results.append(parsed)
@@ -368,8 +399,13 @@ def scan_incremental(window_days: int = MOJ_WINDOW_DAYS) -> list[dict[str, Any]]
             MOJ_MAX_PAGES,
         )
 
-    logger.info("MOJ scan complete: %d documents in %d-day window", len(results), window_days)
+    logger.info("MOJ scan complete: %d văn bản, mới nhất %s", len(results), newest_seen)
+    scan_incremental.last_high_water = newest_seen
     return results
+
+
+# Mốc issueDate mới nhất của lần quét gần nhất, để bên gọi ghi vào watermark.
+scan_incremental.last_high_water = None
 
 
 def _title_overlap(a: str, b: str) -> float:

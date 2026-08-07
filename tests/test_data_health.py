@@ -70,11 +70,43 @@ class TestDoThiQuanHe:
         assert bai_bo / total < 0.30, f"Bãi bỏ chiếm {100*bai_bo//total}% — trước khi sửa là 82%"
 
     def test_hai_kho_do_thi_dong_bo(self):
+        """Số cạnh hai bên phải khớp đúng bằng nhau.
+
+        Từ khi `legal_graph` khoá theo doc_key thay vì số hiệu, không còn cạnh
+        nào bị gộp: hai văn bản của hai tỉnh trùng số hiệu — đã có thật,
+        64/2026/QĐ-UBND của Huế và của Tây Ninh cùng "Căn cứ" 72/2025/QH15 —
+        nay là hai cạnh riêng biệt. Trước đó test này phải trừ hao phần bị gộp;
+        so bằng nhau tuyệt đối là chặt hơn hẳn.
+        """
         with _conn(MASTER_DB) as c:
             master = c.execute("SELECT COUNT(*) FROM document_references").fetchone()[0]
         with _conn(RAG_DB) as c:
             rag = c.execute("SELECT COUNT(*) FROM legal_graph").fetchone()[0]
-        assert master == rag, f"legal_docs.db có {master} cạnh nhưng rag.db có {rag}"
+
+        assert master == rag, (
+            f"legal_docs.db có {master} cạnh nhưng rag.db có {rag} — "
+            f"chạy: python -m src.main --sync-rag-only"
+        )
+
+    def test_do_thi_khong_con_gop_canh_theo_doc_key(self):
+        """Bất biến sau khi đổi khoá, và là cảnh báo sớm cho bao đóng dẫn chiếu.
+
+        Cạnh chỉ được gộp khi TRÙNG HOÀN TOÀN: cùng văn bản nguồn, cùng văn bản
+        đích, cùng loại quan hệ. Đó là cùng một sự kiện pháp lý ghi hai lần, gộp
+        là đúng. Con số này khác 0 nghĩa là `document_references` đang chứa bản
+        ghi lặp — không mất dữ kiện, nhưng là dấu hiệu khâu nạp có vấn đề.
+        """
+        with _conn(MASTER_DB) as c:
+            gop = c.execute("""
+                SELECT COALESCE(SUM(n - 1), 0) FROM (
+                    SELECT COUNT(*) n FROM document_references r
+                    JOIN documents d ON d.id = r.source_doc_id
+                    LEFT JOIN documents t ON t.id = r.target_doc_id
+                    GROUP BY d.doc_key, t.doc_key, r.target_doc_num, r.relation_type
+                    HAVING n > 1
+                )
+            """).fetchone()[0]
+        assert gop == 0, f"{gop} cạnh trùng hoàn toàn trong document_references"
 
 
 class TestMetadataRagIndex:

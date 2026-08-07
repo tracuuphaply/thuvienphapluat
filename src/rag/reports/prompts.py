@@ -1,0 +1,80 @@
+"""Nạp mẫu prompt cho ba loại báo cáo, có cơ chế include phần dùng chung."""
+from __future__ import annotations
+
+import logging
+import re
+from pathlib import Path
+
+from src.config import PROJECT_ROOT, report_prompt_path
+
+logger = logging.getLogger(__name__)
+
+PROMPT_DIR = PROJECT_ROOT / "src" / "rag" / "prompts"
+
+# Loại báo cáo → file mẫu.
+KIND_TO_FILE: dict[str, str] = {
+    "a": "prompt_bao_cao_v98.md",       # tổng hợp ngành
+    "b": "prompt_cap_nhat_van_ban.md",  # phân tích văn bản mới
+    "c": "prompt_tac_dong_nganh.md",    # doanh nghiệp trong ngành
+}
+
+# Mục 9 trở đi là tài liệu cho người vận hành (hợp đồng dữ liệu, tham số API),
+# không phải chỉ dẫn cho mô hình. Mỗi mẫu tự khai chỗ cắt bằng tiêu đề này.
+_CUT_MARKERS = ("## 9. HỢP ĐỒNG DỮ LIỆU", "## 7. HỢP ĐỒNG DỮ LIỆU")
+
+_INCLUDE = re.compile(r"\{\{include:([^}]+)\}\}")
+
+
+class PromptTemplateMissing(RuntimeError):
+    """Không đọc được mẫu prompt — không được sinh báo cáo bằng prompt rút gọn.
+
+    Trước đây thiếu file thì hàm trả về một câu mô tả vai trò một dòng và báo cáo
+    vẫn ra, mất toàn bộ cấu trúc bắt buộc, quy tắc trích dẫn và điều cấm — mà
+    người dùng không hề biết.
+    """
+
+
+def _expand_includes(text: str, depth: int = 0) -> str:
+    if depth > 3:
+        raise PromptTemplateMissing("include lồng quá sâu — nghi ngờ vòng lặp")
+
+    def replace(match: re.Match) -> str:
+        target = PROMPT_DIR / match.group(1).strip()
+        try:
+            return _expand_includes(target.read_text(encoding="utf-8"), depth + 1)
+        except OSError as e:
+            raise PromptTemplateMissing(f"Không đọc được phần dùng chung {target}: {e}")
+
+    return _INCLUDE.sub(replace, text)
+
+
+def load_prompt(kind: str = "a") -> str:
+    """Phần chỉ dẫn dành cho mô hình của một loại báo cáo.
+
+    Biến REPORT_PROMPT_PATH chỉ ghi đè mẫu (a) — đó là mẫu duy nhất người vận
+    hành có nhu cầu thay ngoài repo.
+    """
+    candidates: list[Path] = []
+    override = report_prompt_path()
+    if kind == "a" and override:
+        candidates.append(Path(override))
+    if kind in KIND_TO_FILE:
+        candidates.append(PROMPT_DIR / KIND_TO_FILE[kind])
+    if kind == "a":
+        candidates.append(PROMPT_DIR / "prompt_report.md")
+
+    for path in candidates:
+        try:
+            content = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        content = _expand_includes(content)
+        for marker in _CUT_MARKERS:
+            cut = content.find(marker)
+            if cut > 0:
+                return content[:cut].rstrip()
+        return content
+
+    raise PromptTemplateMissing(
+        f"Không đọc được mẫu prompt loại {kind!r} tại: {[str(p) for p in candidates]}"
+    )

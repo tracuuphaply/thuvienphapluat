@@ -3,6 +3,7 @@ import re
 import datetime
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
+from src.legal.effectivity import HET_TOAN_BO
 from src.rag.db_rag import RAGDatabase, HAS_VEC
 
 @dataclass
@@ -67,6 +68,31 @@ def compute_final_score(rrf_score: float, days_old: float, usage_count: int, max
     frequency = (usage_count / max_usage) if max_usage > 0 else 0
     return 0.5 * relevance + 0.3 * recency + 0.2 * frequency
 
+# Mặc định mọi truy xuất đều loại văn bản đã hết hiệu lực toàn bộ và văn bản
+# chỉ vào kho vì bị dẫn chiếu.
+#
+# Mặc định phải là AN TOÀN chứ không phải "lấy tất": trước đây bộ lọc chỉ chạy
+# sau khi đã lấy 100 kết quả về, nên chỉ cần kho có nhiều văn bản chết là 100 chỗ
+# đó bị chiếm sạch và báo cáo còn vài điều khoản — mà vẫn ra báo cáo, không có
+# dấu hiệu nào cho thấy đã mất dữ liệu. Bao đóng dẫn chiếu biến tình huống đó
+# thành mặc định.
+#
+# Muốn tra cứu cả văn bản lịch sử thì truyền filters={"exclude_eff_states": []}
+# một cách có ý thức.
+DEFAULT_FILTERS: Dict[str, Any] = {
+    "exclude_eff_states": [HET_TOAN_BO],
+    "exclude_closure": True,
+}
+
+
+def with_default_filters(filters: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Ghép bộ lọc người gọi truyền vào lên trên bộ mặc định an toàn."""
+    merged = dict(DEFAULT_FILTERS)
+    if filters:
+        merged.update(filters)
+    return merged
+
+
 def hybrid_search(
     db: RAGDatabase,
     query: str,
@@ -78,15 +104,16 @@ def hybrid_search(
         return []
         
     strategy = classify_query(query)
-    
-    fts_results = db.search_fts(query, 100)
+    filters = with_default_filters(filters)
+
+    fts_results = db.search_fts(query, 100, filters=filters)
     vec_results = []
-    
+
     if strategy == "HYBRID" and HAS_VEC and embedder:
         try:
             query_embedding = embedder.embed_single(query)
             if query_embedding:
-                vec_results = db.search_vector(query_embedding, 100)
+                vec_results = db.search_vector(query_embedding, 100, filters=filters)
         except Exception as e:
             pass
             

@@ -74,6 +74,24 @@ GDRIVE_SERVICE_ACCOUNT_FILE = os.getenv(
 )
 GDRIVE_ROOT_FOLDER_ID = os.getenv("GDRIVE_ROOT_FOLDER_ID", "")
 
+# Ứng dụng OAuth (luồng Desktop app). Service account KHÔNG dùng được: Google
+# cấp cho service account hạn mức lưu trữ 0 GB nên upload vào My Drive trả về
+# 403 storageQuotaExceeded, và không xin thêm quota được.
+GDRIVE_OAUTH_CLIENT_FILE = os.getenv(
+    "GDRIVE_OAUTH_CLIENT_FILE",
+    str(PROJECT_ROOT / "credentials" / "gdrive_oauth_client.json"),
+)
+GDRIVE_OAUTH_TOKEN_FILE = os.getenv(
+    "GDRIVE_OAUTH_TOKEN_FILE",
+    str(PROJECT_ROOT / "credentials" / "gdrive_token.json"),
+)
+# Chỉ xin drive.file — phạm vi không nhạy cảm, không cần Google thẩm định.
+# Scope `drive` đầy đủ là phạm vi hạn chế, phải qua đánh giá an ninh CASA.
+# Hệ quả: ứng dụng chỉ ghi được vào thư mục do chính nó tạo, nên thư mục gốc
+# phải do ứng dụng tạo chứ không trỏ tới thư mục người dùng tạo tay.
+GDRIVE_SCOPES = ("https://www.googleapis.com/auth/drive.file",)
+GDRIVE_ROOT_FOLDER_NAME = os.getenv("GDRIVE_ROOT_FOLDER_NAME", "Kho văn bản pháp luật")
+
 # ──────────────────────────────────────────────
 # Lark Drive
 # ──────────────────────────────────────────────
@@ -88,6 +106,111 @@ LARK_FOLDER_PER_DOC = os.getenv("LARK_FOLDER_PER_DOC", "true").lower() in (
 
 # Auto-delete local .docx files after upload to save disk space
 AUTO_CLEANUP_LOCAL_FILES = os.getenv("AUTO_CLEANUP_LOCAL_FILES", "true").lower() in ("true", "1", "yes")
+
+# Nơi lưu trữ chính. Trước đây suy từ việc có hay không LARK_APP_ID, nên chỉ cần
+# ai đó điền khoá Lark vào .env là toàn bộ pipeline âm thầm đổi đích lưu trữ.
+CLOUD_DRIVE_PROVIDER = os.getenv("CLOUD_DRIVE_PROVIDER", "lark").strip().lower()
+
+# ──────────────────────────────────────────────
+# LLM & Embeddings
+#
+# Trước đây các biến này chỉ được đọc bằng os.getenv rải rác trong
+# src/rag/report_generator.py và src/rag/embeddings_api.py, không có ở đây lẫn
+# .env.example. Người làm đúng theo HUONG_DAN_CHUYEN_GIAO.md nhận được một
+# crawler chạy tốt và một bộ sinh báo cáo chết câm mà không có thông báo nào.
+#
+# Nhóm này là HÀM chứ không phải hằng số như phần còn lại của file, vì chúng
+# phải đọc lại lúc gọi: tiến trình dài như bot Telegram cần đổi model mà không
+# khởi động lại, và đóng băng lúc import thì mất luôn khả năng ép giá trị khi
+# chạy thử. Đường dẫn và các trần ở trên thì ngược lại — chốt một lần lúc khởi
+# động là đúng.
+# ──────────────────────────────────────────────
+# v98store là gateway tương thích OpenAI đang dùng thật; hai khoá còn lại để
+# chuyển nhà cung cấp mà không phải sửa code.
+def v98_api_key() -> str:
+    return os.getenv("V98_API_KEY", "")
+
+
+def openai_api_key() -> str:
+    return os.getenv("OPENAI_API_KEY", "")
+
+
+def gemini_api_key() -> str:
+    return os.getenv("GEMINI_API_KEY", "")
+
+
+def llm_api_key() -> str:
+    """Khoá cho cả gọi chat lẫn nhúng, theo thứ tự ưu tiên đang dùng thật."""
+    return v98_api_key() or openai_api_key() or gemini_api_key()
+
+
+def openai_api_base() -> str:
+    return os.getenv("OPENAI_API_BASE", "https://v98store.com/v1")
+
+
+def report_model() -> str:
+    return os.getenv("REPORT_MODEL", "gpt-4o")
+
+
+def report_max_tokens() -> int:
+    """Báo cáo tiếng Việt 4–6 trang vượt xa 8000 token; thấp hơn là bị cắt."""
+    return int(os.getenv("REPORT_MAX_TOKENS", "16000"))
+
+
+def report_prompt_path() -> str:
+    return os.getenv("REPORT_PROMPT_PATH", "")
+
+
+def embedding_model_override() -> str:
+    """Để trống = tự chọn theo khoá API đang có (xem embeddings_api)."""
+    return os.getenv("EMBEDDING_MODEL", "")
+
+
+def embedding_dim_override() -> str:
+    return os.getenv("EMBEDDING_DIM", "")
+
+
+def embedding_batch_size() -> int:
+    return int(os.getenv("EMBEDDING_BATCH_SIZE", "64"))
+
+
+# ──────────────────────────────────────────────
+# Thu thập theo mốc cố định & bao đóng dẫn chiếu
+# ──────────────────────────────────────────────
+# Sàn quét cố định, không trôi theo ngày chạy như cửa sổ 30 ngày trước đây.
+CLOSURE_SEED_FLOOR = os.getenv("CLOSURE_SEED_FLOOR", "2026-01-01")
+# Quét lùi quá watermark một quãng: văn bản được đăng lên hệ thống muộn hơn ngày
+# ban hành, nên cắt đúng watermark theo issueDate sẽ bỏ sót vĩnh viễn văn bản
+# đăng chậm.
+CRAWL_OVERLAP_DAYS = int(os.getenv("CRAWL_OVERLAP_DAYS", "45"))
+CLOSURE_ENABLED = os.getenv("CLOSURE_ENABLED", "false").lower() in ("true", "1", "yes")
+CLOSURE_MAX_FETCH_PER_RUN = int(os.getenv("CLOSURE_MAX_FETCH_PER_RUN", "300"))
+# Luật tổ chức bộ máy bị mọi văn bản tỉnh "Căn cứ" (72/2025/QH15 bị dẫn 204 lần).
+# Vẫn tải chúng về, nhưng không giãn nở tiếp từ chúng, nếu không bao đóng kéo về
+# cả hệ thống pháp luật mà không thêm giá trị nào cho doanh nghiệp.
+CLOSURE_HUB_INDEGREE = int(os.getenv("CLOSURE_HUB_INDEGREE", "200"))
+CLOSURE_MAX_NODES = int(os.getenv("CLOSURE_MAX_NODES", "15000"))
+# Dừng bao đóng khi đĩa còn dưới mức này. Đĩa đầy giữa lúc SQLite đang ghi
+# có thể làm hỏng cơ sở dữ liệu; frontier nằm trong DB nên dừng rồi chạy
+# tiếp được sau khi dọn chỗ.
+MIN_FREE_DISK_GB = float(os.getenv("MIN_FREE_DISK_GB", "5"))
+
+# ──────────────────────────────────────────────
+# Chấm điểm tác động & báo cáo
+# ──────────────────────────────────────────────
+# Đổi công thức thì tăng version: kết quả cũ vẫn tra được để đối chiếu.
+# Nhúng luôn tên model vì EMBEDDING_MODEL đọc từ env nên có thể đổi thầm lặng.
+IMPACT_SCORER_VERSION = os.getenv("IMPACT_SCORER_VERSION", "v1.0.0")
+MAX_REPORTS_PER_DAY = int(os.getenv("MAX_REPORTS_PER_DAY", "5"))
+REPORT_B_COOLDOWN_DAYS = int(os.getenv("REPORT_B_COOLDOWN_DAYS", "7"))
+
+# ──────────────────────────────────────────────
+# Trang công khai
+# ──────────────────────────────────────────────
+PUBLIC_VAULT_BASE_URL = os.getenv("PUBLIC_VAULT_BASE_URL", "")
+PUBLISH_VAULT_ENABLED = os.getenv("PUBLISH_VAULT_ENABLED", "false").lower() in (
+    "true", "1", "yes",
+)
 
 
 # ──────────────────────────────────────────────

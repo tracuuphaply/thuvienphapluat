@@ -60,13 +60,20 @@ def chunk_factory(rag_db):
 
 @pytest.fixture
 def edge_factory(rag_db):
-    """Tạo nhanh cạnh quan hệ trong legal_graph test."""
-    def _make(source: str, target: str, relation: str):
-        rag_db.db.execute(
-            """INSERT OR REPLACE INTO legal_graph
-               (source_doc_num, target_doc_num, relation_type, confidence)
-               VALUES (?, ?, ?, 1.0)""",
-            (source, target, relation),
+    """Tạo nhanh cạnh quan hệ trong legal_graph test.
+
+    Đi qua đúng API thật thay vì INSERT tay, để test không lặng lẽ dựng ra
+    những hàng mà mã sản xuất không bao giờ tạo được. Test nào không quan tâm
+    tới việc trùng số hiệu thì cứ suy doc_key từ số hiệu; test nào quan tâm
+    (xem tests/test_graph_doc_key.py) truyền khoá thật vào.
+    """
+    def _make(source: str, target: str, relation: str,
+              source_key: str = None, target_key: str = None):
+        rag_db.upsert_graph_edge(
+            source_doc_key=source_key or f"{source.lower()}::",
+            source_doc_num=source,
+            target_doc_key=target_key or f"{target.lower()}::",
+            target_doc_num=target,
+            relation_type=relation,
         )
-        rag_db.db.commit()
     return _make

@@ -64,6 +64,17 @@ class RAGDatabase:
             )
         """)
 
+        # Cột lọc: phải nằm ngay trong legal_chunks để điều kiện đi vào câu SQL.
+        # Lọc sau khi đã lấy 100 kết quả về Python nghĩa là 100 chỗ đó có thể bị
+        # văn bản đã hết hiệu lực chiếm sạch, lọc xong còn vài đoạn — và sau bao
+        # đóng dẫn chiếu thì đó là tình huống mặc định chứ không phải ngoại lệ.
+        self._add_chunk_columns([
+            ("eff_state", "TEXT"),
+            ("is_closure_node", "INTEGER"),
+            ("hierarchy_level", "INTEGER"),
+            ("is_vbqppl", "INTEGER"),
+        ])
+
         # FTS5 table
         fts_check = self.db.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='legal_chunks_fts'"
@@ -132,24 +143,51 @@ class RAGDatabase:
             "CREATE INDEX IF NOT EXISTS idx_chunks_docnum_idx "
             "ON legal_chunks(doc_num, chunk_index)"
         )
+        # Điều kiện lọc mặc định của mọi truy xuất phục vụ báo cáo.
+        self.db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_chunks_eff_state "
+            "ON legal_chunks(eff_state, is_closure_node)"
+        )
 
         # Graph table
+        #
+        # Khoá theo doc_key chứ KHÔNG theo số hiệu. Số hiệu chỉ duy nhất trong
+        # phạm vi một cơ quan, nên khoá theo số hiệu làm hai văn bản của hai
+        # tỉnh khác nhau gộp thành một cạnh — đã gặp thật với "64/2026/QĐ-UBND"
+        # của Huế và của Tây Ninh cùng "Căn cứ" 72/2025/QH15.
+        #
+        # target_doc_key NULL khi đích chưa có trong kho, nên target_doc_num
+        # cũng phải nằm trong khoá duy nhất; thiếu nó thì mọi cạnh treo của cùng
+        # một nguồn sẽ gộp làm một.
         self.db.execute("""
             CREATE TABLE IF NOT EXISTS legal_graph (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                source_doc_num TEXT,
-                target_doc_num TEXT,
-                relation_type TEXT,
-                confidence REAL DEFAULT 1.0,
-                UNIQUE(source_doc_num, target_doc_num, relation_type)
+                source_doc_key TEXT NOT NULL,
+                source_doc_num TEXT NOT NULL,
+                target_doc_key TEXT,
+                target_doc_num TEXT NOT NULL,
+                relation_type TEXT NOT NULL,
+                confidence REAL DEFAULT 1.0
             )
         """)
-        # Chỉ mục UNIQUE tự sinh chỉ phủ tiền tố source_doc_num, nên truy vết
-        # chiều ngược ("văn bản này bị ai tác động") vẫn phải quét toàn bảng.
-        # Phải đặt SAU khi bảng đã tồn tại.
-        self.db.execute(
-            "CREATE INDEX IF NOT EXISTS idx_graph_target ON legal_graph(target_doc_num)"
-        )
+        # Khoá duy nhất phải là CHỈ MỤC BIỂU THỨC, không phải ràng buộc UNIQUE
+        # thường: SQL coi mỗi NULL là một giá trị khác nhau, nên UNIQUE(...,
+        # target_doc_key, ...) hoàn toàn không có tác dụng với cạnh treo. Mà
+        # cạnh treo chiếm 2.963/7.926 cạnh — mỗi lần đồng bộ lại chèn thêm một
+        # bản sao, chạy hằng ngày thì đồ thị phình vô hạn. Đã xảy ra thật: một
+        # lượt đồng bộ đẩy 7.926 cạnh thành 10.889.
+        self.db.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_graph_canh ON legal_graph(
+                source_doc_key, COALESCE(target_doc_key, ''),
+                target_doc_num, relation_type
+            )
+        """)
+        # Truy vết chiều ngược ("văn bản này bị ai tác động") là câu hỏi quan
+        # trọng nhất khi thẩm định hiệu lực, và chỉ mục duy nhất không phủ nó.
+        for col in ("target_doc_num", "source_doc_num", "target_doc_key"):
+            self.db.execute(
+                f"CREATE INDEX IF NOT EXISTS idx_graph_{col} ON legal_graph({col})"
+            )
         self.db.commit()
 
     def upsert_chunk(self, chunk_data: dict, commit: bool = True) -> int:
@@ -174,13 +212,17 @@ class RAGDatabase:
                 UPDATE legal_chunks 
                 SET heading=?, content=?, char_count=?, field_name=?, field_code=?, 
                     industries=?, eff_status=?, issue_date=?, doc_type=?, agency_name=?, 
+                    eff_state=?, is_closure_node=?, hierarchy_level=?, is_vbqppl=?,
                     content_hash=?, updated_at=datetime('now')
                 WHERE id=?
             """, (
                 chunk_data.get("heading"), chunk_data.get("content"), chunk_data.get("char_count"),
                 chunk_data.get("field_name"), chunk_data.get("field_code"), industries,
                 chunk_data.get("eff_status"), chunk_data.get("issue_date"), chunk_data.get("doc_type"),
-                chunk_data.get("agency_name"), chunk_data.get("content_hash"), existing["id"]
+                chunk_data.get("agency_name"),
+                chunk_data.get("eff_state"), chunk_data.get("is_closure_node"),
+                chunk_data.get("hierarchy_level"), chunk_data.get("is_vbqppl"),
+                chunk_data.get("content_hash"), existing["id"]
             ))
             if commit:
                 self.db.commit()
@@ -188,16 +230,21 @@ class RAGDatabase:
         else:
             cursor.execute("""
                 INSERT INTO legal_chunks (
-                    doc_id, doc_num, chunk_index, heading, content, char_count, 
-                    field_name, field_code, industries, eff_status, issue_date, 
-                    doc_type, agency_name, content_hash
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    doc_id, doc_num, chunk_index, heading, content, char_count,
+                    field_name, field_code, industries, eff_status, issue_date,
+                    doc_type, agency_name,
+                    eff_state, is_closure_node, hierarchy_level, is_vbqppl,
+                    content_hash
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 chunk_data.get("doc_id"), chunk_data.get("doc_num"), chunk_data.get("chunk_index"),
                 chunk_data.get("heading"), chunk_data.get("content"), chunk_data.get("char_count"),
                 chunk_data.get("field_name"), chunk_data.get("field_code"), industries,
                 chunk_data.get("eff_status"), chunk_data.get("issue_date"), chunk_data.get("doc_type"),
-                chunk_data.get("agency_name"), chunk_data.get("content_hash")
+                chunk_data.get("agency_name"),
+                chunk_data.get("eff_state"), chunk_data.get("is_closure_node"),
+                chunk_data.get("hierarchy_level"), chunk_data.get("is_vbqppl"),
+                chunk_data.get("content_hash")
             ))
             if commit:
                 self.db.commit()
@@ -227,12 +274,25 @@ class RAGDatabase:
         if commit:
             self.db.commit()
 
-    def upsert_graph_edge(self, source_doc_num: str, target_doc_num: str, relation_type: str, confidence: float = 1.0):
+    def upsert_graph_edge(self, source_doc_key: str, source_doc_num: str,
+                          target_doc_num: str, relation_type: str,
+                          target_doc_key: str | None = None,
+                          confidence: float = 1.0, commit: bool = True):
+        """Ghi một cạnh quan hệ, định danh hai đầu bằng doc_key.
+
+        `source_doc_key` bắt buộc: đó là thứ phân biệt "64/2026/QĐ-UBND" của Huế
+        với bản cùng số hiệu của Tây Ninh. `target_doc_key` được phép NULL vì
+        văn bản đích có thể chưa có trong kho.
+        """
         self.db.execute("""
-            INSERT OR REPLACE INTO legal_graph (source_doc_num, target_doc_num, relation_type, confidence)
-            VALUES (?, ?, ?, ?)
-        """, (source_doc_num, target_doc_num, relation_type, confidence))
-        self.db.commit()
+            INSERT OR REPLACE INTO legal_graph
+                (source_doc_key, source_doc_num, target_doc_key, target_doc_num,
+                 relation_type, confidence)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (source_doc_key, source_doc_num, target_doc_key, target_doc_num,
+              relation_type, confidence))
+        if commit:
+            self.db.commit()
 
     @staticmethod
     def build_fts_query(query: str, operator: str = "AND") -> str:
@@ -253,18 +313,87 @@ class RAGDatabase:
         quoted = [f'"{t}"' for t in tokens]
         return f" {operator} ".join(quoted)
 
-    def search_fts(self, query: str, limit: int = 100, operator: str = "AND") -> List[Dict]:
+    def _add_chunk_columns(self, columns: List[tuple]) -> None:
+        """Thêm cột vào legal_chunks nếu chưa có."""
+        existing = {
+            r[1] for r in self.db.execute("PRAGMA table_info(legal_chunks)")
+        }
+        for name, ddl in columns:
+            if name not in existing:
+                self.db.execute(f"ALTER TABLE legal_chunks ADD COLUMN {name} {ddl}")
+                logger.info("legal_chunks: thêm cột %s", name)
+
+    def build_chunk_filter(self, filters: Optional[Dict[str, Any]]) -> tuple:
+        """(mệnh đề SQL, tham số) để lọc ngay trong câu truy vấn.
+
+        Trả về chuỗi rỗng khi không có điều kiện nào, để bên gọi ghép thẳng vào
+        câu SQL mà không phải xử lý trường hợp đặc biệt.
+        """
+        if not filters:
+            return "", []
+
+        clauses: List[str] = []
+        params: List[Any] = []
+
+        dead = filters.get("exclude_eff_states")
+        if dead:
+            # eff_state NULL nghĩa là chunk chưa được đánh dấu lại sau khi thêm
+            # cột — giữ lại thay vì loại, vì loại sẽ làm rỗng kho ngay sau khi
+            # nâng cấp mà chưa kịp reindex.
+            placeholders = ",".join("?" * len(dead))
+            clauses.append(
+                f"(c.eff_state IS NULL OR c.eff_state NOT IN ({placeholders}))"
+            )
+            params.extend(dead)
+
+        if filters.get("exclude_closure"):
+            clauses.append("(c.is_closure_node IS NULL OR c.is_closure_node = 0)")
+
+        if filters.get("only_vbqppl"):
+            clauses.append("(c.is_vbqppl IS NULL OR c.is_vbqppl = 1)")
+
+        max_level = filters.get("max_hierarchy_level")
+        if max_level is not None:
+            clauses.append("(c.hierarchy_level IS NULL OR c.hierarchy_level <= ?)")
+            params.append(max_level)
+
+        if filters.get("field_name"):
+            clauses.append("c.field_name = ?")
+            params.append(filters["field_name"])
+
+        date_range = filters.get("date_range")
+        if date_range:
+            clauses.append("(c.issue_date IS NULL OR (c.issue_date >= ? AND c.issue_date <= ?))")
+            params.extend(date_range)
+
+        return (" AND " + " AND ".join(clauses)) if clauses else "", params
+
+    def search_fts(
+        self,
+        query: str,
+        limit: int = 100,
+        operator: str = "AND",
+        filters: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict]:
+        """Tìm toàn văn, có lọc NGAY trong câu SQL.
+
+        Lọc sau khi đã lấy `limit` kết quả về Python là sai về bản chất: `limit`
+        chỗ đó bị văn bản không đủ điều kiện chiếm trước, lọc xong còn rất ít.
+        Ghép điều kiện vào SQL thì `limit` áp dụng lên phần ĐÃ lọc.
+        """
         match_expr = self.build_fts_query(query, operator=operator)
         if not match_expr:
             return []
+        where_extra, params = self.build_chunk_filter(filters)
         try:
-            cursor = self.db.execute("""
-                SELECT rowid as id, rank
-                FROM legal_chunks_fts
-                WHERE legal_chunks_fts MATCH ?
-                ORDER BY rank
+            cursor = self.db.execute(f"""
+                SELECT f.rowid as id, f.rank
+                FROM legal_chunks_fts f
+                JOIN legal_chunks c ON c.id = f.rowid
+                WHERE legal_chunks_fts MATCH ?{where_extra}
+                ORDER BY f.rank
                 LIMIT ?
-            """, (match_expr, limit))
+            """, (match_expr, *params, limit))
             return [dict(r) for r in cursor.fetchall()]
         except sqlite3.OperationalError as e:
             # Không nuốt im lặng: trả rỗng mà không log thì không phân biệt được
@@ -272,17 +401,35 @@ class RAGDatabase:
             logger.warning("FTS lỗi với biểu thức %r: %s", match_expr, e)
             return []
 
-    def search_vector(self, embedding: List[float], limit: int = 100) -> List[Dict]:
+    # Nhánh vector không lọc trước được: vec0 phải trả đúng k láng giềng gần
+    # nhất rồi mới join lọc. Lấy dư rồi cắt là cách duy nhất để sau khi lọc vẫn
+    # còn đủ kết quả.
+    VECTOR_OVERFETCH = 4
+
+    def search_vector(
+        self,
+        embedding: List[float],
+        limit: int = 100,
+        filters: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict]:
         if not HAS_VEC:
             return []
         embedding_bytes = struct.pack(f"<{len(embedding)}f", *embedding)
-        cursor = self.db.execute("""
-            SELECT rowid as id, distance 
-            FROM legal_chunks_vec 
-            WHERE embedding MATCH ? 
-            ORDER BY distance 
+        where_extra, params = self.build_chunk_filter(filters)
+        fetch = limit * self.VECTOR_OVERFETCH if where_extra else limit
+        cursor = self.db.execute(f"""
+            SELECT v.id AS id, v.distance AS distance FROM (
+                SELECT rowid AS id, distance
+                FROM legal_chunks_vec
+                WHERE embedding MATCH ?
+                ORDER BY distance
+                LIMIT ?
+            ) v
+            JOIN legal_chunks c ON c.id = v.id
+            WHERE 1=1{where_extra}
+            ORDER BY v.distance
             LIMIT ?
-        """, (embedding_bytes, limit))
+        """, (embedding_bytes, fetch, *params, limit))
         return [dict(r) for r in cursor.fetchall()]
 
     def get_edges(self, doc_num: str) -> List[Dict]:

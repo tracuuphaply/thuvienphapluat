@@ -1,9 +1,9 @@
 """
 Rule-based industry classification for legal documents.
 """
-import re
 from typing import List
 
+from src.analysis.lexicon import AMBIGUOUS_KEYWORDS, count_matches, pattern_for
 from src.obsidian.config_obsidian import INDUSTRY_MAP
 
 # Điểm tối thiểu để gán một ngành. Tiêu đề và lĩnh vực nói lên chủ đề văn bản
@@ -13,41 +13,11 @@ FIELD_WEIGHT = 3
 CONTENT_WEIGHT = 1
 MIN_SCORE = 3
 
-# Từ khoá ngắn dễ khớp nhầm khi nằm trong từ ghép khác nghĩa. Chỉ tính điểm khi
-# KHÔNG đứng cạnh các từ trong danh sách loại trừ.
-#   "điện"  → "bưu điện", "điện tử", "điện thoại", "công điện"
-#   "nước"  → "nhà nước", "trong nước", "nước ngoài"
-#   "mạng"  → "mạng lưới"
-AMBIGUOUS_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "điện": ("bưu điện", "điện tử", "điện thoại", "công điện", "điện báo", "điện văn"),
-    "nước": ("nhà nước", "trong nước", "nước ngoài", "ngoài nước", "cả nước", "toàn nước"),
-    "mạng": ("mạng lưới", "tính mạng"),
-    "khí": ("không khí", "khí hậu", "khí tượng"),
-    "dữ liệu": ("dữ liệu báo cáo", "dữ liệu thống kê"),
-}
-
-_WORD_BOUNDARY_CACHE: dict[str, re.Pattern] = {}
-
-
-def _pattern(keyword: str) -> re.Pattern:
-    """Regex khớp từ khoá theo ranh giới từ, có nhớ đệm."""
-    if keyword not in _WORD_BOUNDARY_CACHE:
-        _WORD_BOUNDARY_CACHE[keyword] = re.compile(
-            rf"(?<!\w){re.escape(keyword)}(?!\w)", re.UNICODE
-        )
-    return _WORD_BOUNDARY_CACHE[keyword]
-
-
-def _count_matches(keyword: str, text: str) -> int:
-    """Số lần từ khoá xuất hiện thật sự, đã trừ các cụm dễ nhầm."""
-    if not text:
-        return 0
-    hits = len(_pattern(keyword).findall(text))
-    if not hits:
-        return 0
-    for trap in AMBIGUOUS_KEYWORDS.get(keyword, ()):
-        hits -= text.count(trap)
-    return max(0, hits)
+# Cơ chế ranh giới từ và bẫy từ ghép nay nằm ở src/analysis/lexicon.py để bộ
+# đếm từ ràng buộc cũng dùng chung: "phải" cần trừ "bên phải" đúng như "nước"
+# cần trừ "nhà nước". Giữ lại tên cũ cho code và test đang import.
+_pattern = pattern_for
+_count_matches = count_matches
 
 
 def score_industries(

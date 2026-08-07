@@ -54,6 +54,10 @@ from src.sources.moj_api import (
 from src.sources.tvpl_downloader import download_documents_sync
 from src.sources.tvpl_rss import scan_rss
 from src.storage.database import (
+    clear_upload_queue,
+    enqueue_upload,
+    get_crawl_cutoff,
+    update_crawl_watermark,
     create_crawl_run,
     finish_crawl_run,
     get_document_by_doc_num,
@@ -71,8 +75,10 @@ from src.storage.file_store import (
     save_rejected_doc_nums,
     save_snapshot,
 )
-from src.storage.gdrive import upload_document_files
-from src.storage.lark_drive import get_lark_client, upload_document_files_lark
+from src.rag.reports.jobs import enqueue_update_reports
+from src.storage import cloud_drive
+from src.storage.cloud_drive import active_provider
+from src.storage.lark_drive import get_lark_client
 from src.pipeline.text_processor import process_fulltext
 
 
@@ -231,6 +237,10 @@ def run_pipeline(
         "total_new": 0,
         "total_notified": 0,
         "gdrive_uploaded": 0,
+        "cloud_failed": 0,
+        "cloud_skipped": 0,
+        "reports_queued": 0,
+        "save_failed": 0,
     }
 
     # Ensure database tables exist
@@ -259,10 +269,21 @@ def run_pipeline(
 
             moj_items = []
             try:
-                moj_items = scan_incremental()
+                # Mốc quét lấy từ watermark bền vững, không tính lại từ hôm nay:
+                # cửa sổ trượt quét lại toàn bộ cửa sổ mỗi lần chạy, và máy tắt
+                # lâu hơn cửa sổ là mất hẳn phần ở giữa mà không ai biết.
+                cutoff, ly_do = get_crawl_cutoff(session, "moj")
+                logger.info("MOJ scan: quét lùi tới %s (%s)", cutoff, ly_do)
+                moj_items = scan_incremental(cutoff=cutoff)
                 metrics["moj_new_found"] = len(moj_items)
                 save_snapshot("moj_scan", moj_items)
                 logger.info("MOJ scan: %d business items found", len(moj_items))
+                # Chỉ dời watermark sau khi quét xong: dời sớm mà lượt quét hỏng
+                # giữa chừng là bỏ sót vĩnh viễn phần chưa kịp lấy.
+                update_crawl_watermark(
+                    session, "moj", scan_incremental.last_high_water
+                )
+                session.commit()
             except Exception as e:
                 logger.error("MOJ scan failed: %s", e)
 
@@ -513,11 +534,22 @@ def run_pipeline(
                         "field_slug", "references", "fulltext_html",
                     )
                 }
-                doc_obj, is_new = upsert_document(session, clean_data)
-
-                # Insert references
-                if refs:
-                    insert_references(session, doc_obj.id, refs)
+                # Một văn bản hỏng KHÔNG được làm chết cả lượt cào. Trước đây
+                # ngoại lệ ở đây làm session rơi vào PendingRollbackError, và
+                # mọi văn bản còn lại trong lô cùng mất — kể cả những bản đã
+                # tải về xong. Commit từng bản để lỗi chỉ giới hạn ở bản đó.
+                try:
+                    doc_obj, is_new = upsert_document(session, clean_data)
+                    if refs:
+                        insert_references(session, doc_obj.id, refs)
+                    session.commit()
+                except Exception as e:
+                    session.rollback()
+                    logger.error(
+                        "Không lưu được %s: %s", clean_data.get("doc_num"), e
+                    )
+                    metrics["save_failed"] = metrics.get("save_failed", 0) + 1
+                    continue
 
                 # Collect for notification. pub_date không phải cột DB nhưng bước
                 # upload cần nó để xếp thư mục theo thời gian khi thiếu issue_date.
@@ -538,60 +570,71 @@ def run_pipeline(
                 )
                 saved_docs.extend(affected_docs)
 
-            # ── Step 6: Upload to Cloud Drive (Lark Drive / Google Drive) ──
+            # ── Step 6: Upload to Cloud Drive ──
             if not skip_gdrive:
+                provider = active_provider()
                 logger.info("=" * 60)
-                if LARK_APP_ID:
-                    logger.info("STEP 6: Uploading to Lark Drive")
+                logger.info("STEP 6: Uploading to %s", provider)
+                logger.info("=" * 60)
+                if provider in (cloud_drive.LARK, cloud_drive.BOTH):
                     access = get_lark_client().check_access()
                     if not access["ok"]:
                         logger.warning("Lark Drive: %s", access["reason"])
-                else:
-                    logger.info("STEP 6: Uploading to Google Drive")
-                logger.info("=" * 60)
 
                 for doc_data in saved_docs:
+                    existing = resolve_existing_document(session, doc_data)
                     try:
                         # Hồ sơ metadata gộp cả hai nguồn, đi kèm file trong thư mục
                         doc_data["metadata_path"] = save_document_metadata(doc_data)
-
-                        if LARK_APP_ID:
-                            drive_result = upload_document_files_lark(doc_data)
-                        else:
-                            drive_result = upload_document_files(doc_data)
-
-                        uploaded_any = any(
-                            drive_result.get(key)
-                            for key in (
-                                "lark_docx_link",
-                                "lark_fulltext_link",
-                                "gdrive_docx_link",
-                            )
-                        )
-                        if uploaded_any:
-                            doc_data.update(drive_result)
-                            # Update DB with Drive links
-                            existing = resolve_existing_document(session, doc_data)
-                            if existing:
-                                existing.gdrive_docx_link = drive_result.get("gdrive_docx_link")
-                                existing.gdrive_folder_id = drive_result.get("gdrive_folder_id")
-                                existing.lark_docx_link = drive_result.get("lark_docx_link")
-                                existing.lark_folder_token = drive_result.get("lark_folder_token")
-                            metrics["gdrive_uploaded"] += 1
-
-                            # Xoá file .docx dưới data/ sau khi đã lên Drive.
-                            # Toàn văn và metadata giữ lại vì Phase 2 (RAG) cần.
-                            if AUTO_CLEANUP_LOCAL_FILES:
-                                docx_p = doc_data.get("docx_path")
-                                if docx_p and Path(docx_p).exists():
-                                    try:
-                                        Path(docx_p).unlink()
-                                        logger.info("Cleaned up local file: %s", docx_p)
-                                    except Exception as e:
-                                        logger.warning("Failed to delete local temp file %s: %s", docx_p, e)
-
+                        outcome = cloud_drive.upload_document(doc_data)
                     except Exception as e:
-                        logger.warning("Cloud Drive upload failed for %s: %s", doc_data.get("doc_num"), e)
+                        logger.warning(
+                            "Cloud Drive upload failed for %s: %s",
+                            doc_data.get("doc_num"), e,
+                        )
+                        if existing:
+                            enqueue_upload(session, existing, active_provider(),
+                                           ["tat_ca"], str(e))
+                        continue
+
+                    if outcome.skipped:
+                        metrics["cloud_skipped"] += 1
+                        continue
+
+                    doc_data.update(outcome.links)
+                    if existing:
+                        for column, value in outcome.links.items():
+                            setattr(existing, column, value)
+
+                    if outcome.failed:
+                        # Thiếu dù chỉ một file cũng KHÔNG đánh dấu đã đồng bộ:
+                        # cột này là cổng cho phép xoá file local, đánh dấu sớm
+                        # là mất bản gốc mà trên mây cũng không có.
+                        logger.warning(
+                            "Chưa lên đủ %s: thiếu %s",
+                            doc_data.get("doc_num"), ", ".join(outcome.failed),
+                        )
+                        if existing:
+                            enqueue_upload(session, existing, outcome.provider,
+                                           outcome.failed, "upload khong day du")
+                        metrics["cloud_failed"] += 1
+                        continue
+
+                    if existing:
+                        existing.cloud_synced_at = datetime.now(timezone.utc)
+                        clear_upload_queue(session, existing.doc_key, outcome.provider)
+                    metrics["gdrive_uploaded"] += 1
+
+                    # Chỉ xoá .docx sau khi CHẮC CHẮN đã lên mây đủ. Toàn văn và
+                    # metadata giữ lại vì tầng RAG đọc từ đĩa.
+                    if AUTO_CLEANUP_LOCAL_FILES:
+                        docx_p = doc_data.get("docx_path")
+                        if docx_p and Path(docx_p).exists():
+                            try:
+                                Path(docx_p).unlink()
+                                logger.info("Cleaned up local file: %s", docx_p)
+                            except Exception as e:
+                                logger.warning("Failed to delete local temp file %s: %s", docx_p, e)
 
                 session.commit()
 
@@ -623,6 +666,24 @@ def run_pipeline(
                     logger.info("Telegram digest sent: %d documents", len(saved_docs))
                 else:
                     logger.error("Failed to send Telegram digest.")
+
+            # ── Step 8: Xếp hàng báo cáo phân tích văn bản mới ──
+            #
+            # XẾP HÀNG chứ không sinh báo cáo tại chỗ. Gọi mô hình mất tới 300
+            # giây và lời gọi đó sẽ nằm trong khối try bao trọn hàm này — một
+            # lỗi LLM đánh dấu cả lần cào là FAILED, kéo theo run_daily.sh bỏ
+            # luôn hai bước đồng bộ vault và RAG. Báo cáo hỏng không được phép
+            # làm hỏng ngày cào dữ liệu.
+            logger.info("=" * 60)
+            logger.info("STEP 8: Xếp hàng báo cáo")
+            logger.info("=" * 60)
+            try:
+                queued = enqueue_update_reports(session, saved_docs)
+                metrics["reports_queued"] = queued
+                session.commit()
+            except Exception as e:
+                # Không để lỗi xếp hàng làm hỏng lần cào đã thành công.
+                logger.error("Không xếp hàng được báo cáo: %s", e)
 
             # ── Finalize crawl run ──
             finish_crawl_run(session, crawl_run, status="SUCCESS", **metrics)
@@ -657,9 +718,11 @@ def run_upload_only() -> dict[str, int]:
     from src.storage.models import Document
 
     init_db()
-    metrics = {"gdrive_uploaded": 0, "total_new": 0}
+    metrics = {"gdrive_uploaded": 0, "total_new": 0, "cloud_failed": 0,
+               "cloud_skipped": 0}
+    provider = active_provider()
 
-    if LARK_APP_ID:
+    if provider in (cloud_drive.LARK, cloud_drive.BOTH):
         access = get_lark_client().check_access()
         if not access["ok"]:
             logger.error("Lark Drive chưa dùng được: %s", access["reason"])
@@ -669,13 +732,17 @@ def run_upload_only() -> dict[str, int]:
     with get_session() as session:
         # Không lọc theo file: văn bản chưa tải được .docx/toàn văn vẫn cần thư
         # mục riêng kèm metadata, để kho trên Drive phản ánh đủ danh sách văn bản.
+        # Lọc theo cloud_synced_at chứ không theo lark_folder_token: cột token
+        # chỉ đúng cho một đích lưu trữ, còn cổng đồng bộ thì chung cho cả hai.
         pending = (
             session.query(Document)
-            .filter(Document.lark_folder_token.is_(None))
+            .filter(Document.cloud_synced_at.is_(None))
+            .filter((Document.is_closure_node.is_(None))
+                    | (Document.is_closure_node == False))  # noqa: E712
             .all()
         )
         metrics["total_new"] = len(pending)
-        logger.info("Có %d văn bản chờ upload.", len(pending))
+        logger.info("Có %d văn bản chờ upload lên %s.", len(pending), provider)
 
         for doc in pending:
             doc_data = {
@@ -683,13 +750,29 @@ def run_upload_only() -> dict[str, int]:
             }
             doc_data["metadata_path"] = save_document_metadata(doc_data)
 
-            result = upload_document_files_lark(doc_data)
-            if not result.get("lark_folder_token"):
+            try:
+                outcome = cloud_drive.upload_document(doc_data)
+            except Exception as e:
+                logger.warning("Upload lỗi cho %s: %s", doc.doc_num, e)
+                enqueue_upload(session, doc, provider, ["tat_ca"], str(e))
+                metrics["cloud_failed"] += 1
                 continue
 
-            doc.lark_docx_link = result.get("lark_docx_link")
-            doc.lark_folder_token = result.get("lark_folder_token")
-            doc.gdrive_docx_link = result.get("gdrive_docx_link")
+            if outcome.skipped:
+                metrics["cloud_skipped"] += 1
+                continue
+
+            for column, value in outcome.links.items():
+                setattr(doc, column, value)
+
+            if outcome.failed:
+                enqueue_upload(session, doc, outcome.provider, outcome.failed,
+                               "upload khong day du")
+                metrics["cloud_failed"] += 1
+                continue
+
+            doc.cloud_synced_at = datetime.now(timezone.utc)
+            clear_upload_queue(session, doc.doc_key, outcome.provider)
             metrics["gdrive_uploaded"] += 1
             session.commit()
 

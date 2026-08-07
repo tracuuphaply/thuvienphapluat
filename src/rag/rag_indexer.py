@@ -77,6 +77,38 @@ def embed_missing(rag_db: RAGDatabase, embedder=None, batch_size: int = 100) -> 
     return _embed_pending(rag_db, embedder, pending, batch_size=batch_size)
 
 
+
+# Trường của bảng documents mà tầng RAG cần: metadata hiển thị + cột lọc.
+_META_FIELDS = (
+    "doc_num", "title", "field_name", "field_code", "industries",
+    "eff_status", "issue_date", "doc_type", "agency_name", "tvpl_id",
+    "eff_state", "is_closure_node", "hierarchy_level", "is_vbqppl",
+)
+
+
+def load_document_metadata() -> dict[str, dict]:
+    """Metadata cho tầng RAG, đọc thẳng từ bảng documents.
+
+    Trước đây hàm này đọc data/metadata/*.json. Các file đó là bản sao được ghi
+    lúc cào và không cập nhật lại, nên mọi trường tính về sau — cờ hiệu lực
+    chuẩn hoá, cấp hiệu lực, cờ văn bản ngữ cảnh — đều rỗng trong RAG index dù
+    cơ sở dữ liệu đã có đủ. Đúng loại lỗi từng khiến vault render link nguồn
+    rỗng trên cả 1015 note.
+
+    Khoá theo doc_num vì legal_chunks cũng khoá theo doc_num. Số hiệu trùng giữa
+    các tỉnh thì bản ghi sau ghi đè bản trước — hạn chế đã biết của tầng chunk,
+    sẽ hết khi chunk chuyển sang doc_key.
+    """
+    from src.storage.database import get_session
+    from src.storage.models import Document
+
+    out: dict[str, dict] = {}
+    with get_session() as session:
+        for doc in session.query(Document).all():
+            out[doc.doc_num] = {f: getattr(doc, f, None) for f in _META_FIELDS}
+    return out
+
+
 def index_from_phase1(db_path: Path, rag_db: RAGDatabase, force: bool = False, stats_only: bool = False):
     chunks_dir = DATA_DIR / "chunks"
     meta_dir = DATA_DIR / "metadata"
@@ -104,19 +136,7 @@ def index_from_phase1(db_path: Path, rag_db: RAGDatabase, force: bool = False, s
     chunk_files = list(chunks_dir.glob("*_chunks.json"))
     logger.info(f"Found {len(chunk_files)} chunk files.")
     
-    # data/metadata/ đặt tên theo số hiệu (04_2026_NQ-HĐND.json) còn data/chunks/
-    # đặt tên theo UUID — ghép đường dẫn từ tên file chunk luôn trượt 100%, khiến
-    # toàn bộ metadata (eff_status, issue_date, industries…) rỗng trong RAG index.
-    # Khớp bằng chính trường doc_num bên trong file thay vì bằng tên file.
-    meta_by_doc_num: dict[str, dict] = {}
-    for mfile in meta_dir.glob("*.json"):
-        try:
-            with open(mfile, 'r', encoding='utf-8') as f:
-                m = json.load(f)
-            if m.get("doc_num"):
-                meta_by_doc_num[m["doc_num"]] = m
-        except Exception as e:
-            logger.warning(f"Bỏ qua metadata hỏng {mfile.name}: {e}")
+    meta_by_doc_num = load_document_metadata()
     logger.info(f"Đã nạp metadata cho {len(meta_by_doc_num)} văn bản.")
 
     pending_embeddings: list[tuple[int, str]] = []
@@ -172,6 +192,14 @@ def index_from_phase1(db_path: Path, rag_db: RAGDatabase, force: bool = False, s
                     "issue_date": meta_data.get("issue_date"),
                     "doc_type": meta_data.get("doc_type"),
                     "agency_name": meta_data.get("agency_name"),
+                    # Cột lọc — phải có ở tầng chunk để điều kiện đi vào
+                    # câu SQL. Thiếu chúng thì bộ lọc chỉ chạy sau khi đã
+                    # lấy 100 kết quả về, và văn bản đã hết hiệu lực chiếm
+                    # sạch chỗ ngay khi kho lớn lên vì bao đóng dẫn chiếu.
+                    "eff_state": meta_data.get("eff_state"),
+                    "is_closure_node": meta_data.get("is_closure_node"),
+                    "hierarchy_level": meta_data.get("hierarchy_level"),
+                    "is_vbqppl": meta_data.get("is_vbqppl"),
                     "content_hash": chash
                 }
                 
@@ -202,14 +230,24 @@ def index_from_phase1(db_path: Path, rag_db: RAGDatabase, force: bool = False, s
     logger.info("Indexing graph edges from Phase 1 DB...")
     try:
         with get_session() as session:
+            # Phân giải đích qua target_doc_id (khoá ngoại thật) chứ không qua
+            # số hiệu: đó là điểm khiến hai văn bản trùng số hiệu không còn bị
+            # gộp thành một cạnh.
+            key_by_id = {d.id: d.doc_key for d in session.query(Document).all()}
             edges = session.query(DocumentReference).all()
             for edge in edges:
-                if edge.source_doc and edge.source_doc.doc_num:
-                    rag_db.upsert_graph_edge(
-                        source_doc_num=edge.source_doc.doc_num,
-                        target_doc_num=edge.target_doc_num,
-                        relation_type=edge.relation_type
-                    )
+                src = edge.source_doc
+                if not (src and src.doc_num and src.doc_key):
+                    continue
+                rag_db.upsert_graph_edge(
+                    source_doc_key=src.doc_key,
+                    source_doc_num=src.doc_num,
+                    target_doc_key=key_by_id.get(edge.target_doc_id),
+                    target_doc_num=edge.target_doc_num,
+                    relation_type=edge.relation_type,
+                    commit=False,
+                )
+            rag_db.db.commit()
     except Exception as e:
         logger.error(f"Error indexing graph edges: {e}")
 

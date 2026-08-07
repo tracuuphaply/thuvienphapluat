@@ -5,9 +5,15 @@ from typing import List, Optional
 import httpx
 import time
 
-# Đọc thẳng os.getenv nên phải chắc chắn .env đã được nạp: import module này mà
-# chưa import src.config thì mọi khoá API đều rỗng và việc nhúng bị tắt âm thầm.
-import src.config  # noqa: F401  (side effect: load_dotenv)
+from src.config import (
+    embedding_batch_size,
+    embedding_dim_override,
+    embedding_model_override,
+    llm_api_key,
+    openai_api_base,
+    openai_api_key,
+    v98_api_key,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -27,13 +33,13 @@ DEFAULT_GEMINI_MODEL = "text-embedding-004"
 
 def active_embedding_model() -> str:
     """Model nhúng đang dùng, theo đúng nhánh mà embed_texts sẽ chọn."""
-    override = os.getenv("EMBEDDING_MODEL")
+    override = embedding_model_override()
     if override:
         return override
-    api_base = os.getenv("OPENAI_API_BASE", "https://v98store.com/v1")
+    api_base = openai_api_base()
     uses_openai = (
-        os.getenv("V98_API_KEY")
-        or os.getenv("OPENAI_API_KEY")
+        v98_api_key()
+        or openai_api_key()
         or "v98store" in api_base
         or "openai" in api_base
     )
@@ -42,7 +48,7 @@ def active_embedding_model() -> str:
 
 def embedding_dimension() -> int:
     """Số chiều của model đang dùng; cho phép ép bằng EMBEDDING_DIM."""
-    forced = os.getenv("EMBEDDING_DIM")
+    forced = embedding_dim_override()
     if forced:
         return int(forced)
     model = active_embedding_model()
@@ -56,8 +62,8 @@ def embedding_dimension() -> int:
 
 class EmbeddingAPI:
     def __init__(self, api_key: str = None, api_base: str = None):
-        self.api_key = api_key or os.getenv("V98_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("GEMINI_API_KEY")
-        self.api_base = api_base or os.getenv("OPENAI_API_BASE", "https://v98store.com/v1")
+        self.api_key = api_key or llm_api_key()
+        self.api_base = api_base or openai_api_base()
         
         if not self.api_key:
             logger.warning("No API key (V98_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY) configured. Embeddings disabled.")
@@ -82,7 +88,7 @@ class EmbeddingAPI:
             return [None] * len(texts)
 
         # Check if using OpenAI-compatible V98 API vs Gemini API
-        if os.getenv("V98_API_KEY") or os.getenv("OPENAI_API_KEY") or "v98store" in self.api_base or "openai" in self.api_base:
+        if v98_api_key() or openai_api_key() or "v98store" in self.api_base or "openai" in self.api_base:
             return self._embed_openai_batch(texts)
         else:
             return self._embed_gemini_batch(texts)
@@ -98,7 +104,7 @@ class EmbeddingAPI:
         # text-embedding-3-small nhận tối đa 2048 input và ~300k token mỗi lượt.
         # Đoạn văn bản pháp luật trung bình ~1300 ký tự (~400 token) nên 64 đoạn
         # ≈ 26k token, còn rất xa hạn mức. Mức cũ là 10 → gấp 6 lần số round-trip.
-        batch_size = int(os.getenv("EMBEDDING_BATCH_SIZE", "64"))
+        batch_size = embedding_batch_size()
 
         model = active_embedding_model()
 

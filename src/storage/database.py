@@ -7,19 +7,24 @@ from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Generator
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from src.config import DATABASE_URL
+from src.config import CLOSURE_SEED_FLOOR, CRAWL_OVERLAP_DAYS, DATABASE_URL
+from src.legal import effectivity
+from src.legal.hierarchy import classify, resolve_province
+from src.storage.migrations import run_migrations
+from src.storage.public_slug import make_public_slug
 from src.storage.models import (
     Base,
     CrawlRun,
     Document,
     DocumentReference,
     DocumentStatusHistory,
+    MojIdIndex,
 )
 
 logger = logging.getLogger(__name__)
@@ -37,35 +42,16 @@ SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 
 def init_db() -> None:
-    """Create all tables if they don't exist and add missing columns."""
+    """Tạo bảng nếu chưa có và áp các migration chưa chạy.
+
+    Danh sách ALTER TABLE trước đây nằm thẳng trong hàm này và chạy lại mỗi lần
+    khởi động; nay nằm ở src/storage/migrations.py và mỗi bước chỉ chạy một lần,
+    có ghi vào bảng schema_migrations.
+    """
     Base.metadata.create_all(bind=engine)
 
-    # Auto-add missing columns to existing SQLite table if needed
     with engine.connect() as conn:
-        from sqlalchemy import text
-        existing_cols = {
-            row[1] for row in conn.execute(text("PRAGMA table_info(documents)"))
-        }
-        for col, col_type in [
-            ("lark_docx_link", "TEXT"),
-            ("lark_folder_token", "VARCHAR(100)"),
-            ("pub_date", "DATE"),
-            ("industries", "VARCHAR(500)"),
-            ("obsidian_path", "TEXT"),
-            ("obsidian_hash", "VARCHAR(64)"),
-            ("doc_key", "VARCHAR(300)"),
-        ]:
-            if col in existing_cols:
-                continue
-            try:
-                conn.execute(text(f"ALTER TABLE documents ADD COLUMN {col} {col_type};"))
-                conn.commit()
-                logger.info("Migrated DB: added column %s to documents", col)
-            except Exception as e:
-                # Không nuốt im lặng: đây là lỗi thật, không phải "cột đã tồn tại"
-                # (trường hợp đó đã được lọc ở trên bằng PRAGMA table_info).
-                logger.error("Không thêm được cột %s: %s", col, e)
-
+        run_migrations(conn)
         _ensure_doc_key(conn)
 
     logger.info("Database tables initialized.")
@@ -234,6 +220,9 @@ REFRESHABLE_FIELDS = frozenset({
     "signer",
     "field_name",
     "field_code",
+    # Suy trực tiếp từ moj_id nên phải đi theo nó; để ở nhánh "chỉ điền khi
+    # rỗng" thì 1015 bản ghi cũ đang rỗng sẽ chỉ được vá nếu tình cờ crawl lại.
+    "moj_url",
 })
 
 
@@ -277,15 +266,156 @@ def upsert_document(session: Session, data: dict) -> tuple[Document, bool]:
                 )
             )
 
+        apply_derived_facts(existing)
         existing.updated_at = datetime.now(timezone.utc)
         return existing, False
     else:
         payload = dict(data)
         payload["doc_key"] = make_doc_key(doc_num, payload.get("agency_name"))
         doc = Document(**payload)
+        apply_derived_facts(doc)
         session.add(doc)
         session.flush()  # Get the auto-generated ID
         return doc, True
+
+
+def apply_derived_facts(doc: Document, as_of: date | None = None) -> None:
+    """Tính lại thứ bậc, địa bàn, cờ hiệu lực và slug công khai cho một văn bản.
+
+    Gọi ở MỌI đường ghi chứ không chỉ trong script backfill: nếu chỉ backfill
+    một lần, mọi văn bản cào về sau đó sẽ có các cột này rỗng và lặng lẽ rơi ra
+    khỏi mọi bộ lọc theo cấp, theo địa bàn hay theo hiệu lực.
+
+    Tính lại cả khi cập nhật vì các trường nguồn đều nằm trong REFRESHABLE_FIELDS
+    — `eff_status` đổi mà `eff_state` giữ nguyên thì hai cột nói ngược nhau.
+    """
+    facts = classify(doc.doc_num or "", doc.doc_type or "", doc.agency_name or "")
+    doc.hierarchy_level = facts.hierarchy_level
+    doc.doc_type_norm = facts.doc_type_norm
+    doc.is_vbqppl = facts.is_vbqppl
+    doc.territorial_scope = facts.territorial_scope
+
+    raw_code, current = resolve_province(doc.agency_name or "")
+    doc.province_code_raw = raw_code
+    doc.province_code_current = current
+
+    eff = effectivity.resolve(
+        doc.eff_status, doc.eff_from, doc.eff_to, as_of or date.today()
+    )
+    doc.eff_state = eff.state
+    doc.eff_state_as_of = eff.as_of
+    doc.eff_state_source = eff.source
+
+    if not doc.public_slug:
+        doc.public_slug = make_public_slug(doc.doc_num or "", doc.doc_key or "")
+    if doc.is_closure_node is None:
+        doc.is_closure_node = False
+
+
+def enqueue_upload(
+    session: Session,
+    doc: Document,
+    provider: str,
+    file_kinds: list[str],
+    error: str,
+) -> None:
+    """Xếp một văn bản vào hàng đợi upload để thử lại lần chạy sau.
+
+    Không có bước này thì upload hỏng chỉ để lại một dòng log: văn bản không bao
+    giờ được thử lại và cũng không ai biết nó thiếu trên mây. Mỗi văn bản chỉ
+    giữ một mục cho mỗi đích lưu trữ — lần hỏng sau cập nhật mục cũ.
+    """
+    from sqlalchemy import text as _text
+
+    session.execute(_text("""
+        INSERT INTO upload_queue (doc_key, doc_num, provider, file_kinds, status,
+                                  attempts, last_error, updated_at)
+        VALUES (:k, :n, :p, :f, 'PENDING', 1, :e, datetime('now'))
+        ON CONFLICT(doc_key, provider) DO UPDATE SET
+            file_kinds = excluded.file_kinds,
+            status     = 'PENDING',
+            attempts   = upload_queue.attempts + 1,
+            last_error = excluded.last_error,
+            updated_at = datetime('now')
+    """), {
+        "k": doc.doc_key, "n": doc.doc_num, "p": provider,
+        "f": ",".join(file_kinds), "e": (error or "")[:500],
+    })
+
+
+def clear_upload_queue(session: Session, doc_key: str, provider: str) -> None:
+    """Xoá mục chờ sau khi văn bản đã lên mây đủ."""
+    from sqlalchemy import text as _text
+
+    session.execute(
+        _text("DELETE FROM upload_queue WHERE doc_key = :k AND provider = :p"),
+        {"k": doc_key, "p": provider},
+    )
+
+
+def pending_uploads(session: Session, limit: int = 100) -> list[dict]:
+    """Các văn bản đang chờ đẩy lên mây, cũ nhất trước."""
+    from sqlalchemy import text as _text
+
+    rows = session.execute(_text("""
+        SELECT doc_key, doc_num, provider, file_kinds, attempts, last_error
+        FROM upload_queue WHERE status = 'PENDING'
+        ORDER BY updated_at LIMIT :n
+    """), {"n": limit}).mappings().all()
+    return [dict(r) for r in rows]
+
+
+def get_crawl_cutoff(session: Session, source: str = "moj") -> tuple[date, str]:
+    """Ngày cần quét lùi tới, và lý do chọn ngày đó.
+
+    Thay cửa sổ trượt `today - 30 ngày`: cửa sổ trượt quét lại toàn bộ 30 ngày ở
+    mỗi lần chạy (6.906 văn bản để tìm 50 bản mới), và máy tắt lâu hơn 30 ngày là
+    mất hẳn phần ở giữa mà không ai biết.
+
+    Vẫn quét lùi quá watermark một quãng OVERLAP_DAYS: /doc/all sắp theo
+    issueDate, nhưng văn bản được ĐĂNG lên hệ thống muộn hơn ngày ban hành khá
+    nhiều. Cắt đúng watermark sẽ bỏ sót vĩnh viễn mọi văn bản đăng chậm.
+    """
+    from sqlalchemy import text as _text
+
+    row = session.execute(_text(
+        "SELECT high_water_issue_date, low_water_issue_date, overlap_days "
+        "FROM crawl_watermark WHERE source = :s"
+    ), {"s": source}).mappings().first()
+
+    floor = date.fromisoformat(CLOSURE_SEED_FLOOR)
+    if not row or not row["high_water_issue_date"]:
+        # Lần đầu: quét về tận sàn cố định để dựng nền, không dùng cửa sổ trượt.
+        return floor, "lan_dau_quet_ve_san"
+
+    high = date.fromisoformat(str(row["high_water_issue_date"]))
+    overlap = int(row["overlap_days"] or CRAWL_OVERLAP_DAYS)
+    cutoff = high - timedelta(days=overlap)
+    return max(cutoff, floor), f"watermark_{high}_lui_{overlap}_ngay"
+
+
+def update_crawl_watermark(
+    session: Session, source: str, high_water: date | None
+) -> None:
+    """Ghi lại mốc issueDate mới nhất đã thấy. Không lùi watermark."""
+    from sqlalchemy import text as _text
+
+    if not high_water:
+        return
+    session.execute(_text("""
+        INSERT INTO crawl_watermark
+            (source, high_water_issue_date, low_water_issue_date, last_run_at, overlap_days)
+        VALUES (:s, :hw, :lw, datetime('now'), :ov)
+        ON CONFLICT(source) DO UPDATE SET
+            high_water_issue_date = MAX(
+                COALESCE(crawl_watermark.high_water_issue_date, '0001-01-01'),
+                excluded.high_water_issue_date
+            ),
+            last_run_at = datetime('now')
+    """), {
+        "s": source, "hw": high_water.isoformat(),
+        "lw": CLOSURE_SEED_FLOOR, "ov": CRAWL_OVERLAP_DAYS,
+    })
 
 
 def insert_references(
@@ -298,23 +428,53 @@ def insert_references(
     """
     count = 0
     for ref in references:
-        # Check if this exact edge already exists
+        target_moj_id = ref.get("target_moj_id") or None
+        # id của văn bản đích được ghi lại kể cả khi cạnh đã tồn tại: các cạnh
+        # tạo trước khi parse_doc_detail giữ id đều đang thiếu trường này.
+        remember_moj_id(session, ref["target_doc_num"], target_moj_id, "reference")
+
         stmt = select(DocumentReference).where(
             DocumentReference.source_doc_id == source_doc_id,
             DocumentReference.target_doc_num == ref["target_doc_num"],
             DocumentReference.relation_type == ref["relation_type"],
         )
-        if session.execute(stmt).scalar_one_or_none() is None:
+        existing_edge = session.execute(stmt).scalar_one_or_none()
+        if existing_edge is None:
             target = get_document_by_doc_num(session, ref["target_doc_num"])
             edge = DocumentReference(
                 source_doc_id=source_doc_id,
                 target_doc_num=ref["target_doc_num"],
                 relation_type=ref["relation_type"],
                 target_doc_id=target.id if target else None,
+                target_moj_id=target_moj_id,
             )
             session.add(edge)
             count += 1
+        elif target_moj_id and not existing_edge.target_moj_id:
+            existing_edge.target_moj_id = target_moj_id
     return count
+
+
+def remember_moj_id(
+    session: Session, doc_num: str, moj_id: str | None, source: str
+) -> bool:
+    """Ghi nhớ cặp số hiệu → id MOJ. True nếu là cặp mới.
+
+    Endpoint /doc/all bỏ qua mọi tham số lọc nên không có cách nào tra một văn
+    bản theo số hiệu. Bảng này là đường duy nhất để biết id của văn bản được dẫn
+    chiếu mà kho chưa có — nó thay cho file cache data/moj_target_ids.json vốn
+    phải nạp cả file vào bộ nhớ và không truy vấn kèm điều kiện được.
+    """
+    doc_num = (doc_num or "").strip()
+    moj_id = (moj_id or "").strip()
+    if not doc_num or not moj_id:
+        return False
+
+    exists = session.get(MojIdIndex, {"doc_num": doc_num, "moj_id": moj_id})
+    if exists is not None:
+        return False
+    session.add(MojIdIndex(doc_num=doc_num, moj_id=moj_id, source=source))
+    return True
 
 
 def resolve_reference_targets(session: Session) -> int:

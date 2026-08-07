@@ -10,9 +10,13 @@ class GraphEdge:
         self.confidence = confidence
 
 class AffectedDoc:
-    def __init__(self, doc_num: str, relation: str):
+    def __init__(self, doc_num: str, relation: str, doc_key: Optional[str] = None):
         self.doc_num = doc_num
         self.relation = relation
+        # Rỗng khi văn bản đầu kia chưa có trong kho — cạnh treo vẫn phải hiện,
+        # vì "có một văn bản sửa đổi mà ta chưa tải về" là thông tin, không phải
+        # thứ để giấu đi.
+        self.doc_key = doc_key
 
 def cascade_retrieve(db: RAGDatabase, doc_num: str, max_depth: int = 2) -> List[GraphEdge]:
     visited = set([doc_num])
@@ -51,50 +55,74 @@ TERMINATING_RELATIONS = ("Bãi bỏ", "Hủy bỏ", "Thay thế", "Đình chỉ"
 AMENDING_RELATIONS = ("Sửa đổi, bổ sung",)
 
 
-def impact_analysis(db: RAGDatabase, doc_num: str) -> List[AffectedDoc]:
+def impact_analysis(
+    db: RAGDatabase, doc_num: str, doc_key: Optional[str] = None
+) -> List[AffectedDoc]:
     """Các văn bản chịu tác động, theo cả hai chiều.
 
     Chiều xuôi: văn bản này tác động lên ai.
     Chiều ngược: ai đang tác động lên văn bản này — đây mới là câu hỏi quan
     trọng khi thẩm định hiệu lực, và bản cũ hoàn toàn không trả lời được.
+
+    Vẫn nhận số hiệu vì đó là thứ người dùng gõ và thứ mô hình sinh ra. Truyền
+    thêm `doc_key` khi đã biết chính xác văn bản nào — ví dụ "64/2026/QĐ-UBND"
+    của Huế chứ không phải của Tây Ninh; thiếu nó thì kết quả là hợp của mọi văn
+    bản trùng số hiệu.
     """
-    out: List[AffectedDoc] = []
-    cursor = db.db.execute(
-        "SELECT target_doc_num, relation_type FROM legal_graph WHERE source_doc_num = ?",
-        (doc_num,),
-    )
-    for r in cursor.fetchall():
-        out.append(AffectedDoc(r["target_doc_num"], r["relation_type"]))
+    xuoi = db.db.execute(
+        "SELECT target_doc_num, target_doc_key, relation_type FROM legal_graph "
+        "WHERE source_doc_num = ?" + (" AND source_doc_key = ?" if doc_key else ""),
+        (doc_num, doc_key) if doc_key else (doc_num,),
+    ).fetchall()
 
-    cursor = db.db.execute(
-        "SELECT source_doc_num, relation_type FROM legal_graph WHERE target_doc_num = ?",
-        (doc_num,),
-    )
-    for r in cursor.fetchall():
-        out.append(AffectedDoc(r["source_doc_num"], f"bị {r['relation_type'].lower()} bởi"))
+    nguoc = db.db.execute(
+        "SELECT source_doc_num, source_doc_key, relation_type FROM legal_graph "
+        "WHERE target_doc_num = ?" + (" AND target_doc_key = ?" if doc_key else ""),
+        (doc_num, doc_key) if doc_key else (doc_num,),
+    ).fetchall()
 
+    # Không gộp theo số hiệu: hai văn bản trùng số hiệu là hai văn bản thật,
+    # gộp lại là làm biến mất một cái. Ràng buộc UNIQUE của bảng đã bảo đảm
+    # không có dòng nào lặp, nên ở đây không cần khử trùng.
+    out = [AffectedDoc(r[0], r[2], r[1]) for r in xuoi]
+    out += [AffectedDoc(r[0], f"bị {r[2].lower()} bởi", r[1]) for r in nguoc]
     return out
 
 
-def effect_warnings(db: RAGDatabase, doc_num: str) -> Dict[str, Any]:
+def _ke_tac_dong(
+    db: RAGDatabase, doc_num: str, relations: tuple, doc_key: Optional[str]
+) -> List[tuple]:
+    """Danh sách (số hiệu, quan hệ) — đã bỏ doc_key nên phải khử trùng.
+
+    Hai Quyết định trùng số hiệu của hai tỉnh cùng bãi bỏ một văn bản là hai
+    cạnh thật, nhưng chiếu xuống còn số hiệu thì ra hai dòng chữ y hệt nhau.
+    Câu cảnh báo "bị sửa đổi bởi: 64/2026/QĐ-UBND, 64/2026/QĐ-UBND" chỉ làm
+    người đọc tưởng hệ thống hỏng.
+    """
+    placeholders = ",".join("?" * len(relations))
+    cursor = db.db.execute(
+        f"""SELECT source_doc_num, relation_type FROM legal_graph
+            WHERE target_doc_num = ? AND relation_type IN ({placeholders})"""
+        + (" AND target_doc_key = ?" if doc_key else ""),
+        (doc_num, *relations, doc_key) if doc_key else (doc_num, *relations),
+    )
+    seen, out = set(), []
+    for r in cursor.fetchall():
+        row = (r["source_doc_num"], r["relation_type"])
+        if row not in seen:
+            seen.add(row)
+            out.append(row)
+    return out
+
+
+def effect_warnings(
+    db: RAGDatabase, doc_num: str, doc_key: Optional[str] = None
+) -> Dict[str, Any]:
     """Tra đồ thị xem văn bản có bị chấm dứt hoặc bị sửa đổi không."""
-    placeholders = ",".join("?" * len(TERMINATING_RELATIONS))
-    cursor = db.db.execute(
-        f"""SELECT source_doc_num, relation_type FROM legal_graph
-            WHERE target_doc_num = ? AND relation_type IN ({placeholders})""",
-        (doc_num, *TERMINATING_RELATIONS),
-    )
-    terminated_by = [(r["source_doc_num"], r["relation_type"]) for r in cursor.fetchall()]
-
-    placeholders = ",".join("?" * len(AMENDING_RELATIONS))
-    cursor = db.db.execute(
-        f"""SELECT source_doc_num, relation_type FROM legal_graph
-            WHERE target_doc_num = ? AND relation_type IN ({placeholders})""",
-        (doc_num, *AMENDING_RELATIONS),
-    )
-    amended_by = [(r["source_doc_num"], r["relation_type"]) for r in cursor.fetchall()]
-
-    return {"terminated_by": terminated_by, "amended_by": amended_by}
+    return {
+        "terminated_by": _ke_tac_dong(db, doc_num, TERMINATING_RELATIONS, doc_key),
+        "amended_by": _ke_tac_dong(db, doc_num, AMENDING_RELATIONS, doc_key),
+    }
 
 
 # Trạng thái tự thân của văn bản, độc lập với đồ thị quan hệ. Nguồn Bộ Tư pháp
@@ -122,6 +150,13 @@ def validate_results(db: RAGDatabase, chunks: List[Dict]) -> List[Dict]:
 
     Văn bản "Hết hiệu lực một phần" hoặc bị sửa đổi KHÔNG bị loại: phần chưa bị
     sửa vẫn là luật hiện hành. Loại nhầm nhóm này sẽ xoá mất 220/1015 văn bản.
+
+    GIỚI HẠN CÒN LẠI. Hàm này tra theo số hiệu vì `legal_chunks` cũng khoá theo
+    số hiệu — hai văn bản trùng số hiệu đang dùng chung một tập chunk, nên không
+    có gì để phân biệt ở tầng này. Hệ quả: một văn bản tỉnh bị bãi bỏ sẽ kéo
+    theo văn bản cùng số hiệu của tỉnh khác. Sai lệch này thiên về loại thừa,
+    không phải trích dẫn nhầm luật đã chết, nên chấp nhận được cho tới khi
+    `legal_chunks` cũng chuyển sang doc_key (phải index lại ~46.000 đoạn).
     """
     valid_chunks: List[Dict] = []
     for c in chunks:
