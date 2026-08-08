@@ -208,12 +208,14 @@ def compute(session, rag: RAGDatabase, version: str, dry_run: bool) -> Counter:
 
     for doc in docs:
         stats["van_ban"] += 1
+        # Theo doc_key, nếu không hai văn bản trùng số hiệu nhận CÙNG một điểm
+        # tác động tính trên tập đoạn trộn lẫn của cả hai.
         rows = rag.db.execute("""
             SELECT c.content, v.embedding
             FROM legal_chunks c
             LEFT JOIN legal_chunks_vec v ON v.rowid = c.id
-            WHERE c.doc_num = ?
-        """, (doc.doc_num,)).fetchall()
+            WHERE COALESCE(c.doc_key, c.doc_num) = ?
+        """, (doc.doc_key or doc.doc_num,)).fetchall()
         if not rows:
             continue
 

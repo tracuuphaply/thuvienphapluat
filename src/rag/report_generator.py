@@ -131,7 +131,8 @@ def generate_compliance_report(
     # 2. Loại đoạn thuộc văn bản đã bị bãi bỏ/thay thế; văn bản bị sửa đổi được
     #    giữ lại kèm cảnh báo (phần chưa bị sửa vẫn là luật hiện hành).
     as_dicts = [
-        {"id": r.id, "doc_num": r.doc_num, "heading": r.heading, "content": r.content}
+        {"id": r.id, "doc_num": r.doc_num, "doc_key": r.doc_key,
+         "heading": r.heading, "content": r.content}
         for r in raw_results
     ]
     kept = validate_results(db, as_dicts)

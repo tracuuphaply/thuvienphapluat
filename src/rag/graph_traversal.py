@@ -132,12 +132,25 @@ PARTIAL_STATUSES = ("hết hiệu lực một phần",)
 NOT_YET_STATUSES = ("chưa có hiệu lực",)
 
 
-def document_status(db: RAGDatabase, doc_num: str) -> str:
-    """eff_status của văn bản, đọc từ metadata đã gắn vào chunk."""
-    row = db.db.execute(
-        "SELECT eff_status FROM legal_chunks WHERE doc_num = ? AND eff_status IS NOT NULL LIMIT 1",
-        (doc_num,),
-    ).fetchone()
+def document_status(db: RAGDatabase, doc_num: str,
+                    doc_key: Optional[str] = None) -> str:
+    """eff_status của văn bản, đọc từ metadata đã gắn vào chunk.
+
+    Có doc_key thì tra đích danh; không có thì lùi về số hiệu và lấy bản ghi
+    đầu tiên như trước — chỉ mơ hồ khi số hiệu trùng giữa các cơ quan.
+    """
+    if doc_key:
+        row = db.db.execute(
+            "SELECT eff_status FROM legal_chunks "
+            "WHERE doc_key = ? AND eff_status IS NOT NULL LIMIT 1",
+            (doc_key,),
+        ).fetchone()
+    else:
+        row = db.db.execute(
+            "SELECT eff_status FROM legal_chunks "
+            "WHERE doc_num = ? AND eff_status IS NOT NULL LIMIT 1",
+            (doc_num,),
+        ).fetchone()
     return (row["eff_status"] or "").strip() if row else ""
 
 
@@ -151,25 +164,23 @@ def validate_results(db: RAGDatabase, chunks: List[Dict]) -> List[Dict]:
     Văn bản "Hết hiệu lực một phần" hoặc bị sửa đổi KHÔNG bị loại: phần chưa bị
     sửa vẫn là luật hiện hành. Loại nhầm nhóm này sẽ xoá mất 220/1015 văn bản.
 
-    GIỚI HẠN CÒN LẠI. Hàm này tra theo số hiệu vì `legal_chunks` cũng khoá theo
-    số hiệu — hai văn bản trùng số hiệu đang dùng chung một tập chunk, nên không
-    có gì để phân biệt ở tầng này. Hệ quả: một văn bản tỉnh bị bãi bỏ sẽ kéo
-    theo văn bản cùng số hiệu của tỉnh khác. Sai lệch này thiên về loại thừa,
-    không phải trích dẫn nhầm luật đã chết, nên chấp nhận được cho tới khi
-    `legal_chunks` cũng chuyển sang doc_key (phải index lại ~46.000 đoạn).
+    Đoạn nào mang sẵn doc_key thì thẩm định đích danh văn bản đó. Trước khi
+    legal_chunks có doc_key, một Quyết định tỉnh bị bãi bỏ kéo theo văn bản cùng
+    số hiệu của tỉnh khác cũng bị loại.
     """
     valid_chunks: List[Dict] = []
     for c in chunks:
         doc_num = c.get("doc_num")
-        if not doc_num:
+        doc_key = c.get("doc_key")
+        if not (doc_num or doc_key):
             valid_chunks.append(c)
             continue
 
-        status = document_status(db, doc_num).lower()
+        status = document_status(db, doc_num, doc_key).lower()
         if status in EXPIRED_STATUSES:
             continue
 
-        warn = effect_warnings(db, doc_num)
+        warn = effect_warnings(db, doc_num, doc_key)
         if warn["terminated_by"]:
             continue
 
@@ -190,17 +201,30 @@ def validate_results(db: RAGDatabase, chunks: List[Dict]) -> List[Dict]:
 
     return valid_chunks
 
-def get_full_context(db: RAGDatabase, doc_num: str) -> Dict[str, Any]:
-    """Get a doc + all related docs in one call."""
+def get_full_context(db: RAGDatabase, doc_num: str,
+                     doc_key: Optional[str] = None) -> Dict[str, Any]:
+    """Toàn văn một văn bản kèm các văn bản liên quan, trong một lần gọi."""
     context = {
         "primary_doc": doc_num,
+        "doc_key": doc_key,
         "chunks": [],
         "related_docs": []
     }
-    
-    cursor = db.db.execute("SELECT * FROM legal_chunks WHERE doc_num = ? ORDER BY chunk_index", (doc_num,))
+
+    # Thiếu doc_key thì câu này gom đoạn của MỌI văn bản trùng số hiệu — tức
+    # trộn toàn văn hai tỉnh làm một. Có doc_key thì lấy đúng một văn bản.
+    if doc_key:
+        cursor = db.db.execute(
+            "SELECT * FROM legal_chunks WHERE doc_key = ? ORDER BY chunk_index",
+            (doc_key,),
+        )
+    else:
+        cursor = db.db.execute(
+            "SELECT * FROM legal_chunks WHERE doc_num = ? ORDER BY chunk_index",
+            (doc_num,),
+        )
     context["chunks"] = [dict(r) for r in cursor.fetchall()]
-    
+
     edges = cascade_retrieve(db, doc_num, max_depth=1)
     related_set = set()
     for e in edges:

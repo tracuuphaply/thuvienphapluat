@@ -111,9 +111,12 @@ def build_update_context(session, rag: RAGDatabase, doc_keys: list[str],
     for doc in docs:
         facts.append(ctx.document_facts(doc, thieu_trang_thai))
         edges.extend(ctx.graph_edges(session, doc))
+        # Theo doc_key: tra bằng số hiệu sẽ trộn toàn văn của mọi văn bản trùng
+        # số hiệu vào cùng một báo cáo.
         for row in rag.db.execute(
-            "SELECT heading, content FROM legal_chunks WHERE doc_num = ? "
-            "ORDER BY chunk_index", (doc.doc_num,)
+            "SELECT heading, content FROM legal_chunks "
+            "WHERE COALESCE(doc_key, doc_num) = ? ORDER BY chunk_index",
+            (doc.doc_key or doc.doc_num,)
         ).fetchall():
             chunks.append({
                 "doc_num": doc.doc_num,
@@ -226,7 +229,8 @@ def generate_business_report(session, rag: RAGDatabase, vsic_code: str,
     # "nghĩa vụ mới chồng lên nghĩa vụ cũ nào", điều (b) không làm được.
     existing = industry_search(rag, industry=short, limit=40, embedder=embedder)
     kept = validate_results(rag, [
-        {"id": r.id, "doc_num": r.doc_num, "heading": r.heading, "content": r.content}
+        {"id": r.id, "doc_num": r.doc_num, "doc_key": r.doc_key,
+         "heading": r.heading, "content": r.content}
         for r in existing
     ])
 

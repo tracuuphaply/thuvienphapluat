@@ -10,6 +10,9 @@ from src.rag.db_rag import RAGDatabase, HAS_VEC
 class SearchResult:
     id: int
     doc_num: str
+    # Định danh thật của văn bản. Thiếu nó thì bộ thẩm định hiệu lực ở cuối
+    # đường chỉ có số hiệu trong tay và không phân biệt nổi hai tỉnh.
+    doc_key: Optional[str]
     heading: str
     content: str
     final_score: float
@@ -175,6 +178,7 @@ def hybrid_search(
         results.append(SearchResult(
             id=m["id"],
             doc_num=doc["doc_num"],
+            doc_key=doc.get("doc_key"),
             heading=doc["heading"],
             content=doc["content"],
             final_score=final_score,

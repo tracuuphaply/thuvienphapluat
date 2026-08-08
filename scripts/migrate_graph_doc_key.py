@@ -14,9 +14,8 @@ tỉnh nên tỷ lệ này chỉ tăng.
 CÁCH LÀM. SQLite không đổi được ràng buộc UNIQUE tại chỗ, phải dựng lại bảng —
 đúng quy trình mà scripts/migrate_doc_key.py đã dùng cho bảng documents.
 
-GIỚI HẠN CÒN LẠI, ghi rõ để không ai tưởng đã xong: `legal_chunks` vẫn khoá theo
-số hiệu. Nghĩa là hai văn bản trùng số hiệu vẫn dùng chung một tập chunk. Sửa
-tầng đó phải index lại toàn bộ ~46.000 đoạn nên tách thành việc riêng.
+Tầng đoạn được xử lý riêng ở scripts/migrate_chunks_doc_key.py — chạy cả hai thì
+mới hết chuyện hai văn bản trùng số hiệu lẫn vào nhau.
 
     python -m scripts.migrate_graph_doc_key --dry-run
     python -m scripts.migrate_graph_doc_key

@@ -73,6 +73,12 @@ class RAGDatabase:
             ("is_closure_node", "INTEGER"),
             ("hierarchy_level", "INTEGER"),
             ("is_vbqppl", "INTEGER"),
+            # Định danh thật của văn bản. Số hiệu chỉ duy nhất trong phạm vi một
+            # cơ quan, nên khoá đoạn theo số hiệu làm hai văn bản của hai tỉnh
+            # dùng chung một tập đoạn — đã hỏng thật: 46 đoạn mang số hiệu
+            # 42/2026/QĐ-UBND là hỗn hợp của Phú Thọ và TP.HCM, đoạn của bên nạp
+            # sau đè lên bên nạp trước rồi để lại phần dư của bên kia.
+            ("doc_key", "TEXT"),
         ])
 
         # FTS5 table
@@ -137,8 +143,15 @@ class RAGDatabase:
                     f"CREATE VIRTUAL TABLE legal_chunks_vec USING vec0(embedding float[{dim}])"
                 )
         
-        # Tra theo (doc_num, chunk_index) chạy ở mỗi lần upsert; thiếu index thì
-        # mỗi đoạn là một lần quét toàn bảng 25.000 dòng.
+        # Khoá duy nhất của một đoạn. Dùng COALESCE để đoạn chưa có doc_key lùi
+        # về số hiệu thay vì lọt qua ràng buộc: cột NULL làm UNIQUE mất tác dụng
+        # hoàn toàn, đúng cái bẫy đã khiến legal_graph phình từ 7.926 lên 10.889
+        # cạnh trong một lượt đồng bộ.
+        self.db.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_chunks_doan "
+            "ON legal_chunks(COALESCE(doc_key, doc_num), chunk_index)"
+        )
+        # Tra theo số hiệu vẫn cần: người dùng gõ số hiệu, mô hình sinh số hiệu.
         self.db.execute(
             "CREATE INDEX IF NOT EXISTS idx_chunks_docnum_idx "
             "ON legal_chunks(doc_num, chunk_index)"
@@ -197,10 +210,14 @@ class RAGDatabase:
         đoạn thì phần lớn thời gian index là chờ fsync chứ không phải xử lý.
         """
         cursor = self.db.cursor()
-        
+
+        # Lùi về số hiệu khi chưa biết doc_key, để hành vi cũ vẫn đúng thay vì
+        # cho phép chèn trùng không giới hạn.
+        doc_key = chunk_data.get("doc_key") or chunk_data.get("doc_num")
         existing = cursor.execute(
-            "SELECT id FROM legal_chunks WHERE doc_num = ? AND chunk_index = ?", 
-            (chunk_data["doc_num"], chunk_data["chunk_index"])
+            "SELECT id FROM legal_chunks "
+            "WHERE COALESCE(doc_key, doc_num) = ? AND chunk_index = ?",
+            (doc_key, chunk_data["chunk_index"])
         ).fetchone()
 
         industries = chunk_data.get("industries", [])
@@ -209,10 +226,11 @@ class RAGDatabase:
 
         if existing:
             cursor.execute("""
-                UPDATE legal_chunks 
-                SET heading=?, content=?, char_count=?, field_name=?, field_code=?, 
-                    industries=?, eff_status=?, issue_date=?, doc_type=?, agency_name=?, 
+                UPDATE legal_chunks
+                SET heading=?, content=?, char_count=?, field_name=?, field_code=?,
+                    industries=?, eff_status=?, issue_date=?, doc_type=?, agency_name=?,
                     eff_state=?, is_closure_node=?, hierarchy_level=?, is_vbqppl=?,
+                    doc_key=COALESCE(?, doc_key), doc_num=COALESCE(?, doc_num),
                     content_hash=?, updated_at=datetime('now')
                 WHERE id=?
             """, (
@@ -222,6 +240,9 @@ class RAGDatabase:
                 chunk_data.get("agency_name"),
                 chunk_data.get("eff_state"), chunk_data.get("is_closure_node"),
                 chunk_data.get("hierarchy_level"), chunk_data.get("is_vbqppl"),
+                # COALESCE để bên gọi không truyền doc_key thì giữ nguyên giá trị
+                # đang có, chứ không xoá trắng định danh của đoạn.
+                chunk_data.get("doc_key"), chunk_data.get("doc_num"),
                 chunk_data.get("content_hash"), existing["id"]
             ))
             if commit:
@@ -230,14 +251,15 @@ class RAGDatabase:
         else:
             cursor.execute("""
                 INSERT INTO legal_chunks (
-                    doc_id, doc_num, chunk_index, heading, content, char_count,
+                    doc_id, doc_key, doc_num, chunk_index, heading, content, char_count,
                     field_name, field_code, industries, eff_status, issue_date,
                     doc_type, agency_name,
                     eff_state, is_closure_node, hierarchy_level, is_vbqppl,
                     content_hash
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                chunk_data.get("doc_id"), chunk_data.get("doc_num"), chunk_data.get("chunk_index"),
+                chunk_data.get("doc_id"), chunk_data.get("doc_key"),
+                chunk_data.get("doc_num"), chunk_data.get("chunk_index"),
                 chunk_data.get("heading"), chunk_data.get("content"), chunk_data.get("char_count"),
                 chunk_data.get("field_name"), chunk_data.get("field_code"), industries,
                 chunk_data.get("eff_status"), chunk_data.get("issue_date"), chunk_data.get("doc_type"),
@@ -249,6 +271,36 @@ class RAGDatabase:
             if commit:
                 self.db.commit()
             return cursor.lastrowid
+
+    def delete_stale_chunks(self, doc_key: str, chunk_count: int,
+                            commit: bool = True) -> int:
+        """Xoá các đoạn có chunk_index vượt quá số đoạn hiện tại của văn bản.
+
+        Nạp lại một văn bản ngắn đi — bị bãi bỏ một phần, hoặc lần cào trước lấy
+        nhầm bản dài — chỉ ghi đè các đoạn đầu; phần đuôi của bản cũ nằm lại vĩnh
+        viễn và vẫn được truy xuất như luật hiện hành. Đó chính là cách 46 đoạn
+        mang số hiệu 42/2026/QĐ-UBND trở thành hỗn hợp của hai tỉnh.
+
+        Phải xoá vector bằng tay: legal_chunks_vec không có trigger như FTS, nên
+        vector mồ côi sẽ tiếp tục được tìm thấy rồi JOIN ra rỗng.
+        """
+        rows = self.db.execute(
+            "SELECT id FROM legal_chunks "
+            "WHERE COALESCE(doc_key, doc_num) = ? AND chunk_index >= ?",
+            (doc_key, chunk_count),
+        ).fetchall()
+        if not rows:
+            return 0
+
+        ids = [r["id"] for r in rows]
+        marks = ",".join("?" * len(ids))
+        if HAS_VEC:
+            self.db.execute(f"DELETE FROM legal_chunks_vec WHERE rowid IN ({marks})", ids)
+        self.db.execute(f"DELETE FROM legal_chunks WHERE id IN ({marks})", ids)
+        if commit:
+            self.db.commit()
+        logger.info("Đã xoá %d đoạn thừa của %s", len(ids), doc_key)
+        return len(ids)
 
     def upsert_vector(self, chunk_id: int, embedding: List[float], commit: bool = True):
         if not HAS_VEC:

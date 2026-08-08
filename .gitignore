@@ -45,6 +45,10 @@ data/reports/
 data/reference_type_evidence.json
 data/moj_target_ids.json
 data/pipeline.lock
+data/report_worker.lock
+
+# Ánh xạ tên thư mục → id trên Google Drive, dựng lại được bằng một lượt chạy
+data/gdrive_cache.json
 
 # Vault Obsidian là kết quả sinh ra từ DB + data/ (đều đã ignore); dựng lại bằng
 # `python -m src.main --sync-vault-only`. 75MB/1041 file, kèm workspace.json

@@ -104,20 +104,23 @@ class TestExportDocumentToMd:
 
 
 class TestRagIndexerMetadataMapping:
-    """Metadata phải tới được tầng RAG.
+    """Metadata phải tới được tầng RAG, và phải tới ĐÚNG văn bản.
 
     Nguồn metadata đã chuyển từ data/metadata/*.json sang bảng `documents`: các
     file JSON là bản sao ghi lúc cào và không cập nhật lại, nên mọi trường tính
     về sau (cờ hiệu lực chuẩn hoá, cấp hiệu lực) đều rỗng trong index dù cơ sở
-    dữ liệu đã có đủ. Chunk vẫn đặt tên theo UUID còn văn bản khớp theo doc_num,
-    nên phép khớp vẫn phải đi qua doc_num chứ không qua tên file.
+    dữ liệu đã có đủ.
+
+    Phép khớp đi qua TÊN FILE chứ không qua số hiệu. Tên file chunk là moj_id,
+    thứ duy nhất chỉ đúng một văn bản; số hiệu thì trùng được giữa các tỉnh, và
+    khớp bằng số hiệu chính là cách hai văn bản dùng chung một tập đoạn.
     """
 
-    def test_khop_metadata_bang_doc_num_khong_phai_ten_file(self, tmp_path, rag_db, monkeypatch):
+    def test_khop_metadata_bang_ten_file_chu_khong_phai_so_hieu(self, tmp_path, rag_db, monkeypatch):
         data_dir = tmp_path
         (data_dir / "chunks").mkdir()
 
-        (data_dir / "chunks" / "0034b890-uuid_chunks.json").write_text(
+        (data_dir / "chunks" / "moj-111_chunks.json").write_text(
             json.dumps([{
                 "doc_num": "04/2026/NQ-HĐND", "chunk_index": 0,
                 "heading": "Điều 1", "content": "Nội dung điều 1",
@@ -125,22 +128,24 @@ class TestRagIndexerMetadataMapping:
 
         import src.rag.rag_indexer as ri
         monkeypatch.setattr(ri, "DATA_DIR", data_dir)
-        monkeypatch.setattr(ri, "load_document_metadata", lambda: {
-            "04/2026/NQ-HĐND": {
+        monkeypatch.setattr(ri, "load_document_metadata", lambda: ({
+            "moj-111": {
+                "doc_key": "04/2026/nq-hđnd::hđnd tỉnh a",
                 "doc_num": "04/2026/NQ-HĐND", "title": "NQ thử",
                 "eff_status": "Còn hiệu lực", "issue_date": "2026-01-15",
                 "doc_type": "Nghị quyết", "agency_name": "HĐND tỉnh",
                 "eff_state": "con_hieu_luc", "hierarchy_level": 8,
                 "is_vbqppl": True, "is_closure_node": False,
             }
-        })
+        }, {}))
         ri.index_from_phase1(None, rag_db)
 
         row = rag_db.db.execute(
-            "SELECT eff_status, issue_date, doc_type, agency_name, eff_state, "
-            "hierarchy_level FROM legal_chunks WHERE doc_num=?",
+            "SELECT doc_key, eff_status, issue_date, doc_type, agency_name, "
+            "eff_state, hierarchy_level FROM legal_chunks WHERE doc_num=?",
             ("04/2026/NQ-HĐND",),
         ).fetchone()
+        assert row["doc_key"] == "04/2026/nq-hđnd::hđnd tỉnh a"
         assert row["eff_status"] == "Còn hiệu lực", "metadata vẫn NULL — mapping còn hỏng"
         assert row["issue_date"] == "2026-01-15"
         assert row["doc_type"] == "Nghị quyết"
@@ -152,7 +157,7 @@ class TestRagIndexerMetadataMapping:
         """Trạng thái hiệu lực đổi mà điều khoản giữ nguyên là ca phổ biến nhất."""
         data_dir = tmp_path
         (data_dir / "chunks").mkdir()
-        chunk_file = data_dir / "chunks" / "uuid_chunks.json"
+        chunk_file = data_dir / "chunks" / "moj-222_chunks.json"
 
         chunk_file.write_text(json.dumps([{
             "doc_num": "05/2026/NĐ-CP", "chunk_index": 0,
@@ -162,18 +167,20 @@ class TestRagIndexerMetadataMapping:
         import src.rag.rag_indexer as ri
         monkeypatch.setattr(ri, "DATA_DIR", data_dir)
 
-        monkeypatch.setattr(ri, "load_document_metadata", lambda: {
-            "05/2026/NĐ-CP": {"doc_num": "05/2026/NĐ-CP",
-                              "eff_status": "Còn hiệu lực",
-                              "eff_state": "con_hieu_luc"}
-        })
+        monkeypatch.setattr(ri, "load_document_metadata", lambda: ({
+            "moj-222": {"doc_key": "05/2026/nđ-cp::chính phủ",
+                        "doc_num": "05/2026/NĐ-CP",
+                        "eff_status": "Còn hiệu lực",
+                        "eff_state": "con_hieu_luc"}
+        }, {}))
         ri.index_from_phase1(None, rag_db)
 
-        monkeypatch.setattr(ri, "load_document_metadata", lambda: {
-            "05/2026/NĐ-CP": {"doc_num": "05/2026/NĐ-CP",
-                              "eff_status": "Hết hiệu lực toàn bộ",
-                              "eff_state": "het_toan_bo"}
-        })
+        monkeypatch.setattr(ri, "load_document_metadata", lambda: ({
+            "moj-222": {"doc_key": "05/2026/nđ-cp::chính phủ",
+                        "doc_num": "05/2026/NĐ-CP",
+                        "eff_status": "Hết hiệu lực toàn bộ",
+                        "eff_state": "het_toan_bo"}
+        }, {}))
         ri.index_from_phase1(None, rag_db)
 
         row = rag_db.db.execute(

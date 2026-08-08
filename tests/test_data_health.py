@@ -109,6 +109,73 @@ class TestDoThiQuanHe:
         assert gop == 0, f"{gop} cạnh trùng hoàn toàn trong document_references"
 
 
+class TestDoanKhoaTheoDocKey:
+    """Đoạn phải khoá theo doc_key chứ không theo số hiệu.
+
+    Số hiệu chỉ duy nhất trong phạm vi một cơ quan. Khi đoạn còn khoá theo số
+    hiệu, 46 đoạn mang số hiệu 42/2026/QĐ-UBND là hỗn hợp của Phú Thọ và
+    TP.HCM — đoạn của bên nạp sau đè lên bên nạp trước rồi để lại phần đuôi của
+    bên kia. Sai lệch lan tới điểm tác động ngành, toàn văn trong báo cáo, và
+    kết quả thẩm định hiệu lực.
+    """
+
+    def test_moi_doan_deu_co_doc_key(self):
+        with _conn(RAG_DB) as c:
+            row = c.execute(
+                "SELECT COUNT(*) tong, SUM(doc_key IS NULL) thieu FROM legal_chunks"
+            ).fetchone()
+        if row["tong"] == 0:
+            pytest.skip("chưa index")
+        assert row["thieu"] == 0, (
+            f"{row['thieu']}/{row['tong']} đoạn chưa có doc_key — "
+            f"chạy: python -m scripts.migrate_chunks_doc_key"
+        )
+
+    def test_khong_hai_van_ban_nao_dung_chung_mot_doan(self):
+        with _conn(RAG_DB) as c:
+            trung = c.execute("""
+                SELECT COALESCE(SUM(n - 1), 0) FROM (
+                    SELECT COUNT(*) n FROM legal_chunks
+                    GROUP BY COALESCE(doc_key, doc_num), chunk_index HAVING n > 1)
+            """).fetchone()[0]
+        assert trung == 0, f"{trung} đoạn trùng khoá (doc_key, chunk_index)"
+
+    def test_so_hieu_trung_van_giu_duoc_hai_tap_doan(self):
+        """Kiểm trên chính các số hiệu đang trùng trong kho, không phải ví dụ."""
+        with _conn(MASTER_DB) as c:
+            trung = [r[0] for r in c.execute(
+                "SELECT doc_num FROM documents GROUP BY doc_num HAVING COUNT(*) > 1")]
+        if not trung:
+            pytest.skip("kho chưa có số hiệu trùng")
+
+        marks = ",".join("?" * len(trung))
+        with _conn(RAG_DB) as c:
+            rows = c.execute(
+                f"SELECT doc_num, COUNT(DISTINCT doc_key) n FROM legal_chunks "
+                f"WHERE doc_num IN ({marks}) GROUP BY doc_num", trung).fetchall()
+        gop = [r["doc_num"] for r in rows if r["n"] < 2]
+        assert not gop, f"vẫn dùng chung một tập đoạn: {gop}"
+
+    def test_khong_co_vector_mo_coi(self):
+        """Vector mồ côi vẫn được tìm thấy rồi JOIN ra rỗng — kết quả biến mất
+        mà không có dòng log nào giải thích.
+        """
+        from src.rag.db_rag import HAS_VEC, RAGDatabase
+
+        if not HAS_VEC:
+            pytest.skip("chưa cài sqlite-vec")
+        # Bảng ảo vec0 chỉ đọc được qua kết nối đã nạp extension.
+        rag = RAGDatabase()
+        try:
+            mo_coi = rag.db.execute(
+                "SELECT COUNT(*) FROM legal_chunks_vec v "
+                "LEFT JOIN legal_chunks c ON c.id = v.rowid WHERE c.id IS NULL"
+            ).fetchone()[0]
+        finally:
+            rag.close()
+        assert mo_coi == 0, f"{mo_coi} vector không còn đoạn tương ứng"
+
+
 class TestMetadataRagIndex:
     def test_chunk_khong_bi_mat_metadata(self):
         """Toàn bộ 6124 chunk từng có eff_status/issue_date NULL vì lỗi ghép đường dẫn."""

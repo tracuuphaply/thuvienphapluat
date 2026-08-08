@@ -80,13 +80,13 @@ def embed_missing(rag_db: RAGDatabase, embedder=None, batch_size: int = 100) -> 
 
 # Trường của bảng documents mà tầng RAG cần: metadata hiển thị + cột lọc.
 _META_FIELDS = (
-    "doc_num", "title", "field_name", "field_code", "industries",
+    "doc_key", "doc_num", "title", "field_name", "field_code", "industries",
     "eff_status", "issue_date", "doc_type", "agency_name", "tvpl_id",
     "eff_state", "is_closure_node", "hierarchy_level", "is_vbqppl",
 )
 
 
-def load_document_metadata() -> dict[str, dict]:
+def load_document_metadata() -> tuple[dict[str, dict], dict[str, dict]]:
     """Metadata cho tầng RAG, đọc thẳng từ bảng documents.
 
     Trước đây hàm này đọc data/metadata/*.json. Các file đó là bản sao được ghi
@@ -95,18 +95,37 @@ def load_document_metadata() -> dict[str, dict]:
     cơ sở dữ liệu đã có đủ. Đúng loại lỗi từng khiến vault render link nguồn
     rỗng trên cả 1015 note.
 
-    Khoá theo doc_num vì legal_chunks cũng khoá theo doc_num. Số hiệu trùng giữa
-    các tỉnh thì bản ghi sau ghi đè bản trước — hạn chế đã biết của tầng chunk,
-    sẽ hết khi chunk chuyển sang doc_key.
+    Trả về hai bảng tra:
+      - theo moj_id: đường phân giải CHÍNH, vì tên file chunk chính là moj_id
+        nên nó chỉ đúng một văn bản.
+      - theo doc_num: chỉ chứa số hiệu KHÔNG trùng, dùng khi tên file không tra
+        được. Số hiệu trùng bị loại hẳn khỏi bảng này — thà không có metadata
+        còn hơn gán nhầm metadata của tỉnh khác.
     """
     from src.storage.database import get_session
     from src.storage.models import Document
 
-    out: dict[str, dict] = {}
+    theo_moj_id: dict[str, dict] = {}
+    theo_doc_num: dict[str, dict] = {}
+    trung: set[str] = set()
+
     with get_session() as session:
         for doc in session.query(Document).all():
-            out[doc.doc_num] = {f: getattr(doc, f, None) for f in _META_FIELDS}
-    return out
+            meta = {f: getattr(doc, f, None) for f in _META_FIELDS}
+            if doc.moj_id:
+                theo_moj_id[str(doc.moj_id)] = meta
+            if doc.doc_num in theo_doc_num:
+                trung.add(doc.doc_num)
+            theo_doc_num[doc.doc_num] = meta
+
+    for doc_num in trung:
+        theo_doc_num.pop(doc_num, None)
+    if trung:
+        logger.info(
+            "%d số hiệu trùng giữa nhiều cơ quan, chỉ phân giải được qua moj_id: %s",
+            len(trung), ", ".join(sorted(trung)[:5]),
+        )
+    return theo_moj_id, theo_doc_num
 
 
 def index_from_phase1(db_path: Path, rag_db: RAGDatabase, force: bool = False, stats_only: bool = False):
@@ -136,10 +155,14 @@ def index_from_phase1(db_path: Path, rag_db: RAGDatabase, force: bool = False, s
     chunk_files = list(chunks_dir.glob("*_chunks.json"))
     logger.info(f"Found {len(chunk_files)} chunk files.")
     
-    meta_by_doc_num = load_document_metadata()
-    logger.info(f"Đã nạp metadata cho {len(meta_by_doc_num)} văn bản.")
+    meta_by_moj_id, meta_by_doc_num = load_document_metadata()
+    logger.info(
+        "Đã nạp metadata: %d theo moj_id, %d theo số hiệu không trùng.",
+        len(meta_by_moj_id), len(meta_by_doc_num),
+    )
 
     pending_embeddings: list[tuple[int, str]] = []
+    khong_ro_van_ban = 0
 
     for cfile in chunk_files:
         try:
@@ -152,9 +175,23 @@ def index_from_phase1(db_path: Path, rag_db: RAGDatabase, force: bool = False, s
             file_doc_num = next(
                 (c.get("doc_num") for c in chunks if c.get("doc_num")), None
             )
-            meta_data = meta_by_doc_num.get(file_doc_num, {}) if file_doc_num else {}
-            if file_doc_num and not meta_data:
-                logger.warning(f"Không tìm thấy metadata cho {file_doc_num}")
+            # Tên file là moj_id, thứ duy nhất trong payload chỉ đúng MỘT văn
+            # bản. Nội dung file chỉ có số hiệu, mà số hiệu thì trùng được giữa
+            # các tỉnh — tra bằng số hiệu là cách hai văn bản dùng chung một tập
+            # đoạn ngay từ đầu.
+            moj_id = cfile.name[: -len("_chunks.json")]
+            meta_data = meta_by_moj_id.get(moj_id)
+            if meta_data is None and file_doc_num:
+                meta_data = meta_by_doc_num.get(file_doc_num)
+            if meta_data is None:
+                khong_ro_van_ban += 1
+                logger.warning(
+                    "Không xác định được văn bản của %s (số hiệu %s) — bỏ qua, "
+                    "vì gán nhầm còn tệ hơn thiếu.", cfile.name, file_doc_num,
+                )
+                continue
+
+            doc_key = meta_data.get("doc_key")
 
             for chunk in chunks:
                 content = chunk.get("content", "")
@@ -162,8 +199,11 @@ def index_from_phase1(db_path: Path, rag_db: RAGDatabase, force: bool = False, s
                 doc_num = chunk.get("doc_num", meta_data.get("doc_num"))
                 c_idx = chunk.get("chunk_index", 0)
 
-                # Check existing
-                cursor = rag_db.db.execute("SELECT id, content_hash FROM legal_chunks WHERE doc_num = ? AND chunk_index = ?", (doc_num, c_idx))
+                cursor = rag_db.db.execute(
+                    "SELECT id, content_hash FROM legal_chunks "
+                    "WHERE COALESCE(doc_key, doc_num) = ? AND chunk_index = ?",
+                    (doc_key or doc_num, c_idx),
+                )
                 existing = cursor.fetchone()
 
                 # Nội dung không đổi thì không cần nhúng lại, nhưng metadata vẫn
@@ -173,6 +213,7 @@ def index_from_phase1(db_path: Path, rag_db: RAGDatabase, force: bool = False, s
 
                 chunk_data = {
                     "doc_id": chunk.get("doc_id", meta_data.get("tvpl_id")),
+                    "doc_key": doc_key,
                     "doc_num": doc_num,
                     "chunk_index": c_idx,
                     "heading": chunk.get("heading", ""),
@@ -218,11 +259,18 @@ def index_from_phase1(db_path: Path, rag_db: RAGDatabase, force: bool = False, s
                         ),
                     ))
 
+            # Bản mới ngắn hơn bản cũ thì phần đuôi của bản cũ nằm lại và vẫn
+            # được truy xuất như luật hiện hành.
+            rag_db.delete_stale_chunks(doc_key or file_doc_num, len(chunks),
+                                       commit=False)
             rag_db.db.commit()
 
         except Exception as e:
             rag_db.db.rollback()
             logger.error(f"Error processing {cfile}: {e}")
+
+    if khong_ro_van_ban:
+        logger.warning("%d file chunk không xác định được văn bản.", khong_ro_van_ban)
 
     if pending_embeddings:
         _embed_pending(rag_db, embedder, pending_embeddings)
