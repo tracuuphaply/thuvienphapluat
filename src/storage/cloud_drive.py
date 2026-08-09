@@ -10,8 +10,11 @@ Hai điều module này làm mà hai nhánh riêng lẻ không làm:
   1. Báo rõ file nào KHÔNG lên được. Nhánh Lark hiện `continue` lặng lẽ khi một
      file lỗi, nên bên gọi tưởng đã xong và xoá file local. Ở đây mọi thất bại
      đều được trả về để xếp vào hàng đợi thử lại.
-  2. Một chỗ duy nhất quyết định văn bản nào lên mây, thay vì rải điều kiện ở
-     mỗi nhánh gọi.
+  2. Quyết định "văn bản nào lên mây" đọc từ một nguồn cấu hình duy nhất
+     (config.upload_closure_nodes). Bên gọi nào cần lọc sẵn ở tầng truy vấn thì
+     phải hỏi cùng hàm đó — chép cứng điều kiện ra chỗ khác là cách nhánh
+     --upload-only từng báo "0 văn bản chờ upload" trong khi kho có 3.443 văn
+     bản chưa lên.
 """
 from __future__ import annotations
 

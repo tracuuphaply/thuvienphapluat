@@ -123,6 +123,57 @@ class TestChonNoiLuuTru:
         assert not outcome.skipped and outcome.ok
 
 
+class TestDanhSachChoUpload:
+    """Nhánh --upload-only phải hỏi CÙNG một nguồn cấu hình với upload_document.
+
+    Bản trước chép cứng điều kiện loại văn bản nền vào câu truy vấn. Sau khi
+    đổi mặc định sang "có đẩy", nhánh này vẫn báo "0 văn bản chờ upload" trong
+    khi kho có 3.443 văn bản chưa lên — hỏng lặng lẽ, và lặng lẽ vì nó báo
+    thành công.
+    """
+
+    def _kho(self, master_session):
+        from src.storage.database import upsert_document
+
+        for i, nen in enumerate([False, True, True]):
+            upsert_document(master_session, {
+                "doc_num": f"{i}/2026/NĐ-CP", "title": "x",
+                "agency_name": "Chính phủ", "is_closure_node": nen,
+            })
+        master_session.commit()
+
+    def _dem(self, session):
+        from src.config import upload_closure_nodes
+        from src.storage.models import Document
+
+        q = session.query(Document).filter(Document.cloud_synced_at.is_(None))
+        if not upload_closure_nodes():
+            q = q.filter((Document.is_closure_node.is_(None))
+                         | (Document.is_closure_node == False))  # noqa: E712
+        return q.count()
+
+    def test_mac_dinh_gom_ca_van_ban_nen(self, master_session, monkeypatch):
+        monkeypatch.delenv("UPLOAD_CLOSURE_NODES", raising=False)
+        self._kho(master_session)
+        assert self._dem(master_session) == 3
+
+    def test_tat_thi_chi_con_van_ban_nghiep_vu(self, master_session, monkeypatch):
+        monkeypatch.setenv("UPLOAD_CLOSURE_NODES", "false")
+        self._kho(master_session)
+        assert self._dem(master_session) == 1
+
+    def test_truy_van_trong_main_khong_chep_cung_dieu_kien(self):
+        """Chặn việc điều kiện lại bị chép ra chỗ khác."""
+        from src.config import PROJECT_ROOT
+
+        src = (PROJECT_ROOT / "src" / "main.py").read_text(encoding="utf-8")
+        i = src.index("def run_upload_only")
+        than = src[i:i + 3000]
+        assert "upload_closure_nodes()" in than, (
+            "run_upload_only phải hỏi config chứ không tự quyết"
+        )
+
+
 class TestHangDoiUpload:
     def _doc(self, session, doc_num="292/2026/NĐ-CP"):
         doc, _ = upsert_document(session, {

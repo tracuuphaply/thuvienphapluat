@@ -37,6 +37,7 @@ from src.config import (
     DATA_DIR,
     LARK_APP_ID,
     TVPL_DOWNLOAD_ENABLED,
+    upload_closure_nodes,
 )
 
 from src.notification.telegram_bot import (
@@ -707,7 +708,7 @@ def run_pipeline(
     return metrics
 
 
-def run_upload_only() -> dict[str, int]:
+def run_upload_only(sync_after: bool = True) -> dict[str, int]:
     """
     Đẩy lên Lark Drive những văn bản đã có trong DB nhưng chưa upload được.
 
@@ -734,13 +735,19 @@ def run_upload_only() -> dict[str, int]:
         # mục riêng kèm metadata, để kho trên Drive phản ánh đủ danh sách văn bản.
         # Lọc theo cloud_synced_at chứ không theo lark_folder_token: cột token
         # chỉ đúng cho một đích lưu trữ, còn cổng đồng bộ thì chung cho cả hai.
-        pending = (
-            session.query(Document)
-            .filter(Document.cloud_synced_at.is_(None))
-            .filter((Document.is_closure_node.is_(None))
-                    | (Document.is_closure_node == False))  # noqa: E712
-            .all()
-        )
+        # Điều kiện "văn bản nền có lên mây không" đọc từ CÙNG một chỗ với
+        # cloud_drive.upload_document. Trước đây chỗ này giữ bản sao cứng của
+        # điều kiện đó, nên sau khi đổi mặc định sang "có đẩy", nhánh
+        # --upload-only vẫn báo "0 văn bản chờ upload" trong khi kho có 3.443
+        # văn bản chưa lên — hai nơi quyết định cùng một chính sách là đủ để
+        # một nơi bị bỏ quên.
+        query = session.query(Document).filter(Document.cloud_synced_at.is_(None))
+        if not upload_closure_nodes():
+            query = query.filter(
+                (Document.is_closure_node.is_(None))
+                | (Document.is_closure_node == False)  # noqa: E712
+            )
+        pending = query.all()
         metrics["total_new"] = len(pending)
         logger.info("Có %d văn bản chờ upload lên %s.", len(pending), provider)
 
@@ -779,6 +786,15 @@ def run_upload_only() -> dict[str, int]:
     logger.info("Đã upload %d/%d văn bản.", metrics["gdrive_uploaded"], metrics["total_new"])
 
     # Step 8.1: Sync to Obsidian Vault (Phase 2)
+    #
+    # Bỏ qua được bằng --no-sync. Hai lý do: upload chỉ ghi legal_docs.db còn
+    # index ghi rag.db, nên tách ra thì chạy song song với một lượt nhúng dài
+    # được; và một lượt "chỉ upload" âm thầm index lại toàn kho là việc bên gọi
+    # không yêu cầu.
+    if not sync_after:
+        logger.info("Bỏ qua đồng bộ vault/RAG theo yêu cầu (--no-sync).")
+        return metrics
+
     try:
         from src.obsidian.vault_syncer import sync as sync_vault
         sync_vault()
@@ -832,7 +848,12 @@ def main() -> None:
     parser.add_argument(
         "--upload-only",
         action="store_true",
-        help="Chỉ upload lại các văn bản đã có trong DB nhưng chưa lên Lark Drive",
+        help="Chỉ upload các văn bản đã có trong DB nhưng chưa lên mây",
+    )
+    parser.add_argument(
+        "--no-sync",
+        action="store_true",
+        help="Dùng với --upload-only: không đồng bộ vault/RAG sau khi upload",
     )
     parser.add_argument(
         "--sync-vault-only",
@@ -849,7 +870,7 @@ def main() -> None:
     setup_logging()
 
     if args.upload_only:
-        run_upload_only()
+        run_upload_only(sync_after=not args.no_sync)
         return
 
     if args.sync_vault_only:
