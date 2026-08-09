@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
 from typing import Generator
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from src.config import CLOSURE_SEED_FLOOR, CRAWL_OVERLAP_DAYS, DATABASE_URL
@@ -481,18 +481,53 @@ def resolve_reference_targets(session: Session) -> int:
     """Nối lại các cạnh đang treo với văn bản đích vừa được thu thập.
 
     Cạnh được tạo trước khi văn bản đích về kho sẽ có target_doc_id NULL mãi
-    mãi nếu không có bước này. Trả về số cạnh nối được thêm.
+    mãi nếu không có bước này. Trả về số cạnh nối thêm hoặc sửa lại.
+
+    Nối bằng `target_moj_id` TRƯỚC, số hiệu chỉ là phương án dự phòng. Bản trước
+    chỉ dò theo số hiệu, hỏng theo hai hướng ngược nhau:
+
+      - Không nối được khi chuỗi số hiệu lệch (khoảng trắng, dấu nháy, tiền tố
+        "Số ..."), dù payload đã ghi sẵn id chính xác của đích. 199 văn bản nền
+        vì thế không có cạnh vào nào, nên không tính được độ sâu bao đóng.
+      - Nối NHẦM khi hai văn bản trùng số hiệu: get_document_by_doc_num trả về
+        một bản bất kỳ. Đo được 216 cạnh đang trỏ sang văn bản của tỉnh khác —
+        quan hệ pháp lý sai, đi thẳng vào báo cáo mà không có dấu hiệu gì.
+
+    Vì vậy hàm này cũng SỬA cạnh đã nối sai: moj_id đến từ payload của Bộ Tư
+    pháp nên nó là căn cứ, còn target_doc_id là suy diễn.
     """
-    pending = (
+    # Số hiệu trùng nhiều cơ quan thì không dò theo số hiệu được nữa.
+    trung = {
+        row[0] for row in session.query(Document.doc_num)
+        .group_by(Document.doc_num)
+        .having(func.count(Document.id) > 1)
+        .all()
+    }
+    id_theo_moj = {
+        moj_id: doc_id
+        for doc_id, moj_id in session.query(Document.id, Document.moj_id)
+        .filter(Document.moj_id.isnot(None))
+        .all()
+    }
+
+    edges = (
         session.query(DocumentReference)
-        .filter(DocumentReference.target_doc_id.is_(None))
+        .filter(
+            (DocumentReference.target_doc_id.is_(None))
+            | (DocumentReference.target_moj_id.isnot(None))
+        )
         .all()
     )
     resolved = 0
-    for edge in pending:
-        target = get_document_by_doc_num(session, edge.target_doc_num)
-        if target is not None:
-            edge.target_doc_id = target.id
+    for edge in edges:
+        dung = id_theo_moj.get(edge.target_moj_id) if edge.target_moj_id else None
+        if dung is None and edge.target_doc_id is None:
+            if edge.target_doc_num in trung:
+                continue
+            target = get_document_by_doc_num(session, edge.target_doc_num)
+            dung = target.id if target is not None else None
+        if dung is not None and dung != edge.target_doc_id:
+            edge.target_doc_id = dung
             resolved += 1
     return resolved
 

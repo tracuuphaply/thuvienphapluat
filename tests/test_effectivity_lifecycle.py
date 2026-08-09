@@ -106,6 +106,80 @@ class TestResolveReferenceTargets:
         edge = master_session.query(DocumentReference).first()
         assert edge.target_doc_id == tgt.id
 
+    def test_noi_bang_moj_id_khi_so_hieu_lech_chuoi(self, master_session):
+        """Payload đã ghi sẵn id chính xác của đích — dò theo chuỗi số hiệu là
+        tự bỏ đi thông tin mạnh hơn.
+
+        199 văn bản nền trong kho thật không có cạnh vào nào chỉ vì chuỗi số
+        hiệu lệch (khoảng trắng, dấu nháy, tiền tố "Số ..."), nên không tính
+        được độ sâu bao đóng của chúng.
+        """
+        src, _ = upsert_document(master_session, {"doc_num": "01/2026/NĐ-CP", "title": "A"})
+        master_session.commit()
+        master_session.add(DocumentReference(
+            source_doc_id=src.id, target_doc_num="Số 02/2026/NĐ-CP",
+            target_moj_id="777", relation_type="Căn cứ"))
+        master_session.commit()
+
+        tgt, _ = upsert_document(master_session, {
+            "doc_num": "02/2026/NĐ-CP", "title": "B", "moj_id": "777"})
+        master_session.commit()
+
+        assert resolve_reference_targets(master_session) == 1
+        master_session.commit()
+        assert master_session.query(DocumentReference).first().target_doc_id == tgt.id
+
+    def test_khong_noi_bua_khi_so_hieu_trung_nhieu_co_quan(self, master_session):
+        """Dò theo số hiệu trả về một bản BẤT KỲ trong nhóm trùng."""
+        src, _ = upsert_document(master_session, {"doc_num": "01/2026/NĐ-CP", "title": "A"})
+        for agency in ("UBND Thành phố Huế", "UBND Tỉnh Tây Ninh"):
+            upsert_document(master_session, {
+                "doc_num": "64/2026/QĐ-UBND", "title": "Q", "agency_name": agency})
+        master_session.commit()
+        master_session.add(DocumentReference(
+            source_doc_id=src.id, target_doc_num="64/2026/QĐ-UBND",
+            relation_type="Căn cứ"))
+        master_session.commit()
+
+        assert resolve_reference_targets(master_session) == 0, \
+            "không biết là tỉnh nào thì để treo, đừng đoán"
+
+    def test_sua_lai_canh_da_noi_sai(self, master_session):
+        """moj_id đến từ payload Bộ Tư pháp nên là căn cứ; target_doc_id là suy
+        diễn. Đo được 216 cạnh trong kho thật đang trỏ sang văn bản tỉnh khác.
+        """
+        src, _ = upsert_document(master_session, {"doc_num": "01/2026/NĐ-CP", "title": "A"})
+        hue, _ = upsert_document(master_session, {
+            "doc_num": "64/2026/QĐ-UBND", "title": "Huế",
+            "agency_name": "UBND Thành phố Huế", "moj_id": "111"})
+        tay_ninh, _ = upsert_document(master_session, {
+            "doc_num": "64/2026/QĐ-UBND", "title": "Tây Ninh",
+            "agency_name": "UBND Tỉnh Tây Ninh", "moj_id": "222"})
+        master_session.commit()
+
+        master_session.add(DocumentReference(
+            source_doc_id=src.id, target_doc_num="64/2026/QĐ-UBND",
+            target_moj_id="222", target_doc_id=hue.id, relation_type="Căn cứ"))
+        master_session.commit()
+
+        assert resolve_reference_targets(master_session) == 1
+        master_session.commit()
+        assert master_session.query(DocumentReference).first().target_doc_id == tay_ninh.id
+
+    def test_chay_lai_khong_dem_thua(self, master_session):
+        src, _ = upsert_document(master_session, {"doc_num": "01/2026/NĐ-CP", "title": "A"})
+        tgt, _ = upsert_document(master_session, {
+            "doc_num": "02/2026/NĐ-CP", "title": "B", "moj_id": "777"})
+        master_session.commit()
+        master_session.add(DocumentReference(
+            source_doc_id=src.id, target_doc_num="02/2026/NĐ-CP",
+            target_moj_id="777", relation_type="Căn cứ"))
+        master_session.commit()
+
+        assert resolve_reference_targets(master_session) == 1
+        master_session.commit()
+        assert resolve_reference_targets(master_session) == 0
+
 
 class TestValidateResults:
     def test_loai_van_ban_da_bi_bai_bo(self, rag_db, edge_factory):
