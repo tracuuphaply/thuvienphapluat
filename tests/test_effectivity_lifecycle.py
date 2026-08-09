@@ -144,9 +144,9 @@ class TestResolveReferenceTargets:
         assert resolve_reference_targets(master_session) == 0, \
             "không biết là tỉnh nào thì để treo, đừng đoán"
 
-    def test_sua_lai_canh_da_noi_sai(self, master_session):
+    def test_sua_lai_canh_khi_dich_dung_da_co_trong_kho(self, master_session):
         """moj_id đến từ payload Bộ Tư pháp nên là căn cứ; target_doc_id là suy
-        diễn. Đo được 216 cạnh trong kho thật đang trỏ sang văn bản tỉnh khác.
+        diễn. Có đích đúng trong kho thì trỏ lại cho đúng.
         """
         src, _ = upsert_document(master_session, {"doc_num": "01/2026/NĐ-CP", "title": "A"})
         hue, _ = upsert_document(master_session, {
@@ -165,6 +165,46 @@ class TestResolveReferenceTargets:
         assert resolve_reference_targets(master_session) == 1
         master_session.commit()
         assert master_session.query(DocumentReference).first().target_doc_id == tay_ninh.id
+
+    def test_bo_lien_ket_suy_dien_o_cap_tinh_khi_id_lech(self, master_session):
+        """Đích đúng chưa có trong kho, liên kết hiện tại mang moj_id khác.
+
+        Với cấp tỉnh, trùng số hiệu là chuyện thường nên không chứng minh được
+        liên kết đúng. Trả cạnh về trạng thái treo để bao đóng đi tải đúng văn
+        bản theo moj_id — cạnh treo trung thực hơn cạnh sai.
+        """
+        src, _ = upsert_document(master_session, {"doc_num": "01/2026/NĐ-CP", "title": "A"})
+        hue, _ = upsert_document(master_session, {
+            "doc_num": "64/2026/QĐ-UBND", "title": "Huế", "moj_id": "111",
+            "agency_name": "UBND Thành phố Huế", "territorial_scope": "tinh"})
+        master_session.commit()
+        master_session.add(DocumentReference(
+            source_doc_id=src.id, target_doc_num="64/2026/QĐ-UBND",
+            target_moj_id="999", target_doc_id=hue.id, relation_type="Căn cứ"))
+        master_session.commit()
+
+        assert resolve_reference_targets(master_session) == 1
+        master_session.commit()
+        assert master_session.query(DocumentReference).first().target_doc_id is None
+
+    def test_giu_lien_ket_trung_uong_du_id_lech(self, master_session):
+        """Bộ Tư pháp cấp nhiều id cho cùng một văn bản — Luật 71/2014/QH13 tồn
+        tại dưới cả "40742" lẫn "vbpqta_11034". Số hiệu trung ương duy nhất toàn
+        quốc nên liên kết vẫn đúng văn bản; xoá đi là mất cạnh thật.
+        """
+        src, _ = upsert_document(master_session, {"doc_num": "01/2026/NĐ-CP", "title": "A"})
+        luat, _ = upsert_document(master_session, {
+            "doc_num": "71/2014/QH13", "title": "Luật", "moj_id": "40742",
+            "agency_name": "Quốc hội", "territorial_scope": "trung_uong"})
+        master_session.commit()
+        master_session.add(DocumentReference(
+            source_doc_id=src.id, target_doc_num="71/2014/QH13",
+            target_moj_id="vbpqta_11034", target_doc_id=luat.id,
+            relation_type="Căn cứ"))
+        master_session.commit()
+
+        assert resolve_reference_targets(master_session) == 0
+        assert master_session.query(DocumentReference).first().target_doc_id == luat.id
 
     def test_chay_lai_khong_dem_thua(self, master_session):
         src, _ = upsert_document(master_session, {"doc_num": "01/2026/NĐ-CP", "title": "A"})

@@ -489,12 +489,22 @@ def resolve_reference_targets(session: Session) -> int:
       - Không nối được khi chuỗi số hiệu lệch (khoảng trắng, dấu nháy, tiền tố
         "Số ..."), dù payload đã ghi sẵn id chính xác của đích. 199 văn bản nền
         vì thế không có cạnh vào nào, nên không tính được độ sâu bao đóng.
-      - Nối NHẦM khi hai văn bản trùng số hiệu: get_document_by_doc_num trả về
-        một bản bất kỳ. Đo được 216 cạnh đang trỏ sang văn bản của tỉnh khác —
-        quan hệ pháp lý sai, đi thẳng vào báo cáo mà không có dấu hiệu gì.
+      - Nối bằng suy diễn khi hai văn bản trùng số hiệu: get_document_by_doc_num
+        trả về một bản bất kỳ trong nhóm.
 
-    Vì vậy hàm này cũng SỬA cạnh đã nối sai: moj_id đến từ payload của Bộ Tư
-    pháp nên nó là căn cứ, còn target_doc_id là suy diễn.
+    XOÁ LIÊN KẾT khi có bằng chứng nó chỉ là suy diễn mà số hiệu lại không đủ
+    định danh. Cụ thể: payload ghi một moj_id, văn bản đang được trỏ tới mang
+    moj_id khác, và đó là văn bản CẤP TỈNH.
+
+    Với văn bản trung ương thì không xoá, vì số hiệu trung ương duy nhất toàn
+    quốc nên liên kết vẫn đúng văn bản — lệch id chỉ là do Bộ Tư pháp cấp nhiều
+    id cho cùng một văn bản (đo được 198 cạnh như vậy; rõ nhất là Luật
+    71/2014/QH13 tồn tại dưới cả "40742" lẫn "vbpqta_11034", hai hệ id khác
+    nhau). Với cấp tỉnh thì trùng số hiệu là chuyện thường, nên 19 cạnh còn lại
+    không chứng minh được là đúng.
+
+    Trả về cạnh treo còn hơn cạnh sai: đích đã bị bỏ liên kết sẽ vào hàng đợi
+    bao đóng theo đúng moj_id của nó, và tự nối lại đúng khi văn bản về kho.
     """
     # Số hiệu trùng nhiều cơ quan thì không dò theo số hiệu được nữa.
     trung = {
@@ -503,12 +513,14 @@ def resolve_reference_targets(session: Session) -> int:
         .having(func.count(Document.id) > 1)
         .all()
     }
-    id_theo_moj = {
-        moj_id: doc_id
-        for doc_id, moj_id in session.query(Document.id, Document.moj_id)
-        .filter(Document.moj_id.isnot(None))
-        .all()
-    }
+    id_theo_moj: dict[str, int] = {}
+    ho_so: dict[int, tuple[str | None, str | None]] = {}
+    for doc_id, moj_id, scope in session.query(
+        Document.id, Document.moj_id, Document.territorial_scope
+    ).all():
+        if moj_id:
+            id_theo_moj[moj_id] = doc_id
+        ho_so[doc_id] = (moj_id, scope)
 
     edges = (
         session.query(DocumentReference)
@@ -521,11 +533,22 @@ def resolve_reference_targets(session: Session) -> int:
     resolved = 0
     for edge in edges:
         dung = id_theo_moj.get(edge.target_moj_id) if edge.target_moj_id else None
+
         if dung is None and edge.target_doc_id is None:
             if edge.target_doc_num in trung:
                 continue
             target = get_document_by_doc_num(session, edge.target_doc_num)
             dung = target.id if target is not None else None
+
+        if dung is None and edge.target_doc_id is not None and edge.target_moj_id:
+            # Đích đúng chưa có trong kho, mà liên kết hiện tại lại mang moj_id
+            # khác — chỉ giữ nếu số hiệu đủ định danh (văn bản trung ương).
+            moj_hien_tai, scope = ho_so.get(edge.target_doc_id, (None, None))
+            if moj_hien_tai and moj_hien_tai != edge.target_moj_id and scope == "tinh":
+                edge.target_doc_id = None
+                resolved += 1
+            continue
+
         if dung is not None and dung != edge.target_doc_id:
             edge.target_doc_id = dung
             resolved += 1

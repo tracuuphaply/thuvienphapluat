@@ -278,25 +278,57 @@ def index_from_phase1(db_path: Path, rag_db: RAGDatabase, force: bool = False, s
     logger.info("Indexing graph edges from Phase 1 DB...")
     try:
         with get_session() as session:
-            # Phân giải đích qua target_doc_id (khoá ngoại thật) chứ không qua
-            # số hiệu: đó là điểm khiến hai văn bản trùng số hiệu không còn bị
-            # gộp thành một cạnh.
-            key_by_id = {d.id: d.doc_key for d in session.query(Document).all()}
-            edges = session.query(DocumentReference).all()
-            for edge in edges:
-                src = edge.source_doc
-                if not (src and src.doc_num and src.doc_key):
-                    continue
-                rag_db.upsert_graph_edge(
-                    source_doc_key=src.doc_key,
-                    source_doc_num=src.doc_num,
-                    target_doc_key=key_by_id.get(edge.target_doc_id),
-                    target_doc_num=edge.target_doc_num,
-                    relation_type=edge.relation_type,
-                    commit=False,
-                )
-            rag_db.db.commit()
+            sync_graph_edges(session, rag_db)
     except Exception as e:
         logger.error(f"Error indexing graph edges: {e}")
 
     logger.info("Indexing complete.")
+
+
+def sync_graph_edges(session, rag_db: RAGDatabase) -> dict[str, int]:
+    """Đưa đồ thị quan hệ trong rag.db về đúng bằng kho chính.
+
+    Đích được phân giải qua `target_doc_id` (khoá ngoại thật) chứ không qua số
+    hiệu — đó là điểm khiến hai văn bản trùng số hiệu không bị gộp thành một
+    cạnh.
+
+    Có bước XOÁ chứ không chỉ upsert. Khi một cạnh được nối lại sang đích khác,
+    hàng cũ nằm lại vĩnh viễn: sửa 246 cạnh xong thì rag.db có 11.323 cạnh
+    trong khi kho chính chỉ có 10.751 — đồ thị khẳng định 572 quan hệ pháp lý
+    không còn tồn tại, và không có gì báo cho ai biết.
+    """
+    key_by_id = {d.id: d.doc_key for d in session.query(Document).all()}
+    hien_hanh: set[tuple] = set()
+
+    for edge in session.query(DocumentReference).all():
+        src = edge.source_doc
+        if not (src and src.doc_num and src.doc_key):
+            continue
+        target_key = key_by_id.get(edge.target_doc_id)
+        hien_hanh.add((src.doc_key, target_key or "",
+                       edge.target_doc_num, edge.relation_type))
+        rag_db.upsert_graph_edge(
+            source_doc_key=src.doc_key,
+            source_doc_num=src.doc_num,
+            target_doc_key=target_key,
+            target_doc_num=edge.target_doc_num,
+            relation_type=edge.relation_type,
+            commit=False,
+        )
+
+    thua = [
+        r["id"] for r in rag_db.db.execute(
+            "SELECT id, source_doc_key, COALESCE(target_doc_key,'') tk, "
+            "target_doc_num, relation_type FROM legal_graph"
+        ).fetchall()
+        if (r["source_doc_key"], r["tk"], r["target_doc_num"],
+            r["relation_type"]) not in hien_hanh
+    ]
+    for i in range(0, len(thua), 500):
+        lo = thua[i:i + 500]
+        marks = ",".join("?" * len(lo))
+        rag_db.db.execute(f"DELETE FROM legal_graph WHERE id IN ({marks})", lo)
+    if thua:
+        logger.info("Đã xoá %d cạnh không còn trong kho chính.", len(thua))
+    rag_db.db.commit()
+    return {"canh": len(hien_hanh), "xoa": len(thua)}

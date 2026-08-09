@@ -112,6 +112,69 @@ class TestKhoaTheoDocKey:
         assert row["target_doc_num"] == "83/2015/QH13"
 
 
+class TestDongBoDoThi:
+    """Nạp lại đồ thị phải XOÁ cạnh không còn, không chỉ thêm cạnh mới.
+
+    Khi một cạnh được nối lại sang đích khác, hàng cũ nằm lại vĩnh viễn. Đã xảy
+    ra thật: sửa 246 cạnh xong thì rag.db có 11.323 cạnh trong khi kho chính chỉ
+    có 10.751 — đồ thị khẳng định 572 quan hệ pháp lý không còn tồn tại.
+    """
+
+    def test_canh_doi_dich_thi_ban_cu_bi_xoa(self, master_session, rag_db):
+        from src.rag.rag_indexer import sync_graph_edges
+        from src.storage.database import insert_references, upsert_document
+        from src.storage.models import DocumentReference
+
+        src, _ = upsert_document(master_session, {
+            "doc_num": "01/2026/NĐ-CP", "title": "A", "agency_name": "Chính phủ"})
+        cu, _ = upsert_document(master_session, {
+            "doc_num": "64/2026/QĐ-UBND", "title": "Huế",
+            "agency_name": "UBND Thành phố Huế", "moj_id": "111"})
+        moi, _ = upsert_document(master_session, {
+            "doc_num": "64/2026/QĐ-UBND", "title": "Tây Ninh",
+            "agency_name": "UBND Tỉnh Tây Ninh", "moj_id": "222"})
+        master_session.flush()
+        insert_references(master_session, src.id, [{
+            "target_doc_num": "64/2026/QĐ-UBND", "relation_type": "Bãi bỏ",
+            "target_moj_id": "222"}])
+        canh = master_session.query(DocumentReference).one()
+        canh.target_doc_id = cu.id
+        master_session.commit()
+
+        sync_graph_edges(master_session, rag_db)
+        assert rag_db.db.execute(
+            "SELECT target_doc_key FROM legal_graph").fetchone()[0] == cu.doc_key
+
+        canh.target_doc_id = moi.id
+        master_session.commit()
+        sync_graph_edges(master_session, rag_db)
+
+        rows = rag_db.db.execute("SELECT target_doc_key FROM legal_graph").fetchall()
+        assert [r[0] for r in rows] == [moi.doc_key], "cạnh cũ vẫn còn"
+
+    def test_canh_bi_xoa_o_kho_chinh_thi_bien_mat(self, master_session, rag_db):
+        from src.rag.rag_indexer import sync_graph_edges
+        from src.storage.database import insert_references, upsert_document
+        from src.storage.models import DocumentReference
+
+        src, _ = upsert_document(master_session, {
+            "doc_num": "01/2026/NĐ-CP", "title": "A", "agency_name": "Chính phủ"})
+        master_session.flush()
+        insert_references(master_session, src.id, [
+            {"target_doc_num": "83/2015/QH13", "relation_type": "Căn cứ"},
+            {"target_doc_num": "45/2013/QH13", "relation_type": "Căn cứ"},
+        ])
+        master_session.commit()
+        sync_graph_edges(master_session, rag_db)
+        assert rag_db.db.execute("SELECT COUNT(*) FROM legal_graph").fetchone()[0] == 2
+
+        master_session.query(DocumentReference).filter_by(
+            target_doc_num="45/2013/QH13").delete()
+        master_session.commit()
+        sync_graph_edges(master_session, rag_db)
+        assert rag_db.db.execute("SELECT COUNT(*) FROM legal_graph").fetchone()[0] == 1
+
+
 class TestTruyVetVanChay:
     """Các hàm truy vết nhận số hiệu làm đầu vào — phải giữ nguyên hành vi đó."""
 
