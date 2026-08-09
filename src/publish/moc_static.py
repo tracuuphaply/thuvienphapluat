@@ -54,10 +54,17 @@ def _index_page(title: str, intro: str, docs: list[Document]) -> str:
 def export_indexes(session, out_dir: Path, version: str) -> int:
     """Sinh trang chỉ mục theo ngành, cơ quan, địa bàn và năm."""
     written = 0
+    # Chỉ mục liệt kê văn bản NGHIỆP VỤ. Văn bản kéo về theo dẫn chiếu vẫn có
+    # trang riêng và vẫn tới được bằng wikilink từ văn bản dẫn tới nó — đó đúng
+    # là công dụng của chúng: kiểm chứng căn cứ. Nhưng đưa vào chỉ mục thì
+    # chúng chôn mất phần cần đọc: 3.255/4.200 mục là văn bản nền, trong đó
+    # 2.134 đã hết hiệu lực toàn bộ.
     docs = (
         session.query(Document)
         .filter(Document.is_vbqppl == True)  # noqa: E712
         .filter(Document.public_slug.isnot(None))
+        .filter((Document.is_closure_node.is_(None))
+                | (Document.is_closure_node == False))  # noqa: E712
         .order_by(Document.issue_date.desc())
         .all()
     )

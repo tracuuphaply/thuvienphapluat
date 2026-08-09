@@ -56,13 +56,14 @@ eff_from: "{eff_from}"
 eff_state: "{eff_state}"
 territorial_scope: "{territorial_scope}"
 province: "{province}"
+la_van_ban_ngu_canh: {is_context}
 tags: {tags}
 ---
 
 # {title}
 
 {disclaimer}
-
+{context_note}
 ## Dữ kiện
 
 | | |
@@ -87,6 +88,16 @@ tags: {tags}
 ## Nguồn gốc
 
 {sources_md}
+"""
+
+# Trang của văn bản kéo về theo dẫn chiếu. Người mở thẳng từ Google hoặc từ một
+# link trong báo cáo không có ngữ cảnh nào để biết đây không phải văn bản
+# nghiệp vụ — mà 65% nhóm này đã hết hiệu lực toàn bộ.
+CONTEXT_NOTE = """
+> **Văn bản ngữ cảnh.** Bản này có trong kho vì được văn bản khác dẫn chiếu tới,
+> không phải vì thuộc phạm vi theo dõi. Nó phục vụ việc kiểm chứng căn cứ pháp
+> lý và đối chiếu quy định cũ với quy định thay thế. Xem *Tình trạng hiệu lực*
+> bên dưới trước khi dùng.
 """
 
 IMPACT_NOTE = """*Chỉ số này đo **cường độ quy phạm** hướng vào một ngành — số lượng và mức độ
@@ -220,13 +231,15 @@ def render_page(session, doc: Document, impacts: list[dict],
         agency = classify(doc.doc_num or "", doc.doc_type or "", "").agency
     agency = agency or "Chưa xác định"
 
-    tags = ["van-ban"]
+    tags = ["van-ban-ngu-canh" if doc.is_closure_node else "van-ban"]
     if doc.doc_type_norm:
         tags.append(doc.doc_type_norm.replace("_", "-"))
     if state:
         tags.append(state.replace("_", "-"))
 
     return PAGE_TEMPLATE.format(
+        is_context=bool(doc.is_closure_node),
+        context_note=CONTEXT_NOTE if doc.is_closure_node else "",
         doc_num=doc.doc_num,
         short_title=_short(doc.title),
         title=doc.title or doc.doc_num,

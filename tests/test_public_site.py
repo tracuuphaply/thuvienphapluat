@@ -80,6 +80,63 @@ class TestNoiDungTrang:
         assert "Chính phủ" in page
 
 
+class TestVanBanNguCanh:
+    """Văn bản kéo về theo dẫn chiếu phải tự nói nó là gì.
+
+    3.255/4.200 trang là văn bản ngữ cảnh và 2.134 trong số đó đã hết hiệu lực
+    toàn bộ. Người mở thẳng từ Google hoặc từ một link trong báo cáo không có
+    gì để biết mình không đang đọc luật hiện hành.
+    """
+
+    def _doc(self, session, **kw):
+        from src.storage.models import Document
+
+        upsert_document(session, {"doc_num": "83/2015/QH13", "title": "Luật cũ",
+                                  "agency_name": "Quốc hội", "moj_id": "9", **kw})
+        session.commit()
+        return session.query(Document).filter_by(doc_num="83/2015/QH13").first()
+
+    def _render(self, session, doc):
+        return site_exporter.render_page(
+            session, doc, [], site_exporter.build_slug_index(session))
+
+    def test_trang_ngu_canh_co_canh_bao(self, master_session):
+        page = self._render(master_session,
+                            self._doc(master_session, is_closure_node=True))
+        assert "Văn bản ngữ cảnh" in page
+        assert "la_van_ban_ngu_canh: True" in page
+        assert "van-ban-ngu-canh" in page
+
+    def test_trang_nghiep_vu_khong_co_canh_bao_thua(self, master_session):
+        page = self._render(master_session,
+                            self._doc(master_session, is_closure_node=False))
+        assert "Văn bản ngữ cảnh" not in page
+        assert "la_van_ban_ngu_canh: False" in page
+
+    def test_chi_muc_khong_liet_ke_van_ban_ngu_canh(self, master_session, tmp_path):
+        from src.publish import moc_static
+
+        import datetime
+
+        upsert_document(master_session, {
+            "doc_num": "01/2026/NĐ-CP", "title": "Nghị định nghiệp vụ",
+            "agency_name": "Chính phủ", "moj_id": "10", "is_closure_node": False,
+            "issue_date": datetime.date(2026, 1, 5)})
+        upsert_document(master_session, {
+            "doc_num": "02/2020/NĐ-CP", "title": "Nghị định nền",
+            "agency_name": "Chính phủ", "moj_id": "11", "is_closure_node": True,
+            "issue_date": datetime.date(2020, 2, 3)})
+        master_session.commit()
+
+        moc_static.export_indexes(master_session, tmp_path, "v-test")
+        noi_dung = "\n".join(p.read_text(encoding="utf-8")
+                             for p in tmp_path.rglob("*.md"))
+        assert "01/2026/NĐ-CP" in noi_dung
+        assert "02/2020/NĐ-CP" not in noi_dung, (
+            "văn bản ngữ cảnh chôn mất phần cần đọc trong chỉ mục"
+        )
+
+
 class TestPhanGiaiWikilink:
     def test_so_hieu_duy_nhat_thi_phan_giai_duoc(self, kho):
         index = site_exporter.build_slug_index(kho)
