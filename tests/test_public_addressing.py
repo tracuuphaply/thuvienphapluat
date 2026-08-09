@@ -62,6 +62,38 @@ class TestPublicSlug:
         assert viet != anh
         assert viet == "296-2026-NDD-CP"
 
+    def test_gach_ngang_doi_khong_gop_voi_gach_ngang_don(self):
+        """Chuỗi phân cách bị slugify co lại thành một dấu.
+
+        "05/2000/QĐ--BVHTT" và "05/2000/QĐ-BVHTT" cùng ra "05-2000-QDD-BVHTT" —
+        đã gặp thật, làm gãy nguyên một lô bao đóng 300 văn bản.
+        """
+        doi = make_public_slug("05/2000/QĐ--BVHTT", "05/2000/qđ--bvhtt::bộ vhtt")
+        don = make_public_slug("05/2000/QĐ-BVHTT", "05/2000/qđ-bvhtt::bộ vhtt")
+        assert doi != don
+        assert don == "05-2000-QDD-BVHTT"
+
+    @pytest.mark.parametrize("doc_num", [
+        "28/2024/QĐ-UBND..",      # dấu chấm cuối
+        "10 /2024/TT-BTNMT",      # khoảng trắng trước dấu /
+        "02/2022/TT-BTNMT (1)",   # ngoặc ở cuối
+        "'18/2024/TT-BCT",        # nháy đơn ở đầu
+    ])
+    def test_phan_cach_dau_cuoi_cung_can_phan_biet(self, doc_num):
+        """Bốn dạng có thật trong kho. Riêng "28/2024/QĐ-UBND.." còn trượt cả
+
+        phần phân biệt dành cho văn bản tỉnh, vì regex hậu tố khớp "-UBND$" mà
+        số hiệu này có hai dấu chấm ở sau.
+        """
+        assert "--" in make_public_slug(doc_num, f"{doc_num.lower()}::co quan")
+
+    def test_so_hieu_binh_thuong_khong_bi_gan_them(self):
+        """Gắn phần phân biệt cho mọi số hiệu thì slug hết đọc được và mọi URL
+        đã in trong báo cáo cũ đều đổi.
+        """
+        assert make_public_slug("292/2026/NĐ-CP", "292/2026/nđ-cp::chính phủ") \
+            == "292-2026-NDD-CP"
+
     def test_so_hieu_con_dau_khac_thi_them_phan_phan_biet(self):
         """Ký tự có dấu ngoài Đ vẫn bị gộp khi bỏ dấu — hiếm (7 lần trong kho)
 

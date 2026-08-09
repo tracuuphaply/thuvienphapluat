@@ -33,6 +33,7 @@ from sqlalchemy.orm import Session
 
 from src.config import (
     CLOSURE_HUB_INDEGREE,
+    CLOSURE_MAX_DEPTH,
     CLOSURE_MAX_FETCH_PER_RUN,
     CLOSURE_MAX_NODES,
     MIN_FREE_DISK_GB,
@@ -101,12 +102,25 @@ def seed_frontier(session: Session, max_new: int = 0) -> int:
     riêng chứ không im lặng bỏ qua — số lượng đó phải hiện ra trong khối hạn chế
     dữ liệu của báo cáo.
     """
+    # Độ sâu suy từ VĂN BẢN PHÁT HIỆN ra đích, không gán cứng.
+    #
+    # Bản trước ghi depth = 1 cho mọi mục, nên first_seen_depth là dữ kiện sai
+    # trên toàn bộ văn bản nền — đọc lên tưởng đâu tất cả đều được văn bản 2026
+    # dẫn chiếu trực tiếp. Số hạng −1,5·depth trong công thức ưu tiên cũng thành
+    # hằng số, tức xếp hạng mất hẳn phần phạt theo khoảng cách: văn bản cách 5
+    # chặng đứng ngang văn bản được dẫn thẳng từ hạt giống.
+    #
+    # Hạt giống có first_seen_depth NULL vì chúng vào kho theo lĩnh vực chứ
+    # không theo dẫn chiếu — coi là 0. MIN vì một đích có thể bị nhiều văn bản
+    # ở nhiều tầng dẫn tới; đường ngắn nhất mới là khoảng cách thật.
     rows = session.execute(text("""
         SELECT r.target_moj_id AS moj_id,
                r.target_doc_num AS doc_num,
                MIN(r.relation_type) AS relation_type,
-               COUNT(*) AS in_degree
+               COUNT(*) AS in_degree,
+               MIN(COALESCE(src.first_seen_depth, 0)) + 1 AS depth
         FROM document_references r
+        JOIN documents src ON src.id = r.source_doc_id
         WHERE r.target_doc_id IS NULL
           AND r.target_moj_id IS NOT NULL
           AND r.target_moj_id <> ''
@@ -117,8 +131,12 @@ def seed_frontier(session: Session, max_new: int = 0) -> int:
     """)).mappings().all()
 
     added = 0
+    bo_qua_qua_sau = 0
     for row in rows:
         if (row["doc_num"] or "").strip() in JUNK_DOC_NUMS:
+            continue
+        if CLOSURE_MAX_DEPTH and row["depth"] > CLOSURE_MAX_DEPTH:
+            bo_qua_qua_sau += 1
             continue
         # ON CONFLICT DO NOTHING chứ KHÔNG dùng INSERT OR IGNORE: dạng OR IGNORE
         # nuốt mọi vi phạm ràng buộc, kể cả NOT NULL, nên thiếu một cột bắt buộc
@@ -127,17 +145,23 @@ def seed_frontier(session: Session, max_new: int = 0) -> int:
             INSERT INTO crawl_frontier
                 (moj_id, doc_num, depth, priority, state, attempts,
                  discovered_via_relation)
-            VALUES (:id, :num, 1, :pri, 'PENDING', 0, :rel)
+            VALUES (:id, :num, :depth, :pri, 'PENDING', 0, :rel)
             ON CONFLICT(moj_id) DO NOTHING
         """), {
             "id": row["moj_id"],
             "num": row["doc_num"],
-            "pri": priority_of(row["relation_type"], row["in_degree"], 1),
+            "depth": row["depth"],
+            "pri": priority_of(row["relation_type"], row["in_degree"], row["depth"]),
             "rel": row["relation_type"],
         })
         added += result.rowcount or 0
         if max_new and added >= max_new:
             break
+    if bo_qua_qua_sau:
+        logger.info(
+            "Bỏ qua %d đích sâu quá %d chặng (CLOSURE_MAX_DEPTH)",
+            bo_qua_qua_sau, CLOSURE_MAX_DEPTH,
+        )
     return added
 
 
@@ -267,7 +291,14 @@ def run_closure(
                     on_document(detail, depth)
                     stats.saved += 1
                 except Exception as e:
+                    # Rollback TRƯỚC khi đánh dấu. Sau một lỗi flush, SQLAlchemy
+                    # từ chối mọi lệnh tiếp theo trên session đó, nên _mark cũng
+                    # ném và giết luôn vòng lặp — một văn bản hỏng làm mất cả
+                    # lô. Đã xảy ra thật: "05/2000/QĐ--BVHTT" đụng slug rồi kéo
+                    # theo PendingRollbackError, lô 300 dừng ở văn bản đó.
+                    session.rollback()
                     _mark(session, moj_id, FAILED, str(e))
+                    session.commit()
                     stats.failed += 1
                     logger.warning("Không ghi được %s: %s", doc_num, e)
                     continue

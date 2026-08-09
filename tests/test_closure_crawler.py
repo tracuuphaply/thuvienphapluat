@@ -178,6 +178,129 @@ class TestVanChan:
         assert row["attempts"] == 1 and "mat mang" in row["last_error"]
 
 
+    def test_loi_ghi_kho_khong_lam_dung_ca_dot(self, kho, monkeypatch):
+        """Lỗi lúc GHI khác lỗi lúc TẢI, và nguy hiểm hơn hẳn.
+
+        Sau một lỗi flush, SQLAlchemy từ chối mọi lệnh tiếp theo trên session
+        đó — kể cả lệnh đánh dấu FAILED. Bản trước gọi _mark ngay, nên chính bộ
+        bắt lỗi ném tiếp và giết vòng lặp: một văn bản hỏng làm mất cả lô 300.
+        Đã xảy ra thật với "05/2000/QĐ--BVHTT" đụng ràng buộc public_slug.
+        """
+        import src.sources.moj_api as moj
+
+        monkeypatch.setattr(moj, "fetch_doc_detail", lambda i: {
+            "data": {"id": i, "docNum": f"X{i}", "title": "x", "references": []}})
+        monkeypatch.setattr(closure, "MOJ_RATE_LIMIT_SECONDS", 0)
+
+        def ghi(detail, depth):
+            if detail.get("moj_id") == "2001":
+                # Ép session vào trạng thái hỏng đúng như một vi phạm ràng buộc.
+                kho.execute(text("INSERT INTO documents (doc_num) VALUES (NULL)"))
+                kho.flush()
+
+        closure.seed_frontier(kho)
+        kho.commit()
+        stats = closure.run_closure(kho, max_fetch=10, on_document=ghi)
+
+        assert stats.failed == 1
+        assert stats.saved == 1, "văn bản còn lại vẫn phải được ghi"
+        states = dict(kho.execute(text(
+            "SELECT moj_id, state FROM crawl_frontier")).all())
+        assert states["2001"] == closure.FAILED
+        assert states["2002"] == closure.DONE
+
+
+class TestDoSauBaoDong:
+    """Độ sâu suy từ văn bản phát hiện ra đích, không gán cứng.
+
+    Bản trước ghi depth = 1 cho mọi mục, nên `first_seen_depth` là dữ kiện sai
+    trên toàn bộ văn bản nền, và số hạng −1,5·depth trong công thức ưu tiên trở
+    thành hằng số — xếp hạng mất hẳn phần phạt theo khoảng cách.
+    """
+
+    def test_dich_cua_hat_giong_o_do_sau_1(self, kho):
+        closure.seed_frontier(kho)
+        kho.commit()
+        depths = kho.execute(text(
+            "SELECT DISTINCT depth FROM crawl_frontier")).scalars().all()
+        assert depths == [1]
+
+    def test_dich_cua_van_ban_nen_sau_hon_mot_bac(self, kho):
+        nen, _ = upsert_document(kho, {
+            "doc_num": "83/2015/QH13", "title": "Luật nền", "moj_id": "2001",
+            "agency_name": "Quốc hội", "is_closure_node": True,
+            "first_seen_depth": 1,
+        })
+        kho.flush()
+        insert_references(kho, nen.id, [
+            {"target_doc_num": "45/2013/QH13", "relation_type": "Căn cứ",
+             "target_moj_id": "3001"},
+        ])
+        kho.commit()
+
+        closure.seed_frontier(kho)
+        kho.commit()
+        assert kho.execute(text(
+            "SELECT depth FROM crawl_frontier WHERE moj_id='3001'"
+        )).scalar() == 2
+
+    def test_duong_ngan_nhat_moi_la_khoang_cach_that(self, kho):
+        """Một đích bị nhiều văn bản ở nhiều tầng dẫn tới."""
+        sau, _ = upsert_document(kho, {
+            "doc_num": "70/2020/NĐ-CP", "title": "Sâu", "moj_id": "2002",
+            "agency_name": "Chính phủ", "is_closure_node": True,
+            "first_seen_depth": 4,
+        })
+        kho.flush()
+        insert_references(kho, sau.id, [
+            {"target_doc_num": "83/2015/QH13", "relation_type": "Căn cứ",
+             "target_moj_id": "2001"},
+        ])
+        kho.commit()
+        closure.seed_frontier(kho)
+        kho.commit()
+        # Hạt giống (depth 0) cũng dẫn tới 2001, nên khoảng cách là 1 chứ không phải 5.
+        assert kho.execute(text(
+            "SELECT depth FROM crawl_frontier WHERE moj_id='2001'")).scalar() == 1
+
+    def test_tran_do_sau_chan_duoc_duoi_dai(self, kho, monkeypatch):
+        monkeypatch.setattr(closure, "CLOSURE_MAX_DEPTH", 1)
+        nen, _ = upsert_document(kho, {
+            "doc_num": "83/2015/QH13", "title": "Luật nền", "moj_id": "2001",
+            "agency_name": "Quốc hội", "is_closure_node": True,
+            "first_seen_depth": 1,
+        })
+        kho.flush()
+        insert_references(kho, nen.id, [
+            {"target_doc_num": "45/2013/QH13", "relation_type": "Căn cứ",
+             "target_moj_id": "3001"},
+        ])
+        kho.commit()
+
+        closure.seed_frontier(kho)
+        kho.commit()
+        assert kho.execute(text(
+            "SELECT COUNT(*) FROM crawl_frontier WHERE moj_id='3001'")).scalar() == 0
+
+    def test_khong_dat_tran_thi_khong_gioi_han(self, kho, monkeypatch):
+        monkeypatch.setattr(closure, "CLOSURE_MAX_DEPTH", 0)
+        nen, _ = upsert_document(kho, {
+            "doc_num": "83/2015/QH13", "title": "Luật nền", "moj_id": "2001",
+            "agency_name": "Quốc hội", "is_closure_node": True,
+            "first_seen_depth": 9,
+        })
+        kho.flush()
+        insert_references(kho, nen.id, [
+            {"target_doc_num": "45/2013/QH13", "relation_type": "Căn cứ",
+             "target_moj_id": "3001"},
+        ])
+        kho.commit()
+        closure.seed_frontier(kho)
+        kho.commit()
+        assert kho.execute(text(
+            "SELECT depth FROM crawl_frontier WHERE moj_id='3001'")).scalar() == 10
+
+
 class TestWatermark:
     """Mốc quét bền vững thay cửa sổ trượt.
 

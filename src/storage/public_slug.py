@@ -54,15 +54,36 @@ def slugify_doc_num(doc_num: str) -> str:
     return text.strip("-")
 
 
-def _is_lossy(doc_num: str) -> bool:
-    """Việc bỏ dấu có làm mất thông tin phân biệt không?
+# Chuỗi phân cách dài hơn một ký tự, hoặc phân cách ở đầu/cuối. Cả hai đều bị
+# slugify co lại nên hai số hiệu khác nhau ra cùng slug — đã gặp thật:
+# "05/2000/QĐ--BVHTT" và "05/2000/QĐ-BVHTT" cùng ra "05-2000-QDD-BVHTT", làm
+# gãy nguyên một lô bao đóng.
+_PHAN_CACH_CO_LAI = re.compile(r"[^A-Za-z0-9]{2,}|^[^A-Za-z0-9]|[^A-Za-z0-9]$")
 
-    Đ/đ đã được mã hoá không mất thông tin ở trên. Mọi ký tự có dấu CÒN LẠI vẫn
-    bị gộp về chữ cái gốc, nên hai số hiệu khác nhau có thể ra cùng slug — hiếm
-    (7 lần trong kho, đều là số hiệu bị lẫn tiêu đề), nhưng vẫn phải chặn.
+
+def _is_lossy(doc_num: str) -> bool:
+    """Việc tạo slug có làm mất thông tin phân biệt không?
+
+    Hai nguồn mất mát:
+
+    1. Ký tự có dấu ngoài Đ/đ. Đ đã được mã hoá không mất thông tin ở trên; mọi
+       ký tự có dấu còn lại vẫn bị gộp về chữ cái gốc — hiếm (7 lần trong kho,
+       đều là số hiệu bị lẫn tiêu đề) nhưng vẫn phải chặn.
+    2. Chuỗi phân cách bị co lại.
+
+    KHÔNG coi việc "/" và "-" cùng thành "-" là mất mát, dù về lý thuyết
+    "05-2000-QĐ/BVHTT" sẽ đụng "05/2000/QĐ-BVHTT". Số hiệu Việt Nam không có
+    dạng đó, mà coi là mất mát thì mọi số hiệu đều phải gắn phần phân biệt —
+    slug hết đọc được và mọi URL đã in trong báo cáo cũ đều đổi.
     """
-    remaining = (doc_num or "").translate(_DIACRITIC_MAP)
-    return any(ord(ch) > 127 for ch in unicodedata.normalize("NFC", remaining))
+    raw = (doc_num or "").strip()
+    text = raw.translate(_DIACRITIC_MAP)
+    if any(ord(ch) > 127 for ch in unicodedata.normalize("NFC", text)):
+        return True
+    # Xét sau khi bỏ dấu: ký tự tổ hợp không phải là phân cách.
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    return bool(_PHAN_CACH_CO_LAI.search(text))
 
 
 def _discriminator(doc_key: str) -> str:

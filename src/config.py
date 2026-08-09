@@ -206,6 +206,14 @@ CLOSURE_MAX_FETCH_PER_RUN = int(os.getenv("CLOSURE_MAX_FETCH_PER_RUN", "300"))
 # cả hệ thống pháp luật mà không thêm giá trị nào cho doanh nghiệp.
 CLOSURE_HUB_INDEGREE = int(os.getenv("CLOSURE_HUB_INDEGREE", "200"))
 CLOSURE_MAX_NODES = int(os.getenv("CLOSURE_MAX_NODES", "15000"))
+
+# Trần độ sâu bao đóng. 0 = không giới hạn (mặc định, đúng lựa chọn đã chốt).
+#
+# Có van này vì độ sâu nay được tính đúng: trước đây mọi đích đều bị gán cứng
+# depth = 1 nên không có cách nào chặn theo khoảng cách. Đặt 2 nếu chỉ cần văn
+# bản mà văn bản mới dẫn chiếu tới và văn bản mà CHÚNG dẫn tới — đủ để nói
+# "quy định nào đã đổi", trong khi cái đuôi sâu hơn mới là phần làm kho phình.
+CLOSURE_MAX_DEPTH = int(os.getenv("CLOSURE_MAX_DEPTH", "0"))
 # Dừng bao đóng khi đĩa còn dưới mức này. Đĩa đầy giữa lúc SQLite đang ghi
 # có thể làm hỏng cơ sở dữ liệu; frontier nằm trong DB nên dừng rồi chạy
 # tiếp được sau khi dọn chỗ.
