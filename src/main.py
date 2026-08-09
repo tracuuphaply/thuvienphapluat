@@ -222,7 +222,7 @@ def pipeline_lock() -> Generator[None, None, None]:
 def run_pipeline(
     dry_run: bool = False,
     moj_only: bool = False,
-    skip_gdrive: bool = False,
+    skip_cloud: bool = False,
     limit: int = 0,
 ) -> dict[str, int]:
     """
@@ -571,7 +571,7 @@ def run_pipeline(
                 saved_docs.extend(affected_docs)
 
             # ── Step 6: Upload to Cloud Drive ──
-            if not skip_gdrive:
+            if not skip_cloud:
                 provider = active_provider()
                 logger.info("=" * 60)
                 logger.info("STEP 6: Uploading to %s", provider)
@@ -814,10 +814,14 @@ def main() -> None:
         action="store_true",
         help="Skip TVPL (no login needed, MOJ only)",
     )
+    # Tên cũ --skip-gdrive giữ lại làm bí danh: nó có trong run_daily.sh, trong
+    # tài liệu bàn giao và trong thói quen gõ tay. Nhưng nó nói sai việc mình
+    # làm — từ khi có bộ điều phối cloud_drive, cờ này bỏ qua CẢ Lark.
     parser.add_argument(
-        "--skip-gdrive",
+        "--skip-cloud", "--skip-gdrive",
+        dest="skip_cloud",
         action="store_true",
-        help="Skip Google Drive upload",
+        help="Không đẩy file lên mây (cả Google Drive lẫn Lark)",
     )
     parser.add_argument(
         "--limit",
@@ -870,7 +874,7 @@ def main() -> None:
             metrics = run_pipeline(
                 dry_run=args.dry_run,
                 moj_only=args.moj_only,
-                skip_gdrive=args.skip_gdrive,
+                skip_cloud=args.skip_cloud,
                 limit=args.limit,
             )
     except RuntimeError as e:

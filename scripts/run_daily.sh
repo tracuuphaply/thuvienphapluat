@@ -21,8 +21,14 @@ fi
 
 echo "=== Pipeline bắt đầu lúc $(date) ==="
 
-# 1. Cào và xử lý văn bản mới
-"$PY" -m src.main --skip-gdrive
+# 1. Cào và xử lý văn bản mới, đẩy luôn lên mây.
+#
+#    Bản cũ truyền --skip-gdrive vô điều kiện, từ thời nhánh Google Drive chưa
+#    chạy được vì dùng service account (hạn mức 0 GB). Nhưng từ khi có bộ điều
+#    phối cloud_drive, cờ đó bỏ qua CẢ Lark — nghĩa là lần chạy hằng ngày chưa
+#    bao giờ đẩy file lên mây, trong khi yêu cầu vận hành là mọi văn bản tải về
+#    phải lưu mây trước. Đích lưu trữ nay chọn bằng CLOUD_DRIVE_PROVIDER.
+"$PY" -m src.main
 PIPELINE_RC=$?
 echo "--- pipeline kết thúc, mã thoát=$PIPELINE_RC ---"
 
@@ -30,10 +36,23 @@ echo "--- pipeline kết thúc, mã thoát=$PIPELINE_RC ---"
 #    run_pipeline() KHÔNG tự làm bước này (nó nằm trong nhánh --upload-only),
 #    nên chỉ chạy src.main thì vault vĩnh viễn không được cập nhật.
 if [ "$PIPELINE_RC" -eq 0 ]; then
+    # 2b. Bao đóng dẫn chiếu — kéo về văn bản mà nhóm mới dẫn chiếu tới, kể cả
+    #     bản đã bị bãi bỏ. Chạy TRƯỚC đồng bộ để văn bản vừa kéo về cũng vào
+    #     index trong cùng một lượt. Tự tắt khi CLOSURE_ENABLED=false.
+    if [ "${CLOSURE_ENABLED:-false}" = "true" ]; then
+        "$PY" -m scripts.run_closure || echo "Bao đóng lỗi, đi tiếp."
+    fi
+
     "$PY" -m src.main --sync-vault-only
     "$PY" -m src.main --sync-rag-only
+
+    # 2c. Rút hàng đợi báo cáo. Tách khỏi pipeline cào có chủ đích: một lỗi LLM
+    #     không được phép đánh dấu cả lần cào là hỏng.
+    if [ "${REPORT_WORKER_ENABLED:-false}" = "true" ]; then
+        "$PY" -m scripts.run_report_worker || echo "Bộ sinh báo cáo lỗi, đi tiếp."
+    fi
 else
-    echo "Bỏ qua đồng bộ vault/RAG vì pipeline lỗi."
+    echo "Bỏ qua bao đóng và đồng bộ vault/RAG vì pipeline lỗi."
 fi
 
 # 3. Sao lưu — chạy bất kể pipeline thành công hay không.
