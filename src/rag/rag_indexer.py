@@ -273,7 +273,27 @@ def index_from_phase1(db_path: Path, rag_db: RAGDatabase, force: bool = False, s
         logger.warning("%d file chunk không xác định được văn bản.", khong_ro_van_ban)
 
     if pending_embeddings:
+        # Bỏ những đoạn đã bị xoá trong lúc chạy. `pending_embeddings` gom suốt
+        # cả lượt rồi mới nhúng ở cuối, còn delete_stale_chunks chạy ngay sau
+        # mỗi file — đoạn vào hàng đợi rồi mới bị xoá sẽ được ghi vector cho một
+        # rowid không còn tồn tại. Đo được 458 vector mồ côi như vậy; chúng vẫn
+        # được tìm thấy rồi JOIN ra rỗng, tức kết quả biến mất không dấu vết.
+        con_song = {
+            r[0] for r in rag_db.db.execute(
+                "SELECT id FROM legal_chunks").fetchall()
+        }
+        truoc = len(pending_embeddings)
+        pending_embeddings = [p for p in pending_embeddings if p[0] in con_song]
+        if truoc != len(pending_embeddings):
+            logger.info("Bỏ %d đoạn đã bị xoá khỏi hàng đợi nhúng.",
+                        truoc - len(pending_embeddings))
         _embed_pending(rag_db, embedder, pending_embeddings)
+
+    # Đoạn có nội dung không đổi thì vòng lặp trên bỏ qua bước nhúng — đúng, trừ
+    # khi nó chưa từng có vector. Không có bước này thì đoạn đó vĩnh viễn nằm
+    # ngoài nhánh tìm kiếm ngữ nghĩa mà không ai biết.
+    embed_missing(rag_db, embedder)
+    rag_db.delete_orphan_vectors()
 
     logger.info("Indexing graph edges from Phase 1 DB...")
     try:

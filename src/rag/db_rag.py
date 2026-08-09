@@ -302,6 +302,32 @@ class RAGDatabase:
         logger.info("Đã xoá %d đoạn thừa của %s", len(ids), doc_key)
         return len(ids)
 
+    def delete_orphan_vectors(self, commit: bool = True) -> int:
+        """Xoá vector không còn đoạn tương ứng.
+
+        Vector mồ côi vẫn được nhánh tìm kiếm ngữ nghĩa trả về rồi JOIN ra rỗng
+        — kết quả biến mất giữa chừng mà không có dòng log nào. Chúng phát sinh
+        khi một đoạn bị xoá sau lúc đã vào hàng đợi nhúng.
+        """
+        if not HAS_VEC:
+            return 0
+        ids = [
+            r[0] for r in self.db.execute(
+                "SELECT v.rowid FROM legal_chunks_vec v "
+                "LEFT JOIN legal_chunks c ON c.id = v.rowid WHERE c.id IS NULL"
+            ).fetchall()
+        ]
+        for i in range(0, len(ids), 500):
+            lo = ids[i:i + 500]
+            marks = ",".join("?" * len(lo))
+            self.db.execute(
+                f"DELETE FROM legal_chunks_vec WHERE rowid IN ({marks})", lo)
+        if commit:
+            self.db.commit()
+        if ids:
+            logger.info("Đã xoá %d vector mồ côi.", len(ids))
+        return len(ids)
+
     def upsert_vector(self, chunk_id: int, embedding: List[float], commit: bool = True):
         if not HAS_VEC:
             return

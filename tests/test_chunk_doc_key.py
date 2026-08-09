@@ -119,6 +119,54 @@ class TestDonDoanThua:
             "SELECT COUNT(*) FROM legal_chunks_vec").fetchone()[0] == 0
 
 
+@pytest.mark.skipif(
+    not __import__("src.rag.db_rag", fromlist=["HAS_VEC"]).HAS_VEC,
+    reason="chưa cài sqlite-vec",
+)
+class TestVectorMoCoi:
+    """Vector không còn đoạn tương ứng vẫn được tìm thấy rồi JOIN ra rỗng.
+
+    Kết quả biến mất giữa chừng mà không có dòng log nào. Đo được 458 vector
+    như vậy sau một lượt index: `pending_embeddings` gom suốt cả lượt rồi mới
+    nhúng ở cuối, còn delete_stale_chunks chạy ngay sau mỗi file — đoạn vào
+    hàng đợi rồi mới bị xoá vẫn được ghi vector.
+    """
+
+    def _vec(self, rag_db, chunk_id):
+        from src.rag.embeddings_api import embedding_dimension
+
+        rag_db.upsert_vector(chunk_id, [0.1] * embedding_dimension())
+
+    def test_don_duoc_vector_mo_coi(self, rag_db):
+        cid = _doan(rag_db, "a::x", "A", 0, "nội dung")
+        self._vec(rag_db, cid)
+        rag_db.db.execute("DELETE FROM legal_chunks WHERE id = ?", (cid,))
+        rag_db.db.commit()
+
+        assert rag_db.db.execute(
+            "SELECT COUNT(*) FROM legal_chunks_vec").fetchone()[0] == 1
+        assert rag_db.delete_orphan_vectors() == 1
+        assert rag_db.db.execute(
+            "SELECT COUNT(*) FROM legal_chunks_vec").fetchone()[0] == 0
+
+    def test_khong_dung_toi_vector_con_song(self, rag_db):
+        song = _doan(rag_db, "a::x", "A", 0, "còn")
+        chet = _doan(rag_db, "b::y", "B", 0, "mất")
+        self._vec(rag_db, song)
+        self._vec(rag_db, chet)
+        rag_db.db.execute("DELETE FROM legal_chunks WHERE id = ?", (chet,))
+        rag_db.db.commit()
+
+        rag_db.delete_orphan_vectors()
+        con = [r[0] for r in rag_db.db.execute(
+            "SELECT rowid FROM legal_chunks_vec").fetchall()]
+        assert con == [song]
+
+    def test_khong_co_mo_coi_thi_khong_lam_gi(self, rag_db):
+        self._vec(rag_db, _doan(rag_db, "a::x", "A", 0, "x"))
+        assert rag_db.delete_orphan_vectors() == 0
+
+
 class TestThamDinhHieuLucTheoDocKey:
     def test_van_ban_bi_bai_bo_khong_keo_theo_tinh_khac(self, rag_db, edge_factory):
         """Trước khi đoạn có doc_key, một Quyết định tỉnh bị bãi bỏ làm văn bản
