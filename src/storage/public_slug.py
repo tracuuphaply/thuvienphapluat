@@ -54,36 +54,32 @@ def slugify_doc_num(doc_num: str) -> str:
     return text.strip("-")
 
 
-# Chuỗi phân cách dài hơn một ký tự, hoặc phân cách ở đầu/cuối. Cả hai đều bị
-# slugify co lại nên hai số hiệu khác nhau ra cùng slug — đã gặp thật:
-# "05/2000/QĐ--BVHTT" và "05/2000/QĐ-BVHTT" cùng ra "05-2000-QDD-BVHTT", làm
-# gãy nguyên một lô bao đóng.
-_PHAN_CACH_CO_LAI = re.compile(r"[^A-Za-z0-9]{2,}|^[^A-Za-z0-9]|[^A-Za-z0-9]$")
+# Dạng chuẩn của số hiệu Việt Nam: "292/2026/NĐ-CP", "47/2013/TT-BNNPTNT".
+# Hai dấu gạch chéo đầu, phần còn lại nối bằng gạch ngang đơn.
+#
+# Ý nghĩa của việc khoanh dạng chuẩn: TRONG dạng này, vị trí của "/" và "-" là
+# cố định, nên bỏ dấu rồi thay hết bằng "-" vẫn suy ngược lại được — hai số
+# hiệu chuẩn khác nhau không thể ra cùng một slug. Ngoài dạng này thì không có
+# bảo đảm nào, nên gắn phần phân biệt.
+#
+# Lý do phải chặt tới mức này: hai lần trước tôi chỉ vá đúng ca vừa gặp và lần
+# nào cũng có ca mới. "05/2000/QĐ--BVHTT" đụng "05/2000/QĐ-BVHTT" (gạch đôi),
+# rồi "85/2005/TTLT/BTC-BCA" đụng "85/2005/TTLT-BTC-BCA" (gạch chéo thay gạch
+# ngang) — ca thứ hai là thứ tôi từng ghi trong chính file này là "số hiệu Việt
+# Nam không có dạng đó".
+_DANG_CHUAN = re.compile(r"^\d+/\d{4}/[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$")
 
 
 def _is_lossy(doc_num: str) -> bool:
     """Việc tạo slug có làm mất thông tin phân biệt không?
 
-    Hai nguồn mất mát:
-
-    1. Ký tự có dấu ngoài Đ/đ. Đ đã được mã hoá không mất thông tin ở trên; mọi
-       ký tự có dấu còn lại vẫn bị gộp về chữ cái gốc — hiếm (7 lần trong kho,
-       đều là số hiệu bị lẫn tiêu đề) nhưng vẫn phải chặn.
-    2. Chuỗi phân cách bị co lại.
-
-    KHÔNG coi việc "/" và "-" cùng thành "-" là mất mát, dù về lý thuyết
-    "05-2000-QĐ/BVHTT" sẽ đụng "05/2000/QĐ-BVHTT". Số hiệu Việt Nam không có
-    dạng đó, mà coi là mất mát thì mọi số hiệu đều phải gắn phần phân biệt —
-    slug hết đọc được và mọi URL đã in trong báo cáo cũ đều đổi.
+    Trả về False chỉ khi số hiệu ở dạng chuẩn — nơi phép tạo slug suy ngược
+    được. Mọi dạng khác coi là có thể mất thông tin.
     """
-    raw = (doc_num or "").strip()
-    text = raw.translate(_DIACRITIC_MAP)
-    if any(ord(ch) > 127 for ch in unicodedata.normalize("NFC", text)):
-        return True
-    # Xét sau khi bỏ dấu: ký tự tổ hợp không phải là phân cách.
+    text = (doc_num or "").strip().translate(_DIACRITIC_MAP)
     text = unicodedata.normalize("NFKD", text)
     text = "".join(c for c in text if not unicodedata.combining(c))
-    return bool(_PHAN_CACH_CO_LAI.search(text))
+    return not _DANG_CHUAN.match(text)
 
 
 def _discriminator(doc_key: str) -> str:

@@ -62,6 +62,30 @@ class TestPublicSlug:
         assert viet != anh
         assert viet == "296-2026-NDD-CP"
 
+    def test_gach_cheo_khong_gop_voi_gach_ngang(self):
+        """Ca thứ ba, và nó bác bỏ giả định từng viết thẳng vào public_slug.py.
+
+        Bộ Tư pháp ghi thông tư liên tịch không nhất quán: kho có cả
+        "85/2005/TTLT/BTC-BCA" lẫn "85/2005/TTLT-BTC-BCA". Bản trước ghi rõ
+        "số hiệu Việt Nam không có dạng đó" nên cố tình không chặn — dữ liệu
+        bác bỏ ngay trong ngày, làm hỏng một văn bản của lô bao đóng.
+        """
+        cheo = make_public_slug("85/2005/TTLT/BTC-BCA", "85/2005/ttlt/btc-bca::btc")
+        ngang = make_public_slug("85/2005/TTLT-BTC-BCA", "85/2005/ttlt-btc-bca::btc")
+        assert cheo != ngang
+        assert ngang == "85-2005-TTLT-BTC-BCA"
+
+    def test_so_hieu_khong_co_nam_duoc_phan_biet(self):
+        """Quyết định cá biệt, Công điện, Thông báo đánh số lại mỗi năm, nên
+        "1889/QĐ-BCT" của 2020 và của 2024 là hai văn bản cùng số hiệu.
+
+        Chưa trùng trong kho hiện tại — đây là phòng ngừa, không phải vá lỗi
+        đã xảy ra. Nhưng bao đóng đang kéo về văn bản cũ nên chỉ là thời gian.
+        """
+        a = make_public_slug("1889/QĐ-BCT", "1889/qđ-bct::bộ công thương::2020")
+        b = make_public_slug("1889/QĐ-BCT", "1889/qđ-bct::bộ công thương::2024")
+        assert a != b
+
     def test_gach_ngang_doi_khong_gop_voi_gach_ngang_don(self):
         """Chuỗi phân cách bị slugify co lại thành một dấu.
 
