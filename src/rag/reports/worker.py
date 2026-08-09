@@ -137,7 +137,11 @@ def run_job(session, rag: RAGDatabase, job: dict, scorer_version: str,
     session.commit()
 
     try:
-        if kind == "b":
+        if kind == "a":
+            result = generators.generate_industry_report(
+                session, rag, job["vsic_code"], scorer_version, embedder=embedder
+            )
+        elif kind == "b":
             keys = json.loads(job["subject_keys"] or "[]")
             result = generators.generate_update_report(
                 session, rag, keys, scorer_version

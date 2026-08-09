@@ -96,6 +96,106 @@ COMMON_NOTES = [
 
 
 # ──────────────────────────────────────────────
+# (a) Tổng hợp pháp lý một ngành
+# ──────────────────────────────────────────────
+# Mục 4 của prompt quy định 4–6 trang, kèm lý do: "một bản 4 trang được đọc hết
+# có giá trị hơn một bản 15 trang bị bỏ qua". Mặc định cũ ở report_generator là
+# 8–15 trang, mâu thuẫn ngay với prompt hệ thống.
+DO_DAI_MAC_DINH = "Báo cáo chuyên đề (4–6 trang)"
+PHAM_VI_MAC_DINH = (
+    "Khung pháp lý điều chỉnh hoạt động kinh doanh, đầu tư, nghĩa vụ tài chính, "
+    "lao động và điều kiện kinh doanh"
+)
+
+
+def build_industry_context(session, rag: RAGDatabase, vsic_code: str,
+                           scorer_version: str, embedder=None) -> ctx.ReportContext:
+    """Ngữ cảnh cho báo cáo (a): kết quả TRUY XUẤT theo ngành.
+
+    Khác (b) ở chỗ căn bản: (b) đọc một danh sách văn bản cố định đã biết
+    trước, còn (a) phải tự tìm ra văn bản nào liên quan tới ngành.
+    """
+    short = _short_name(vsic_code)
+    raw = industry_search(rag, industry=short, limit=60, embedder=embedder)
+    kept = validate_results(rag, [
+        {"id": r.id, "doc_num": r.doc_num, "doc_key": r.doc_key,
+         "heading": r.heading, "content": r.content}
+        for r in raw
+    ])
+    if not kept:
+        return ctx.ReportContext()
+
+    keys = {c["doc_key"] for c in kept if c.get("doc_key")}
+    docs = session.query(Document).filter(Document.doc_key.in_(keys or {""})).all()
+
+    thieu: list[str] = []
+    facts = [ctx.document_facts(d, thieu) for d in docs]
+    edges = [e for d in docs for e in ctx.graph_edges(session, d)]
+
+    chunks = [{
+        "doc_num": c.get("doc_num"),
+        "heading": c.get("heading"),
+        "content_excerpt": (c.get("content") or "")[:1500],
+        **({"canh_bao_hieu_luc": c["canh_bao_hieu_luc"]}
+           if c.get("canh_bao_hieu_luc") else {}),
+    } for c in kept]
+
+    payload = {
+        "thong_tin_tra_cuu": {
+            "so_van_ban": len(facts),
+            "so_doan": len(chunks),
+            "so_quan_he": len(edges),
+        },
+        "han_che_du_lieu": ctx.limitations(
+            thieu, [], loai_do_het_hieu_luc=len(raw) - len(kept),
+            ghi_chu_thoi_gian=(
+                "Danh sách là KẾT QUẢ TRUY XUẤT theo ngành, không phải toàn bộ "
+                "văn bản của ngành trong kho."
+            ),
+            bao_dong=ctx.van_ban_dan_chieu_khong_lay_duoc(session),
+        ),
+        "danh_sach_van_ban": facts,
+        "chi_tiet_dieu_khoan_chunks": chunks,
+        "do_thi_quan_he_van_ban_edges": edges,
+        "diem_tac_dong_nganh": ctx.industry_impact(
+            session, [d.doc_key for d in docs], scorer_version),
+    }
+    return ctx.ReportContext(payload=payload,
+                             doc_nums=[d["doc_num"] for d in facts])
+
+
+def generate_industry_report(session, rag: RAGDatabase, vsic_code: str,
+                             scorer_version: str, model: str = "",
+                             embedder=None) -> ReportResult:
+    report_ctx = build_industry_context(
+        session, rag, vsic_code, scorer_version, embedder=embedder)
+    if report_ctx.is_empty():
+        # Ngữ cảnh rỗng thì KHÔNG gọi mô hình: một bản sinh từ hư không trông
+        # vẫn có thẩm quyền, và đó mới là điều nguy hiểm.
+        raise LLMUnavailable(
+            f"Không truy xuất được điều khoản nào cho ngành {vsic_code}.")
+
+    today = datetime.date.today()
+    header = {
+        "NGANH": f"{official_name(_short_name(vsic_code)) or _short_name(vsic_code)}"
+                 f"  (VSIC cấp 1, mã {vsic_code})",
+        "PHAM_VI": PHAM_VI_MAC_DINH,
+        "KY_BAO_CAO": today.strftime("%m/%Y"),
+        "MOC_CAT": today.strftime("%d/%m/%Y"),
+        "DOI_TUONG": DEFAULT_AUDIENCE,
+        "DO_DAI": DO_DAI_MAC_DINH,
+    }
+    result = call_report_llm(
+        load_prompt("a"),
+        _user_message(header, report_ctx.payload, COMMON_NOTES),
+        model=model,
+    )
+    return ReportResult(kind="a", markdown=result.text,
+                        payload=report_ctx.payload,
+                        truncated=result.truncated, model=result.model)
+
+
+# ──────────────────────────────────────────────
 # (b) Phân tích văn bản mới
 # ──────────────────────────────────────────────
 # Số đoạn tối đa lấy từ MỘT văn bản cũ. Văn bản mới được đọc toàn bộ vì đó là
@@ -329,6 +429,8 @@ def _short_name(vsic_code: str) -> str:
 
 
 __all__ = [
-    "C_MIN_SHARE", "C_THRESHOLD", "ReportResult", "build_update_context",
-    "generate_business_report", "generate_update_report", "code_of",
+    "C_MIN_SHARE", "C_THRESHOLD", "ReportResult",
+    "build_industry_context", "build_update_context",
+    "generate_business_report", "generate_industry_report",
+    "generate_update_report", "code_of",
 ]

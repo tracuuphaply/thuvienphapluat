@@ -215,6 +215,96 @@ class TestBaoThieuVanBanDanChieu:
             assert "vuot_tran_do_sau" in p, f"prompt {kind}"
 
 
+class TestBaoCaoNganhVaoWorker:
+    """Báo cáo (a) từng nằm ngoài gói reports/ nên worker không chạy được nó.
+
+    Nó chỉ sinh được bằng tay qua scripts/generate_industry_reports.py, Telegram
+    hoặc CLI — tức loại báo cáo có trigger định kỳ lại là loại duy nhất không
+    tự chạy được.
+    """
+
+    def test_worker_khong_con_nhanh_chua_ho_tro_cho_a(self):
+        import inspect
+
+        from src.rag.reports import worker
+
+        src = inspect.getsource(worker.run_job)
+        assert 'kind == "a"' in src
+        assert "generate_industry_report" in src
+
+    def test_bo_sinh_a_nam_trong_goi_reports(self):
+        from src.rag.reports import generators
+
+        assert hasattr(generators, "generate_industry_report")
+        assert hasattr(generators, "build_industry_context")
+
+    def test_ngu_canh_rong_thi_khong_goi_mo_hinh(self, master_session, rag_db):
+        """Một bản sinh từ hư không trông vẫn có thẩm quyền — đó mới là nguy hiểm."""
+        from src.rag.reports.generators import generate_industry_report
+        from src.rag.reports.llm import LLMUnavailable
+
+        with pytest.raises(LLMUnavailable):
+            generate_industry_report(master_session, rag_db, "K", "v-test")
+
+    def test_do_dai_khop_voi_prompt(self):
+        """Mặc định cũ 8–15 trang mâu thuẫn mục 4 của prompt (4–6 trang)."""
+        from src.rag.reports.generators import DO_DAI_MAC_DINH
+
+        assert "4–6 trang" in DO_DAI_MAC_DINH
+
+
+class TestLichHangQuy:
+    """Trigger cho (a): "kết thúc 1 quý/6 tháng" theo yêu cầu vận hành."""
+
+    def test_khoa_ky_on_dinh_trong_cung_mot_quy(self):
+        import datetime
+
+        from scripts.enqueue_quarterly_reports import ky_bao_cao
+
+        assert ky_bao_cao(datetime.date(2026, 7, 1)) == "2026-Q3"
+        assert ky_bao_cao(datetime.date(2026, 9, 30)) == "2026-Q3"
+
+    def test_sang_quy_moi_thi_doi_khoa(self):
+        import datetime
+
+        from scripts.enqueue_quarterly_reports import ky_bao_cao
+
+        assert ky_bao_cao(datetime.date(2026, 9, 30)) != \
+            ky_bao_cao(datetime.date(2026, 10, 1))
+
+    @pytest.mark.parametrize("thang,ky", [
+        (1, "Q1"), (3, "Q1"), (4, "Q2"), (6, "Q2"),
+        (7, "Q3"), (9, "Q3"), (10, "Q4"), (12, "Q4"),
+    ])
+    def test_moc_quy_dung_ranh_gioi(self, thang, ky):
+        import datetime
+
+        from scripts.enqueue_quarterly_reports import ky_bao_cao
+
+        assert ky_bao_cao(datetime.date(2026, thang, 15)).endswith(ky)
+
+    def test_plist_quy_dung_mang_bon_moc(self):
+        """StartCalendarInterval nhận MỘT MẢNG dict. Một dict duy nhất chỉ đặt
+        được một mốc, nên bản chỉ có Day+Month chạy một quý mỗi năm chứ không
+        phải bốn — sai lặng lẽ, ba quý sau mới phát hiện.
+        """
+        from src.config import PROJECT_ROOT
+
+        sh = (PROJECT_ROOT / "scripts" / "install_scheduler.sh").read_text(
+            encoding="utf-8")
+        assert "vn.legalvault.quarterly" in sh
+        for thang in (1, 4, 7, 10):
+            assert f"<key>Month</key><integer>{thang}</integer>" in sh
+
+    def test_script_chay_quy_ton_tai_va_chay_duoc(self):
+        import os
+
+        from src.config import PROJECT_ROOT
+
+        path = PROJECT_ROOT / "scripts" / "run_quarterly.sh"
+        assert path.exists() and os.access(path, os.X_OK)
+
+
 class TestXuatPdfTrongWorker:
     """PDF chỉ được dựng SAU khi qua cổng trích dẫn.
 
