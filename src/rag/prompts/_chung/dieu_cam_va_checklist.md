@@ -22,5 +22,10 @@
 - [ ] Không văn bản "Hết hiệu lực toàn bộ" nào bị trình bày như đang áp dụng?
 - [ ] Mọi `canh_bao_hieu_luc` trong dữ liệu đã được phản ánh?
 - [ ] Toàn bộ `han_che_du_lieu` đã được công bố ở phụ lục?
+- [ ] Nếu có `han_che_du_lieu.van_ban_dan_chieu_chua_co_trong_kho`: đã nói rõ
+      đồ thị quan hệ CHƯA đầy đủ, kèm ba con số `khong_tai_duoc`,
+      `khong_co_id`, `vuot_tran_do_sau`? Đặc biệt `vuot_tran_do_sau` nghĩa là
+      việc truy vết dẫn chiếu bị cắt ở một khoảng cách nhất định — không được
+      trình bày danh mục văn bản liên quan như đã đầy đủ.
 - [ ] Mỗi chương đủ 4 khối? Mỗi khuyến nghị có mốc thời gian?
 - [ ] Có bảng lộ trình tuân thủ, danh mục tham chiếu, tuyên bố miễn trách nhiệm?

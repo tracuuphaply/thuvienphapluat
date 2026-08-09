@@ -141,18 +141,47 @@ def industry_impact(session, doc_keys: list[str], version: str,
     } for r in rows]
 
 
+def van_ban_dan_chieu_khong_lay_duoc(session) -> dict[str, Any]:
+    """Văn bản bị dẫn chiếu mà bao đóng không đưa được về kho.
+
+    Ba nhóm, ba lý do khác hẳn nhau, nên không gộp thành một con số:
+
+      - `khong_tai_duoc`: gateway Bộ Tư pháp trả lỗi cho chính id nằm trong
+        payload dẫn chiếu của nó. Ta biết văn bản tồn tại và biết cả id.
+      - `khong_co_id`: dẫn chiếu chỉ ghi số hiệu, không kèm id. Endpoint
+        /doc/all bỏ qua mọi tham số lọc nên không tra ngược được.
+      - `vuot_tran_do_sau`: cố ý bỏ, do CLOSURE_MAX_DEPTH. Đây là thứ người đọc
+        cần biết nhất trong ba nhóm — nó nói rằng đồ thị quan hệ đã bị cắt ở
+        một khoảng cách nhất định, chứ không phải đã đầy đủ.
+
+    Thiếu khối này thì báo cáo dẫn một đồ thị đã cắt cụt mà không nói gì.
+    """
+    from sqlalchemy import text
+
+    rows = dict(session.execute(text(
+        "SELECT state, COUNT(*) FROM crawl_frontier "
+        "WHERE state IN ('FAILED', 'NO_ID', 'TOO_DEEP') GROUP BY state"
+    )).all())
+    return {
+        "khong_tai_duoc": rows.get("FAILED", 0),
+        "khong_co_id": rows.get("NO_ID", 0),
+        "vuot_tran_do_sau": rows.get("TOO_DEEP", 0),
+    }
+
+
 def limitations(
     thieu_trang_thai: list[str],
     thieu_metadata: list[str],
     loai_do_het_hieu_luc: int = 0,
     ghi_chu_thoi_gian: str = "",
+    bao_dong: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Khối hạn chế dữ liệu — mô hình BẮT BUỘC công bố ở phụ lục.
 
     Đây là thứ giữ cho báo cáo trung thực khi dữ liệu thiếu, thay vì im lặng lấp
     bằng kiến thức nền.
     """
-    return {
+    out = {
         "so_van_ban_khong_ro_trang_thai_hieu_luc": len(thieu_trang_thai),
         "danh_sach_khong_ro_trang_thai": thieu_trang_thai,
         "so_doan_bi_loai_vi_van_ban_het_hieu_luc": loai_do_het_hieu_luc,
@@ -160,3 +189,6 @@ def limitations(
         "danh_sach_thieu_metadata": thieu_metadata,
         "pham_vi_thoi_gian_thuc_te": ghi_chu_thoi_gian,
     }
+    if bao_dong and any(bao_dong.values()):
+        out["van_ban_dan_chieu_chua_co_trong_kho"] = bao_dong
+    return out

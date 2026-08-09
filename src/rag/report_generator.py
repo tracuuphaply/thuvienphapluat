@@ -65,6 +65,18 @@ def load_system_prompt() -> str:
     cáo vẫn được sinh ra — mất toàn bộ cấu trúc bắt buộc, quy tắc trích dẫn và
     điều cấm, mà người dùng không hề biết. Giờ thiếu mẫu là lỗi cứng.
     """
+    # Đường mới trước: nó nở {{include:_chung/...}}, còn nhánh đọc file thô bên
+    # dưới thì không. Từ khi mục "ĐIỀU CẤM VÀ CHECKLIST" chuyển sang file dùng
+    # chung, đọc thô sẽ đưa nguyên chuỗi "{{include:...}}" cho mô hình — tức
+    # báo cáo (a) mất sạch quy tắc trích dẫn và điều cấm, im lặng.
+    if not report_prompt_path():
+        try:
+            from src.rag.reports.prompts import load_prompt
+
+            return load_prompt("a")
+        except Exception as e:
+            logger.warning("Không nạp được prompt qua reports.prompts: %s", e)
+
     override = report_prompt_path()
     candidates = [Path(override)] if override else []
     candidates.append(REPO_PROMPT_PATH)

@@ -160,6 +160,61 @@ class TestDoiChieuVanBanCu:
         assert "van_ban_cu_chua_co_toan_van" in p
 
 
+class TestBaoThieuVanBanDanChieu:
+    """Văn bản bị dẫn chiếu mà bao đóng không lấy được phải hiện ra.
+
+    Ba nhóm, ba lý do khác hẳn nhau. Quan trọng nhất là `vuot_tran_do_sau`:
+    nó nói rằng việc truy vết dẫn chiếu bị cắt ở một khoảng cách nhất định,
+    nên danh mục văn bản liên quan KHÔNG đầy đủ. Thiếu khối này thì báo cáo dẫn
+    một đồ thị đã cắt cụt mà không nói gì.
+    """
+
+    def _frontier(self, session, **states):
+        for i, (state, n) in enumerate(states.items()):
+            for j in range(n):
+                session.execute(text(
+                    "INSERT INTO crawl_frontier (moj_id, doc_num, depth, priority, "
+                    "state, attempts) VALUES (:m, 'X', 1, 1.0, :s, 0)"),
+                    {"m": f"{state}-{i}-{j}", "s": state.upper()})
+        session.commit()
+
+    def test_dem_du_ba_nhom(self, master_session):
+        from src.rag.reports.context import van_ban_dan_chieu_khong_lay_duoc
+
+        self._frontier(master_session, failed=2, no_id=3, too_deep=4, done=9,
+                       pending=5)
+        assert van_ban_dan_chieu_khong_lay_duoc(master_session) == {
+            "khong_tai_duoc": 2, "khong_co_id": 3, "vuot_tran_do_sau": 4,
+        }
+
+    def test_khong_thieu_gi_thi_khong_them_khoi(self, master_session):
+        from src.rag.reports.context import (
+            limitations, van_ban_dan_chieu_khong_lay_duoc,
+        )
+
+        self._frontier(master_session, done=3, pending=2)
+        out = limitations([], [], bao_dong=van_ban_dan_chieu_khong_lay_duoc(
+            master_session))
+        assert "van_ban_dan_chieu_chua_co_trong_kho" not in out
+
+    def test_co_thieu_thi_vao_han_che_du_lieu(self, master_session):
+        from src.rag.reports.context import (
+            limitations, van_ban_dan_chieu_khong_lay_duoc,
+        )
+
+        self._frontier(master_session, too_deep=242)
+        out = limitations([], [], bao_dong=van_ban_dan_chieu_khong_lay_duoc(
+            master_session))
+        assert out["van_ban_dan_chieu_chua_co_trong_kho"]["vuot_tran_do_sau"] == 242
+
+    def test_checklist_nhac_mo_hinh_dung_khoi_nay(self):
+        """Dữ liệu có mà prompt không nhắc thì mô hình không dùng tới."""
+        for kind in ("a", "b", "c"):
+            p = load_prompt(kind)
+            assert "van_ban_dan_chieu_chua_co_trong_kho" in p, f"prompt {kind}"
+            assert "vuot_tran_do_sau" in p, f"prompt {kind}"
+
+
 class TestCongTrongYeu:
     def test_nghi_dinh_tro_len_luon_duoc_bao(self):
         assert jobs.materiality(5, 0.0, False).should_queue

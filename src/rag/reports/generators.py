@@ -174,6 +174,7 @@ def build_update_context(session, rag: RAGDatabase, doc_keys: list[str],
                 "Danh sách văn bản là toàn bộ văn bản cần phân tích trong kỳ, "
                 "không phải mẫu truy xuất."
             ),
+            bao_dong=ctx.van_ban_dan_chieu_khong_lay_duoc(session),
         ),
         "danh_sach_van_ban": facts,
         "chi_tiet_dieu_khoan_chunks": chunks,
@@ -287,6 +288,7 @@ def generate_business_report(session, rag: RAGDatabase, vsic_code: str,
                 "Kho quy định hiện hữu là kết quả truy xuất theo ngành, đã loại "
                 "văn bản hết hiệu lực toàn bộ."
             ),
+            bao_dong=ctx.van_ban_dan_chieu_khong_lay_duoc(session),
         ),
         "danh_sach_van_ban": facts,
         "quy_dinh_hien_huu_cua_nganh": [{
