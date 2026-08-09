@@ -109,6 +109,79 @@ class TestDoThiQuanHe:
         assert gop == 0, f"{gop} cạnh trùng hoàn toàn trong document_references"
 
 
+class TestVanAnToanTrenKhoThat:
+    """Rủi ro số 1 của kế hoạch, và nó hỏng trong im lặng.
+
+    Bao đóng kéo về hàng nghìn văn bản đã hết hiệu lực. Nếu lọc chạy SAU khi đã
+    lấy đủ `limit` kết quả thì phần lớn chỗ bị văn bản chết chiếm, lọc xong còn
+    vài đoạn — báo cáo vẫn ra, chỉ mỏng đi, không có dòng log nào báo.
+
+    Đây là phép kiểm HÀNH VI trên kho thật: chạy tìm kiếm rồi soi từng kết quả.
+    Khác với tests/test_retrieval_safety_valve.py vốn dựng dữ liệu giả để kiểm
+    tính đúng của mệnh đề SQL.
+    """
+
+    TU_KHOA = ("doanh nghiệp", "thuế", "lao động", "xây dựng", "đất đai")
+
+    def _tim(self, rag, tu_khoa):
+        from src.rag.hybrid_search import DEFAULT_FILTERS
+
+        return rag.search_fts(tu_khoa, limit=60, filters=dict(DEFAULT_FILTERS))
+
+    def test_khong_ket_qua_nao_thuoc_van_ban_het_hieu_luc(self):
+        from src.legal.effectivity import HET_TOAN_BO
+        from src.rag.db_rag import RAGDatabase
+
+        rag = RAGDatabase()
+        try:
+            if rag.db.execute("SELECT COUNT(*) FROM legal_chunks").fetchone()[0] == 0:
+                pytest.skip("chưa index")
+            for tu in self.TU_KHOA:
+                hits = self._tim(rag, tu)
+                if not hits:
+                    continue
+                ids = [h["id"] for h in hits]
+                marks = ",".join("?" * len(ids))
+                xau = rag.db.execute(
+                    f"SELECT COUNT(*) FROM legal_chunks WHERE id IN ({marks}) "
+                    f"AND (eff_state = ? OR is_closure_node = 1)",
+                    (*ids, HET_TOAN_BO),
+                ).fetchone()[0]
+                assert xau == 0, f"'{tu}': {xau}/{len(hits)} kết quả không hợp lệ"
+        finally:
+            rag.close()
+
+    def test_van_lay_du_ket_qua_du_kho_day_van_ban_chet(self):
+        """Lọc đúng mà trả về quá ít cũng là hỏng — chỉ là hỏng kiểu khác."""
+        from src.rag.db_rag import RAGDatabase
+
+        rag = RAGDatabase()
+        try:
+            if rag.db.execute("SELECT COUNT(*) FROM legal_chunks").fetchone()[0] == 0:
+                pytest.skip("chưa index")
+            mong = {tu: len(self._tim(rag, tu)) for tu in self.TU_KHOA}
+        finally:
+            rag.close()
+        it_qua = {t: n for t, n in mong.items() if n < 10}
+        assert not it_qua, f"truy xuất trả quá ít kết quả: {it_qua}"
+
+    def test_kho_song_khong_bi_van_ban_nen_lan_at(self):
+        """Tỷ lệ đoạn dùng được phải còn đủ lớn để truy xuất có chỗ mà chọn."""
+        with _conn(RAG_DB) as c:
+            row = c.execute("""
+                SELECT COUNT(*) tong,
+                       SUM(COALESCE(is_closure_node,0)=0
+                           AND COALESCE(eff_state,'') <> 'het_toan_bo') dung_duoc
+                FROM legal_chunks
+            """).fetchone()
+        if row["tong"] == 0:
+            pytest.skip("chưa index")
+        assert row["dung_duoc"] >= 20000, (
+            f"chỉ còn {row['dung_duoc']}/{row['tong']} đoạn dùng được — "
+            f"bao đóng đã lấn át kho hiện hành"
+        )
+
+
 class TestDoanKhoaTheoDocKey:
     """Đoạn phải khoá theo doc_key chứ không theo số hiệu.
 
