@@ -215,6 +215,74 @@ class TestBaoThieuVanBanDanChieu:
             assert "vuot_tran_do_sau" in p, f"prompt {kind}"
 
 
+class TestXuatPdfTrongWorker:
+    """PDF chỉ được dựng SAU khi qua cổng trích dẫn.
+
+    PDF là dạng gửi cho khách, markdown là bản để soi mô hình đã bịa số hiệu
+    nào. Dựng cả hai cùng lúc thì bản bị chặn cũng có PDF, và sớm muộn có người
+    gửi nhầm.
+    """
+
+    def _job(self, kind="b", **kw):
+        return {"id": 7, "kind": kind, "vsic_code": kw.get("vsic_code"),
+                "industry": kw.get("industry"), "parent_job_id": None,
+                "subject_keys": "[]"}
+
+    def _result(self, sidecar=None):
+        from src.rag.reports.generators import ReportResult
+
+        return ReportResult(kind="b", markdown="# X\n\nNội dung.",
+                            sidecar=sidecar or {}, model="thu-nghiem")
+
+    def test_nhan_bia_cua_b_la_so_hieu(self):
+        from src.rag.reports.worker import _nhan_bia
+
+        r = self._result({"doc_nums": ["301/2026/NĐ-CP", "63/2024/NĐ-CP"]})
+        assert _nhan_bia(self._job("b"), r) == "301/2026/NĐ-CP, 63/2024/NĐ-CP"
+
+    def test_nhan_bia_cat_bot_khi_qua_nhieu_so_hieu(self):
+        from src.rag.reports.worker import _nhan_bia
+
+        r = self._result({"doc_nums": [f"{i}/2026/NĐ-CP" for i in range(6)]})
+        assert _nhan_bia(self._job("b"), r).endswith("…")
+
+    def test_nhan_bia_cua_a_va_c_la_ten_nganh(self):
+        from src.rag.reports.worker import _nhan_bia
+
+        job = self._job("c", vsic_code="Q", industry="Y tế và trợ giúp xã hội")
+        assert _nhan_bia(job, self._result()) == "Q · Y tế và trợ giúp xã hội"
+
+    def test_thieu_ca_ma_lan_ten_thi_khong_de_bia_trong(self):
+        from src.rag.reports.worker import _nhan_bia
+
+        assert _nhan_bia(self._job("a"), self._result()) == "Chưa xác định"
+
+    def test_dung_duoc_pdf_that(self, tmp_path):
+        from src.rag.reports.worker import _build_pdf
+
+        md = tmp_path / "bc.md"
+        md.write_text("# Thử\n\nMột đoạn.", encoding="utf-8")
+        out = _build_pdf(self._job("a", vsic_code="K", industry="Tài chính"),
+                         md, self._result())
+        assert out and Path(out).exists() and Path(out).suffix == ".pdf"
+        assert Path(out).stat().st_size > 1000
+
+    def test_loi_dung_pdf_khong_lam_job_that_bai(self, tmp_path, monkeypatch):
+        """Markdown đã qua cổng rồi — mất PDF là mất một định dạng, không mất
+        nội dung. Nhưng phải trả None để bên gọi biết mà đừng ghi đường dẫn.
+        """
+        import src.utils.report_pdf as rp
+        from src.rag.reports.worker import _build_pdf
+
+        def no(*a, **k):
+            raise RuntimeError("thiếu font")
+        monkeypatch.setattr(rp, "build_report_pdf", no)
+
+        md = tmp_path / "bc.md"
+        md.write_text("# X", encoding="utf-8")
+        assert _build_pdf(self._job("a"), md, self._result()) is None
+
+
 class TestCongTrongYeu:
     def test_nghi_dinh_tro_len_luon_duoc_bao(self):
         assert jobs.materiality(5, 0.0, False).should_queue

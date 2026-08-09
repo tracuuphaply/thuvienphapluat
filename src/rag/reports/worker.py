@@ -45,9 +45,71 @@ class WorkerStats:
         return dict(self.__dict__)
 
 
+TIEU_DE = {
+    "a": "Báo cáo tổng hợp pháp lý ngành",
+    "b": "Báo cáo cập nhật văn bản mới",
+    "c": "Báo cáo chuyên sâu cho doanh nghiệp",
+}
+
+THU_MUC = {"a": "nganh", "b": "van_ban_moi", "c": "doanh_nghiep"}
+
+
+def _nhan_bia(job: dict, result: generators.ReportResult) -> str:
+    """Dòng chủ đề in trên bìa: tên ngành với (a)/(c), số hiệu với (b)."""
+    if job["kind"] == "b":
+        nums = (result.sidecar or {}).get("doc_nums") or []
+        return ", ".join(nums[:3]) + (" …" if len(nums) > 3 else "")
+    ma, ten = job.get("vsic_code") or "", job.get("industry") or ""
+    return f"{ma} · {ten}".strip(" ·") or "Chưa xác định"
+
+
+def _build_pdf(job: dict, md_path: Path,
+               result: generators.ReportResult) -> str | None:
+    """Dựng PDF từ markdown đã qua cổng trích dẫn.
+
+    Dùng chung build_report_pdf với scripts/generate_industry_reports.py: quy
+    ước markdown ở mục 7 của prompt được viết cho đúng bộ dựng đó, nên bộ thứ
+    hai sẽ lệch ngay lần đầu prompt đổi.
+
+    Lỗi dựng PDF KHÔNG làm job thất bại — markdown đã có và đã qua cổng, mất
+    PDF là mất một định dạng chứ không mất nội dung. Nhưng phải log, vì thiếu
+    font là lỗi hay gặp nhất khi đổi máy (report_pdf.py hardcode đường dẫn font
+    macOS) và im lặng thì không ai biết vì sao không có file.
+    """
+    from src.config import PROJECT_ROOT
+    from src.utils.report_pdf import ReportMeta, build_report_pdf
+
+    brand_path = PROJECT_ROOT / "report_branding.json"
+    brand = (json.loads(brand_path.read_text(encoding="utf-8"))
+             if brand_path.exists() else {})
+    hom_nay = datetime.date.today()
+
+    meta = ReportMeta(
+        industry=_nhan_bia(job, result),
+        industry_code=job.get("vsic_code") or "",
+        period=f"{TIEU_DE[job['kind']]} · {hom_nay:%m/%Y}",
+        cutoff=f"{hom_nay:%d/%m/%Y}",
+        scope=brand.get("scope", ""),
+        company=brand.get("company", ""),
+        contact=brand.get("footer", ""),
+    )
+    try:
+        return str(build_report_pdf(
+            result.markdown, md_path.with_suffix(".pdf"), meta))
+    except Exception as e:
+        logger.warning("Job %d: không dựng được PDF — %s: %s",
+                       job["id"], type(e).__name__, e)
+        return None
+
+
 def _write_outputs(job_id: int, kind: str, result: generators.ReportResult) -> dict:
-    """Ghi markdown và sidecar. PDF do bước xuất bản lo, sau khi qua cổng trích dẫn."""
-    out_dir = REPORTS_DIR / {"a": "nganh", "b": "van_ban_moi", "c": "doanh_nghiep"}[kind]
+    """Ghi markdown và sidecar.
+
+    PDF dựng riêng SAU cổng trích dẫn, không ở đây: PDF là dạng gửi cho khách,
+    còn markdown là bản để soi mô hình đã bịa số hiệu nào. Dựng cả hai cùng lúc
+    thì bản bị chặn cũng có PDF, và sớm muộn có người gửi nhầm.
+    """
+    out_dir = REPORTS_DIR / THU_MUC[kind]
     out_dir.mkdir(parents=True, exist_ok=True)
     stem = f"job{job_id:05d}_{datetime.date.today().isoformat()}"
 
@@ -117,6 +179,11 @@ def run_job(session, rag: RAGDatabase, job: dict, scorer_version: str,
                   **paths)
         session.commit()
         return jobs.BLOCKED_CITATION
+
+    # Qua cổng rồi mới dựng PDF — bản bị chặn chỉ có markdown.
+    pdf = _build_pdf(job, Path(paths["output_md_path"]), result)
+    if pdf:
+        paths["output_pdf_path"] = pdf
 
     jobs.mark(session, job_id, jobs.DONE,
               citation_total=citation.total, citation_missing=0,
