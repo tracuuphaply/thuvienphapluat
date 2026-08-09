@@ -98,6 +98,30 @@ COMMON_NOTES = [
 # ──────────────────────────────────────────────
 # (b) Phân tích văn bản mới
 # ──────────────────────────────────────────────
+# Số đoạn tối đa lấy từ MỘT văn bản cũ. Văn bản mới được đọc toàn bộ vì đó là
+# chủ thể của báo cáo; văn bản cũ chỉ để đối chiếu, mà một đạo luật bị thay thế
+# có thể 300 Điều — nhồi hết vào là đẩy phần phân tích ra khỏi cửa sổ ngữ cảnh.
+CU_MAX_DOAN = 40
+
+
+def _dieu_khoan_van_ban(rag: RAGDatabase, doc: Document,
+                        gioi_han: int | None = None) -> list[dict[str, str]]:
+    """Điều khoản của một văn bản, tra theo doc_key.
+
+    Tra bằng số hiệu sẽ trộn toàn văn của mọi văn bản trùng số hiệu.
+    """
+    sql = ("SELECT heading, content FROM legal_chunks "
+           "WHERE COALESCE(doc_key, doc_num) = ? ORDER BY chunk_index")
+    params: list = [doc.doc_key or doc.doc_num]
+    if gioi_han:
+        sql += " LIMIT ?"
+        params.append(gioi_han)
+    return [
+        {"heading": r["heading"], "content_excerpt": (r["content"] or "")[:1500]}
+        for r in rag.db.execute(sql, params).fetchall()
+    ]
+
+
 def build_update_context(session, rag: RAGDatabase, doc_keys: list[str],
                          scorer_version: str) -> ctx.ReportContext:
     """Ngữ cảnh cho báo cáo (b): TOÀN BỘ nội dung của các văn bản đã biết."""
@@ -111,18 +135,8 @@ def build_update_context(session, rag: RAGDatabase, doc_keys: list[str],
     for doc in docs:
         facts.append(ctx.document_facts(doc, thieu_trang_thai))
         edges.extend(ctx.graph_edges(session, doc))
-        # Theo doc_key: tra bằng số hiệu sẽ trộn toàn văn của mọi văn bản trùng
-        # số hiệu vào cùng một báo cáo.
-        for row in rag.db.execute(
-            "SELECT heading, content FROM legal_chunks "
-            "WHERE COALESCE(doc_key, doc_num) = ? ORDER BY chunk_index",
-            (doc.doc_key or doc.doc_num,)
-        ).fetchall():
-            chunks.append({
-                "doc_num": doc.doc_num,
-                "heading": row["heading"],
-                "content_excerpt": (row["content"] or "")[:1500],
-            })
+        for doan in _dieu_khoan_van_ban(rag, doc):
+            chunks.append({"doc_num": doc.doc_num, **doan})
 
     # Văn bản CŨ bị nhóm này sửa đổi/thay thế — để nói được "thay đổi so với cái gì".
     impacted_nums = {
@@ -134,9 +148,19 @@ def build_update_context(session, rag: RAGDatabase, doc_keys: list[str],
     for old in session.query(Document).filter(
         Document.doc_num.in_(impacted_nums or {""})
     ).all():
-        impacted.append(ctx.document_facts(old, []))
+        fact = ctx.document_facts(old, [])
+        # Kèm ĐIỀU KHOẢN của bản cũ, không chỉ metadata. Đó là toàn bộ lý do
+        # bao đóng dẫn chiếu kéo cả văn bản đã bị bãi bỏ về: chỉ có nội dung cũ
+        # mới trả lời được "quy định nào đã đổi và doanh nghiệp chịu ảnh hưởng
+        # ra sao". Biết mỗi số hiệu bản cũ thì báo cáo chỉ nói được là có thay
+        # thế, không nói được thay thế cái gì.
+        fact["dieu_khoan_cu"] = _dieu_khoan_van_ban(rag, old, gioi_han=CU_MAX_DOAN)
+        impacted.append(fact)
 
     thieu_metadata = sorted(impacted_nums - {d["doc_num"] for d in impacted})
+    khong_co_toan_van = sorted(
+        d["doc_num"] for d in impacted if not d["dieu_khoan_cu"]
+    )
 
     payload = {
         "thong_tin_tra_cuu": {
@@ -157,6 +181,10 @@ def build_update_context(session, rag: RAGDatabase, doc_keys: list[str],
         "van_ban_bi_tac_dong": impacted,
         "diem_tac_dong_nganh": ctx.industry_impact(session, doc_keys, scorer_version),
     }
+    if khong_co_toan_van:
+        # Không nuốt im lặng: thiếu toàn văn bản cũ thì phần "thay đổi so với
+        # cái gì" của báo cáo không có căn cứ, và người đọc phải biết điều đó.
+        payload["han_che_du_lieu"]["van_ban_cu_chua_co_toan_van"] = khong_co_toan_van
     return ctx.ReportContext(payload=payload, doc_nums=[d["doc_num"] for d in facts])
 
 

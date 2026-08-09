@@ -30,9 +30,20 @@ không phải mẫu. Đọc hết `chi_tiet_dieu_khoan_chunks`.
 
 **Bước 2 — Xác định cái gì thay đổi.** Với mỗi văn bản, đọc
 `do_thi_quan_he_van_ban_edges` để biết nó sửa đổi, thay thế hay bãi bỏ văn bản
-nào. Khối `van_ban_bi_tac_dong` chứa văn bản cũ tương ứng — so hai bên để nói
-được thay đổi so với CÁI GÌ. Không có văn bản cũ trong dữ liệu thì nói rõ là
-chưa đối chiếu được, đừng suy đoán nội dung cũ.
+nào. Khối `van_ban_bi_tac_dong` chứa văn bản cũ tương ứng, trong đó
+`dieu_khoan_cu` là ĐIỀU KHOẢN THẬT của bản cũ.
+
+Đây là phần có giá trị nhất của báo cáo này. Đặt điều khoản cũ cạnh điều khoản
+mới và nói bằng câu cụ thể: quy định nào đổi, đổi từ gì sang gì, doanh nghiệp
+phải làm khác đi ra sao. "Nghị định 100 thay thế Nghị định 50" là thông tin thư
+mục, không phải phân tích — người đọc cần biết ngưỡng vốn đã tăng từ 3 tỷ lên 10
+tỷ, thời hạn báo cáo rút từ 30 ngày xuống 15 ngày.
+
+Bản cũ nào không có `dieu_khoan_cu` (danh sách ở `han_che_du_lieu.
+van_ban_cu_chua_co_toan_van`) thì nói rõ là CHƯA ĐỐI CHIẾU ĐƯỢC nội dung, tuyệt
+đối không suy đoán bản cũ quy định gì. `dieu_khoan_cu` bị cắt còn tối đa 40 đoạn
+đầu, nên nếu điều khoản cần đối chiếu không có ở đó thì cũng ghi là chưa đối
+chiếu được, đừng kết luận là bản cũ không có quy định tương ứng.
 
 **Bước 3 — Xếp theo thứ bậc.** Dùng `cap_hieu_luc_phap_ly`: **số nhỏ hơn là
 hiệu lực cao hơn**. Văn bản có `la_van_ban_qppl` = false KHÔNG được dùng làm căn
@@ -72,6 +83,14 @@ Bảng: Nghĩa vụ | Đối tượng áp dụng | Căn cứ (số hiệu + Đi�
 ### 3. VĂN BẢN ĐANG ÁP DỤNG BỊ ẢNH HƯỞNG
 Văn bản cũ mà doanh nghiệp có thể đang dựa vào, nay bị sửa đổi/thay thế/bãi bỏ.
 Ghi rõ còn hiệu lực một phần hay hết toàn bộ. Không có thì viết "Không ghi nhận".
+
+Với mỗi văn bản cũ có `dieu_khoan_cu`, bắt buộc có bảng đối chiếu:
+
+Quy định | Trước đây (số hiệu + Điều) | Từ nay (số hiệu + Điều) | Doanh nghiệp phải làm gì khác
+
+Mỗi dòng là một thay đổi có hệ quả thực tế. Không đưa vào bảng những thay đổi
+thuần câu chữ. Ô nào không đối chiếu được thì ghi "chưa đối chiếu được", không
+để trống và không đoán.
 
 ### 4. VIỆC CẦN LÀM
 Mỗi việc phải có mốc thời gian cụ thể. Không viết khuyến nghị chung chung.
@@ -120,7 +139,7 @@ DOI_TUONG    : {{DOI_TUONG}}
   "danh_sach_van_ban":        [...],
   "chi_tiet_dieu_khoan_chunks": [...],
   "do_thi_quan_he_van_ban_edges": [...],
-  "van_ban_bi_tac_dong":      [...],
+  "van_ban_bi_tac_dong":      [{..., "dieu_khoan_cu": [...]}],
   "diem_tac_dong_nganh":      [...]
 }
 ```

@@ -10,9 +10,8 @@ Hai điều module này làm mà hai nhánh riêng lẻ không làm:
   1. Báo rõ file nào KHÔNG lên được. Nhánh Lark hiện `continue` lặng lẽ khi một
      file lỗi, nên bên gọi tưởng đã xong và xoá file local. Ở đây mọi thất bại
      đều được trả về để xếp vào hàng đợi thử lại.
-  2. Bỏ qua văn bản kéo về do bị dẫn chiếu. Chúng là ngữ cảnh cho RAG, không
-     phải hồ sơ người dùng mở ra xem — đẩy vài nghìn văn bản nền lên Drive chỉ
-     đốt hết 15 GB miễn phí mà không ai đọc.
+  2. Một chỗ duy nhất quyết định văn bản nào lên mây, thay vì rải điều kiện ở
+     mỗi nhánh gọi.
 """
 from __future__ import annotations
 
@@ -20,7 +19,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from src.config import CLOUD_DRIVE_PROVIDER
+from src.config import CLOUD_DRIVE_PROVIDER, upload_closure_nodes
 
 logger = logging.getLogger(__name__)
 
@@ -109,10 +108,13 @@ def _upload_lark(doc_data: dict[str, Any]) -> UploadOutcome:
 def upload_document(doc_data: dict[str, Any]) -> UploadOutcome:
     """Đẩy hồ sơ một văn bản lên nơi lưu trữ đang cấu hình.
 
-    Văn bản có `is_closure_node` = True được bỏ qua có chủ đích: chúng vào kho
-    vì bị văn bản khác dẫn chiếu, chỉ dùng làm ngữ cảnh truy xuất.
+    Văn bản kéo về theo dẫn chiếu (`is_closure_node`) MẶC ĐỊNH vẫn lên Drive:
+    yêu cầu vận hành nói rõ mọi văn bản tải về đều phải lưu Drive trước, và
+    nhóm này được nêu đích danh trong yêu cầu đó — văn bản bị bãi bỏ chính là
+    mắt xích giải thích vì sao quy định hiện hành ra đời, người đọc báo cáo cần
+    mở được nó. Đặt UPLOAD_CLOSURE_NODES=false để loại nhóm này khỏi Drive.
     """
-    if doc_data.get("is_closure_node"):
+    if doc_data.get("is_closure_node") and not upload_closure_nodes():
         return UploadOutcome(
             provider=active_provider(),
             skipped_reason="van_ban_ngu_canh",

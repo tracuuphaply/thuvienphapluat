@@ -59,6 +59,107 @@ class TestNapPrompt:
         assert all(marker in load_prompt(k) for k in "abc")
 
 
+class TestDoiChieuVanBanCu:
+    """Báo cáo (b) phải nói được quy định nào đã đổi, không chỉ số hiệu nào.
+
+    Đó là toàn bộ lý do bao đóng dẫn chiếu kéo cả văn bản đã bị bãi bỏ về. Bản
+    trước chỉ đưa METADATA của văn bản cũ vào ngữ cảnh, nên mô hình nói được
+    "Nghị định 100 thay thế Nghị định 50" mà không nói được thay thế cái gì —
+    thông tin thư mục, không phải phân tích.
+    """
+
+    def _kho(self, master_session, rag_db):
+        from src.storage.database import insert_references, upsert_document
+
+        moi, _ = upsert_document(master_session, {
+            "doc_num": "100/2026/NĐ-CP", "title": "Nghị định mới",
+            "agency_name": "Chính phủ", "doc_type": "Nghị định",
+            "issue_date": datetime.date(2026, 3, 1), "eff_status": "Còn hiệu lực",
+        })
+        cu, _ = upsert_document(master_session, {
+            "doc_num": "50/2020/NĐ-CP", "title": "Nghị định cũ",
+            "agency_name": "Chính phủ", "doc_type": "Nghị định",
+            "issue_date": datetime.date(2020, 1, 1),
+            "eff_status": "Hết hiệu lực toàn bộ",
+        })
+        master_session.flush()
+        insert_references(master_session, moi.id, [
+            {"target_doc_num": "50/2020/NĐ-CP", "relation_type": "Thay thế"},
+        ])
+        master_session.commit()
+
+        for doc, noi_dung in ((moi, "Vốn tối thiểu 10 tỷ đồng."),
+                              (cu, "Vốn tối thiểu 3 tỷ đồng.")):
+            rag_db.upsert_chunk({
+                "doc_key": doc.doc_key, "doc_num": doc.doc_num, "chunk_index": 0,
+                "heading": "Điều 5", "content": noi_dung,
+                "char_count": len(noi_dung), "industries": [],
+                "content_hash": f"h-{doc.doc_num}",
+            })
+        return moi
+
+    def test_dua_dieu_khoan_cu_vao_ngu_canh(self, master_session, rag_db):
+        from src.rag.reports.generators import build_update_context
+
+        moi = self._kho(master_session, rag_db)
+        payload = build_update_context(
+            master_session, rag_db, [moi.doc_key], "v-test").payload
+
+        cu = payload["van_ban_bi_tac_dong"]
+        assert [d["doc_num"] for d in cu] == ["50/2020/NĐ-CP"]
+        assert "3 tỷ" in cu[0]["dieu_khoan_cu"][0]["content_excerpt"], (
+            "chỉ có metadata bản cũ — không đối chiếu được trước/sau"
+        )
+
+    def test_bao_thieu_khi_chua_co_toan_van_ban_cu(self, master_session, rag_db):
+        """Thiếu toàn văn bản cũ thì phần 'thay đổi so với cái gì' không có căn
+        cứ, và người đọc phải biết điều đó thay vì nhận một khoảng trống.
+        """
+        from src.rag.reports.generators import build_update_context
+
+        moi = self._kho(master_session, rag_db)
+        rag_db.db.execute("DELETE FROM legal_chunks WHERE doc_num='50/2020/NĐ-CP'")
+        rag_db.db.commit()
+
+        payload = build_update_context(
+            master_session, rag_db, [moi.doc_key], "v-test").payload
+        assert payload["han_che_du_lieu"]["van_ban_cu_chua_co_toan_van"] == [
+            "50/2020/NĐ-CP"
+        ]
+
+    def test_khong_bao_thieu_khi_du(self, master_session, rag_db):
+        from src.rag.reports.generators import build_update_context
+
+        moi = self._kho(master_session, rag_db)
+        payload = build_update_context(
+            master_session, rag_db, [moi.doc_key], "v-test").payload
+        assert "van_ban_cu_chua_co_toan_van" not in payload["han_che_du_lieu"]
+
+    def test_cat_bot_van_ban_cu_qua_dai(self, master_session, rag_db):
+        """Một đạo luật bị thay thế có thể 300 Điều; nhồi hết vào là đẩy phần
+        phân tích ra khỏi cửa sổ ngữ cảnh.
+        """
+        from src.rag.reports.generators import CU_MAX_DOAN, build_update_context
+
+        moi = self._kho(master_session, rag_db)
+        cu_key = "50/2020/nđ-cp::chính phủ"
+        for i in range(1, CU_MAX_DOAN + 20):
+            rag_db.upsert_chunk({
+                "doc_key": cu_key, "doc_num": "50/2020/NĐ-CP", "chunk_index": i,
+                "heading": f"Điều {i}", "content": f"nội dung {i}",
+                "char_count": 10, "industries": [], "content_hash": f"h{i}",
+            })
+        payload = build_update_context(
+            master_session, rag_db, [moi.doc_key], "v-test").payload
+        assert len(payload["van_ban_bi_tac_dong"][0]["dieu_khoan_cu"]) == CU_MAX_DOAN
+
+    def test_prompt_noi_ro_truong_moi(self):
+        """Dữ liệu có mà prompt không nhắc thì mô hình không dùng tới."""
+        p = load_prompt("b")
+        assert "dieu_khoan_cu" in p
+        assert "van_ban_cu_chua_co_toan_van" in p
+
+
 class TestCongTrongYeu:
     def test_nghi_dinh_tro_len_luon_duoc_bao(self):
         assert jobs.materiality(5, 0.0, False).should_queue

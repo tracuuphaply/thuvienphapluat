@@ -73,17 +73,43 @@ class TestChonNoiLuuTru:
         monkeypatch.setattr(cloud_drive, "CLOUD_DRIVE_PROVIDER", "dropbox")
         assert cloud_drive.active_provider() == "lark"
 
-    def test_bo_qua_van_ban_ngu_canh(self, monkeypatch):
-        """Văn bản kéo về do bị dẫn chiếu chỉ làm ngữ cảnh RAG.
+    def test_van_ban_ngu_canh_MAC_DINH_van_len_drive(self, monkeypatch):
+        """Yêu cầu vận hành: mọi văn bản tải về đều phải lưu Drive trước.
 
-        Đẩy vài nghìn bản như vậy lên Drive chỉ đốt hết 15 GB miễn phí.
+        Văn bản kéo về theo dẫn chiếu được nêu đích danh trong yêu cầu đó —
+        văn bản bị bãi bỏ là mắt xích giải thích vì sao quy định hiện hành ra
+        đời, người đọc báo cáo cần mở được nó. Bản trước tự ý loại nhóm này.
         """
+        monkeypatch.delenv("UPLOAD_CLOSURE_NODES", raising=False)
+        monkeypatch.setattr(cloud_drive, "CLOUD_DRIVE_PROVIDER", "gdrive")
+        monkeypatch.setattr(
+            cloud_drive, "_upload_gdrive",
+            lambda d: UploadOutcome("gdrive", uploaded=["metadata"]),
+        )
+        outcome = cloud_drive.upload_document(
+            {"doc_num": "83/2015/QH13", "is_closure_node": True}
+        )
+        assert not outcome.skipped and outcome.ok
+
+    def test_tat_duoc_bang_bien_moi_truong(self, monkeypatch):
+        """Bao đóng có thể kéo về vài nghìn văn bản nền, mỗi bản 4 file."""
+        monkeypatch.setenv("UPLOAD_CLOSURE_NODES", "false")
         monkeypatch.setattr(cloud_drive, "CLOUD_DRIVE_PROVIDER", "gdrive")
         outcome = cloud_drive.upload_document(
             {"doc_num": "83/2015/QH13", "is_closure_node": True}
         )
-        assert outcome.skipped
         assert outcome.skipped_reason == "van_ban_ngu_canh"
+
+    def test_cau_hinh_doc_lai_luc_goi(self, monkeypatch):
+        """Đóng băng lúc import thì tiến trình chạy dài ngày không nhận cấu
+        hình mới, và phải khởi động lại mới đổi được.
+        """
+        from src import config
+
+        monkeypatch.setenv("UPLOAD_CLOSURE_NODES", "false")
+        assert not config.upload_closure_nodes()
+        monkeypatch.setenv("UPLOAD_CLOSURE_NODES", "true")
+        assert config.upload_closure_nodes()
 
     def test_van_ban_nghiep_vu_khong_bi_bo_qua(self, monkeypatch):
         monkeypatch.setattr(cloud_drive, "CLOUD_DRIVE_PROVIDER", "gdrive")

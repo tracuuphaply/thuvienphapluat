@@ -8,8 +8,11 @@ rồi chạy lại là tiếp đúng chỗ dừng. Chạy nhiều lần cho tớ
     python -m scripts.run_closure --max-fetch 50     # thử một lô nhỏ
     python -m scripts.run_closure                    # theo CLOSURE_MAX_FETCH_PER_RUN
 
-Văn bản kéo về được đánh dấu `is_closure_node = 1`: chúng vào kho RAG làm ngữ
-cảnh nhưng KHÔNG vào bản tin Telegram, KHÔNG sinh báo cáo và KHÔNG đẩy lên Drive.
+Văn bản kéo về được đánh dấu `is_closure_node = 1`: chúng KHÔNG vào bản tin
+Telegram và KHÔNG tự sinh báo cáo — chúng là ngữ cảnh, không phải sự kiện. Nhưng
+vẫn vào kho RAG và vẫn lên Drive: bản đã bị bãi bỏ chính là thứ trả lời được
+"quy định nào đã đổi", nên người đọc báo cáo phải mở được nó. Đặt
+UPLOAD_CLOSURE_NODES=false nếu muốn giữ Drive gọn.
 
 ĐIỀU KIỆN TIÊN QUYẾT — chạy MỘT LẦN trước lần bao đóng đầu tiên:
 

@@ -111,6 +111,22 @@ AUTO_CLEANUP_LOCAL_FILES = os.getenv("AUTO_CLEANUP_LOCAL_FILES", "true").lower()
 # ai đó điền khoá Lark vào .env là toàn bộ pipeline âm thầm đổi đích lưu trữ.
 CLOUD_DRIVE_PROVIDER = os.getenv("CLOUD_DRIVE_PROVIDER", "lark").strip().lower()
 
+
+def upload_closure_nodes() -> bool:
+    """Có đẩy văn bản kéo về theo dẫn chiếu lên Drive không.
+
+    Mặc định CÓ. Yêu cầu vận hành nói rõ mọi văn bản tải về đều phải lưu Drive
+    trước, và văn bản nền chính là nhóm được nêu tên trong yêu cầu đó.
+
+    Đặt UPLOAD_CLOSURE_NODES=false nếu muốn Drive chỉ chứa văn bản thuộc lĩnh
+    vực doanh nghiệp — bao đóng dẫn chiếu có thể kéo về vài nghìn văn bản nền,
+    mỗi văn bản 4 file. Đọc lúc gọi chứ không đóng băng lúc import, để đổi cấu
+    hình không phải khởi động lại tiến trình chạy dài ngày.
+    """
+    return os.getenv("UPLOAD_CLOSURE_NODES", "true").strip().lower() in (
+        "true", "1", "yes",
+    )
+
 # ──────────────────────────────────────────────
 # LLM & Embeddings
 #
