@@ -33,7 +33,10 @@ import argparse
 import logging
 
 from src.pipeline import closure
-from src.pipeline.text_processor import process_fulltext
+from src.pipeline.text_processor import (
+    has_meaningful_fulltext,
+    process_fulltext,
+)
 from src.storage.database import (
     get_session,
     init_db,
@@ -64,7 +67,10 @@ def _save_closure_document(session, detail: dict, depth: int) -> None:
     doc_data.pop("event_type", None)
 
     moj_id = doc_data.get("moj_id", "")
-    if fulltext_html and moj_id:
+    # Gateway trả về khung HTML rỗng cho văn bản nó không có toàn văn, thay vì
+    # báo lỗi. Ghi nhận nó là "đã có toàn văn" tạo ra dữ kiện sai — 163 văn bản
+    # từng khai có toàn văn mà không một chữ nào.
+    if fulltext_html and moj_id and has_meaningful_fulltext(fulltext_html):
         # Gọi bằng TÊN THAM SỐ, không theo vị trí: process_fulltext nhận
         # (doc_id, html_content, doc_num) còn save_moj_fulltext nhận
         # (doc_id, html_content) — truyền nhầm thứ tự thì toàn văn HTML bị dùng

@@ -35,6 +35,22 @@ CHUNKS_DIR.mkdir(parents=True, exist_ok=True)
 # ──────────────────────────────────────────────
 # HTML → Clean Markdown
 # ──────────────────────────────────────────────
+# Dưới ngưỡng này thì coi như không có nội dung. Gateway Bộ Tư pháp trả về một
+# khung HTML rỗng (`<body></body>`, 83 byte) cho những văn bản nó không có toàn
+# văn, thay vì báo lỗi. Ghi nhận nó là "đã có toàn văn" tạo ra một dữ kiện sai:
+# 163 văn bản từng khai có toàn văn mà không một chữ nào.
+MIN_FULLTEXT_CHARS = 200
+
+
+def has_meaningful_fulltext(html: str) -> bool:
+    """Nội dung HTML có đủ chữ để coi là toàn văn không?
+
+    Xét trên văn bản đã bóc thẻ chứ không xét độ dài HTML: một khung rỗng vẫn
+    dài vài chục byte, còn một trang đầy thẻ định dạng có thể ít chữ.
+    """
+    return len(html_to_clean_text(html or "").strip()) >= MIN_FULLTEXT_CHARS
+
+
 def html_to_clean_text(html: str) -> str:
     """
     Convert raw HTML fulltext to clean plain text / light Markdown.

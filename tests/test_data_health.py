@@ -214,12 +214,19 @@ class TestDoanKhoaTheoDocKey:
         assert trung == 0, f"{trung} đoạn trùng khoá (doc_key, chunk_index)"
 
     def test_so_hieu_trung_van_giu_duoc_hai_tap_doan(self):
-        """Kiểm trên chính các số hiệu đang trùng trong kho, không phải ví dụ."""
+        """Kiểm trên chính các số hiệu đang trùng trong kho, không phải ví dụ.
+
+        Chỉ xét số hiệu mà TỪ HAI văn bản trở lên thực sự có đoạn. Một số văn
+        bản không có toàn văn (gateway Bộ Tư pháp không trả nội dung), nên
+        chúng không có đoạn nào — đó không phải dấu hiệu dùng chung tập đoạn.
+        """
         with _conn(MASTER_DB) as c:
-            trung = [r[0] for r in c.execute(
-                "SELECT doc_num FROM documents GROUP BY doc_num HAVING COUNT(*) > 1")]
+            trung = [r[0] for r in c.execute("""
+                SELECT doc_num FROM documents WHERE has_chunks = 1
+                GROUP BY doc_num HAVING COUNT(*) > 1
+            """)]
         if not trung:
-            pytest.skip("kho chưa có số hiệu trùng")
+            pytest.skip("kho chưa có số hiệu trùng mà cả hai đều có đoạn")
 
         marks = ",".join("?" * len(trung))
         with _conn(RAG_DB) as c:
@@ -228,6 +235,20 @@ class TestDoanKhoaTheoDocKey:
                 f"WHERE doc_num IN ({marks}) GROUP BY doc_num", trung).fetchall()
         gop = [r["doc_num"] for r in rows if r["n"] < 2]
         assert not gop, f"vẫn dùng chung một tập đoạn: {gop}"
+
+    def test_khong_khai_co_toan_van_khi_khong_co_chu_nao(self):
+        """Gateway trả khung HTML rỗng (83 byte) thay vì báo lỗi.
+
+        Ghi nhận nó là "đã có toàn văn" tạo ra dữ kiện sai trong kho: 321 văn
+        bản từng khai có toàn văn mà không một chữ nào, và báo cáo có thể dẫn
+        chúng như thể đã đọc được nội dung.
+        """
+        with _conn(MASTER_DB) as c:
+            lech = c.execute(
+                "SELECT COUNT(*) FROM documents "
+                "WHERE has_fulltext = 1 AND COALESCE(has_chunks, 0) = 0"
+            ).fetchone()[0]
+        assert lech == 0, f"{lech} văn bản khai có toàn văn nhưng không có đoạn nào"
 
     def test_khong_co_vector_mo_coi(self):
         """Vector mồ côi vẫn được tìm thấy rồi JOIN ra rỗng — kết quả biến mất
