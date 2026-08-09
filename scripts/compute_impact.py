@@ -246,9 +246,19 @@ def compute(session, rag: RAGDatabase, version: str, dry_run: bool) -> Counter:
         ))
         stats["co_diem"] += 1
 
-    # Phân vị chỉ có nghĩa khi so với toàn bộ phân phối, nên phải chấm xong hết
-    # rồi mới xếp hạng.
-    scorer.assign_percentiles(impacts)
+    # Chấm xong hết rồi mới xếp hạng, vì phân vị cần cả phân phối.
+    #
+    # Nhóm tham chiếu là văn bản NGHIỆP VỤ, không gồm văn bản ngữ cảnh kéo về
+    # theo dẫn chiếu. Văn bản ngữ cảnh vẫn được chấm và vẫn nhận phân vị — chúng
+    # chỉ không được tham gia định nghĩa "cao" là bao nhiêu.
+    nghiep_vu = {
+        d.doc_key for d in docs if not d.is_closure_node and d.doc_key
+    }
+    logger.info(
+        "Phân vị so trên %d văn bản nghiệp vụ (bỏ %d văn bản ngữ cảnh khỏi "
+        "phân phối tham chiếu).", len(nghiep_vu), len(docs) - len(nghiep_vu),
+    )
+    scorer.assign_percentiles(impacts, reference_keys=nghiep_vu)
 
     if not dry_run:
         session.execute(

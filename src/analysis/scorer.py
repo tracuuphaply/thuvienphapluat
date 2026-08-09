@@ -145,14 +145,32 @@ def score_document(
 
 def assign_percentiles(
     impacts: list[DocumentImpact],
+    reference_keys: set[str] | None = None,
 ) -> dict[str, list[float]]:
     """Gán `impact_pct_industry` cho mọi văn bản, theo từng ngành.
 
-    Phải chạy trên CẢ kho một lượt: phân vị chỉ có nghĩa khi so với toàn bộ phân
+    Phải chạy một lượt trên cả tập: phân vị chỉ có nghĩa khi so với một phân
     phối. Trả về phân phối đã dùng, để lưu lại và giải thích được con số về sau.
+
+    `reference_keys` giới hạn PHÂN PHỐI THAM CHIẾU, không giới hạn tập được
+    gán điểm. Mọi văn bản vẫn nhận phân vị, nhưng phân vị đó so với nhóm nào là
+    một quyết định phải nói rõ.
+
+    Vì sao cần: bao đóng dẫn chiếu đưa vào kho 3.443 văn bản nền — phần lớn
+    ngắn, cấp tỉnh, đã hết hiệu lực, tức điểm thấp. Gộp chúng vào phân phối thì
+    một văn bản ở phân vị 50 trong 1.053 văn bản nghiệp vụ nhảy lên phân vị 89
+    trong 4.466, dù bản thân nó không đổi gì. Ngưỡng ≥ 80 chọn ngành cho báo
+    cáo (c) sẽ kích hoạt cho gần như mọi thứ — đúng bệnh ngập báo cáo mà
+    C_MIN_SHARE sinh ra để chặn, quay lại bằng cửa khác.
+
+    Câu hỏi mà chỉ số này trả lời là "ngành i nên quan tâm văn bản này tới mức
+    nào so với các văn bản KHÁC CÓ THỂ SINH BÁO CÁO", nên nhóm tham chiếu đúng
+    là văn bản nghiệp vụ, không phải văn bản ngữ cảnh.
     """
     by_industry: dict[str, list[float]] = {}
     for impact in impacts:
+        if reference_keys is not None and impact.doc_key not in reference_keys:
+            continue
         for code, score in impact.scores.items():
             by_industry.setdefault(code, []).append(score.impact_raw)
 
@@ -161,8 +179,13 @@ def assign_percentiles(
 
     for impact in impacts:
         for code, score in impact.scores.items():
-            score.impact_pct_industry = centroids.percentile_rank(
-                score.impact_raw, by_industry[code]
+            # Ngành không có mặt trong nhóm tham chiếu thì không có phân phối để
+            # so. Để 0 chứ không lấy phân phối của ngành khác, và cũng không
+            # ném lỗi giữa một lượt chấm cả kho.
+            phan_phoi = by_industry.get(code)
+            score.impact_pct_industry = (
+                centroids.percentile_rank(score.impact_raw, phan_phoi)
+                if phan_phoi else 0.0
             )
 
     return by_industry

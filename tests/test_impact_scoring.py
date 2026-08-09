@@ -82,6 +82,51 @@ class TestHaiLoaiPhanTram:
         # nhưng cường độ thì khác hẳn
         assert manh.impact_pct_industry > yeu.impact_pct_industry
 
+    def test_van_ban_ngu_canh_khong_lam_lech_phan_vi(self):
+        """Bao đóng đưa vào kho 3.443 văn bản nền, phần lớn điểm thấp.
+
+        Gộp chúng vào phân phối thì một văn bản nghiệp vụ ở giữa bảng nhảy lên
+        gần đỉnh mà bản thân nó không đổi gì — ngưỡng ≥ 80 chọn ngành cho báo
+        cáo (c) kích hoạt cho gần như mọi thứ. Đúng bệnh ngập báo cáo mà
+        C_MIN_SHARE sinh ra để chặn, quay lại bằng cửa khác.
+        """
+        nghiep_vu = [
+            scorer.score_document(f"nv{i}", f"NV{i}", 100.0 * i, {"K": 1.0}, {}, 2)
+            for i in range(1, 11)
+        ]
+        ngu_canh = [
+            scorer.score_document(f"nc{i}", f"NC{i}", 1.0, {"K": 1.0}, {}, 9)
+            for i in range(200)
+        ]
+        keys = {d.doc_key for d in nghiep_vu}
+
+        giua = nghiep_vu[4]        # hạng 5/10
+        scorer.assign_percentiles(nghiep_vu + ngu_canh, reference_keys=keys)
+        dung = giua.scores["K"].impact_pct_industry
+
+        scorer.assign_percentiles(nghiep_vu + ngu_canh)   # gộp cả hai nhóm
+        lech = giua.scores["K"].impact_pct_industry
+
+        assert dung < 60, f"văn bản giữa bảng phải ở khoảng giữa, đang {dung}"
+        assert lech > 90, "phép đo phải cho thấy sai lệch thật sự tồn tại"
+
+    def test_van_gan_phan_vi_cho_van_ban_ngoai_nhom_tham_chieu(self):
+        """Giới hạn PHÂN PHỐI, không giới hạn tập được gán điểm."""
+        nv = scorer.score_document("nv", "NV", 100.0, {"K": 1.0}, {}, 2)
+        nc = scorer.score_document("nc", "NC", 1.0, {"K": 1.0}, {}, 9)
+        scorer.assign_percentiles([nv, nc], reference_keys={"nv"})
+        assert nc.scores["K"].impact_pct_industry is not None
+        assert nc.scores["K"].impact_pct_industry < nv.scores["K"].impact_pct_industry
+
+    def test_nganh_vang_mat_trong_nhom_tham_chieu_khong_no(self):
+        """Không được ném lỗi giữa một lượt chấm cả kho, cũng không được mượn
+        phân phối của ngành khác.
+        """
+        nv = scorer.score_document("nv", "NV", 100.0, {"K": 1.0}, {}, 2)
+        nc = scorer.score_document("nc", "NC", 50.0, {"A": 1.0}, {}, 9)
+        scorer.assign_percentiles([nv, nc], reference_keys={"nv"})
+        assert nc.scores["A"].impact_pct_industry == 0.0
+
     def test_van_ban_cap_cao_tac_dong_manh_hon(self):
         """Một điều cấm trong Luật không cùng sức nặng với trong quyết định tỉnh."""
         luat = self._impact(level=2)
