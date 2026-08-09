@@ -40,8 +40,121 @@ Chỉ một lần chạy được phép tại một thời điểm — `pipeline
 Sao lưu SQLite dùng `VACUUM INTO`, không copy byte thô: copy file đang mở có thể
 tạo bản sao rách, và bỏ quên file `-wal` là mất giao dịch đã commit.
 
-**Chưa có quy trình kiểm chứng phục hồi.** Nên thử khôi phục một bản vào thư mục
-tạm định kỳ.
+Quy trình phục hồi đã được kiểm chứng ngày 07/8/2026: giải nén `db_<ngày>.sqlite.gz`
+ra thư mục tạm, `PRAGMA integrity_check` trả `ok`, số văn bản và số quan hệ khớp
+bản đang chạy. Nên lặp lại định kỳ, và **bắt buộc chạy trước mỗi migration** đụng
+vào bảng `documents`.
+
+```bash
+gunzip -c data/backups/db_2026-08-06.sqlite.gz > /tmp/restore_test.db
+sqlite3 /tmp/restore_test.db "PRAGMA integrity_check; SELECT COUNT(*) FROM documents;"
+```
+
+## Nơi lưu trữ đám mây
+
+Chọn bằng `CLOUD_DRIVE_PROVIDER` trong `.env`: `gdrive` | `lark` | `both`.
+Trước đây đích lưu trữ được suy từ việc có hay không `LARK_APP_ID`, nên chỉ cần
+điền khoá Lark là pipeline âm thầm đổi chỗ lưu file.
+
+Văn bản kéo về do bị dẫn chiếu (`is_closure_node = 1`) **vẫn** được đẩy lên mây.
+Bản cũ loại chúng ra; sai, vì văn bản đã bị bãi bỏ chính là thứ trả lời được
+"quy định nào đã đổi", nên người đọc báo cáo phải mở được nó. Đặt
+`UPLOAD_CLOSURE_NODES=false` nếu muốn Drive chỉ chứa văn bản nghiệp vụ.
+
+### Thiết lập Google Drive lần đầu
+
+Xác thực bằng **OAuth**, không dùng service account: Google cấp cho service
+account hạn mức lưu trữ 0 GB nên upload vào My Drive luôn trả `403
+storageQuotaExceeded` và không xin thêm quota được. Đó là lý do nhánh Drive cũ
+chưa từng chạy và `run_daily.sh` luôn truyền `--skip-gdrive`.
+
+Giao diện Google đã đổi: mục "OAuth consent screen" cũ nay là **Google Auth
+Platform**, tách thành 4 tab Branding · Audience · Clients · Data Access. Màn
+hình *"Google Auth Platform not configured yet"* ở lần đầu là bình thường.
+
+1. [console.cloud.google.com](https://console.cloud.google.com) → tạo project.
+2. **APIs & Services → Library** → bật **Google Drive API**.
+3. **Google Auth Platform → Get started** → App name + email hỗ trợ → Audience
+   **External** → email liên hệ → đồng ý policy → **Create**.
+4. Tab **Data Access** → *Add or remove scopes* → chỉ tích
+   `.../auth/drive.file` → Update → Save.
+5. Tab **Audience** → **PUBLISH APP** → Confirm. Trạng thái phải là
+   **In production**.
+6. Tab **Clients** → *Create client* → **Desktop app** → Download JSON → lưu
+   thành `credentials/gdrive_oauth_client.json`.
+7. `python -m scripts.gdrive_check --authorize` → đăng nhập, bấm Allow. Màn hình
+   "Google hasn't verified this app" là bình thường với scope không nhạy cảm →
+   Advanced → Go to … (unsafe).
+8. Script tự tạo thư mục gốc và in id ra; ghi vào `.env` thành
+   `GDRIVE_ROOT_FOLDER_ID=...`, rồi đặt `CLOUD_DRIVE_PROVIDER=gdrive`.
+
+**Hai cái bẫy, cả hai đều không lộ ra lúc test tay:**
+
+- **Bỏ bước 5** → refresh token hết hạn sau đúng 7 ngày, pipeline chạy hằng ngày
+  chết câm với lỗi `invalid_grant`. Google chỉ cấp 7 ngày cho ứng dụng còn ở
+  trạng thái Testing.
+- **Trỏ `GDRIVE_ROOT_FOLDER_ID` tới thư mục tạo tay** → mọi lần ghi báo lỗi, vì
+  phạm vi `drive.file` chỉ cho ghi vào thư mục do chính ứng dụng tạo. Để trống
+  biến này ở lần chạy đầu.
+
+Khi thấy `invalid_grant` trong log, chạy lại `gdrive_check --authorize`.
+
+### Hàng đợi upload
+
+Upload hỏng dù chỉ một file cũng **không** đánh dấu `documents.cloud_synced_at`,
+và văn bản được xếp vào bảng `upload_queue` để thử lại. Cột `cloud_synced_at` là
+cổng: chưa có giá trị thì `AUTO_CLEANUP_LOCAL_FILES` không được phép xoá file
+local — đánh dấu sớm là mất bản gốc mà trên mây cũng không có.
+
+```sql
+SELECT doc_num, provider, file_kinds, attempts, last_error FROM upload_queue;
+```
+
+Đẩy lại phần còn thiếu: `python -m src.main --upload-only`.
+
+## Bao đóng dẫn chiếu
+
+Kéo về mọi văn bản mà kho đang dẫn chiếu tới nhưng chưa có, **kể cả văn bản đã
+hết hiệu lực hoặc bị bãi bỏ** — đó chính là thứ trả lời được "quy định nào đã
+đổi và doanh nghiệp chịu ảnh hưởng ra sao".
+
+```bash
+python -m scripts.run_closure --max-fetch 400     # lặp tới khi "đang chờ" về 0
+python -m src.main --sync-rag-only                # BẮT BUỘC sau mỗi đợt
+```
+
+Hàng đợi nằm trong bảng `crawl_frontier` nên ngắt giữa chừng rồi chạy lại là
+tiếp đúng chỗ dừng.
+
+### Trần độ sâu — cái van quan trọng nhất
+
+`CLOSURE_MAX_DEPTH` (mặc định 0 = không giới hạn). **Nên đặt 2.**
+
+Đo trên kho thật: không đặt trần thì mỗi văn bản kéo về sinh thêm **1,54** văn
+bản cần kéo, tức không hội tụ. Van cắt hub (`CLOSURE_HUB_INDEGREE=200`) không
+giúp gì — không văn bản nào trong hàng đợi vượt ngưỡng đó. Nguồn phân kỳ nằm ở
+đầu ngược lại: **71% hàng đợi là văn bản chỉ bị dẫn chiếu đúng một lần**, mỗi
+cái kéo về lại sinh ~7 dẫn chiếu mới. Đặt trần 2 kéo tỷ lệ xuống **1,06** và
+cho bao đóng một điểm kết thúc xác định.
+
+Mục vượt trần được đánh dấu `state = 'TOO_DEEP'` chứ không xoá, nên nâng trần
+sau này là chạy tiếp chứ không phải dò lại từ đầu.
+
+### Sau khi đổi trần: phải tính lại độ sâu
+
+```bash
+python -m scripts.backfill_closure_depth --dry-run
+python -m scripts.backfill_closure_depth
+```
+
+Duyệt chiều rộng từ tập hạt giống để ra **đường ngắn nhất**. Bắt buộc chạy sau
+khi nâng/hạ trần, vì trần chỉ có ý nghĩa khi độ sâu trong kho là đúng.
+
+### Dung lượng
+
+Đo được **1,57 MB/văn bản** (gồm HTML gốc, clean text, chunk, index RAG). Chốt
+chặn `MIN_FREE_DISK_GB` dừng bao đóng trước khi đầy đĩa. Đừng đưa về 0: đầy ổ
+khởi động thì SQLite ghi hỏng giữa transaction.
 
 ## Bảo trì dữ liệu
 
