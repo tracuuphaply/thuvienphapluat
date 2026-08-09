@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import logging
+import random
 import re
 import time
 from pathlib import Path
@@ -92,10 +93,36 @@ _load_cache()
 # ──────────────────────────────────────────────
 # Retry with Exponential Backoff
 # ──────────────────────────────────────────────
-def _retry_api_call(func, *args, max_retries: int = 3, **kwargs) -> Any:
+# Google trả giới hạn tốc độ dưới dạng 403, không phải 429 — một quirk nổi
+# tiếng của Drive API. Trước đây bộ thử lại chỉ xét mã trạng thái nên coi mọi
+# 403 là lỗi vĩnh viễn và ném ngay: 22 văn bản rơi vào hàng đợi lỗi trong một
+# đợt upload dù chỉ cần chờ vài giây.
+#
+# Không gộp chung mọi 403: `storageQuotaExceeded` và lỗi quyền là vĩnh viễn,
+# thử lại chỉ tốn thời gian. `dailyLimitExceeded` cũng không thử lại được trong
+# vài giây — nó reset theo ngày.
+_LY_DO_QUA_TOC_DO = frozenset({
+    "rateLimitExceeded", "userRateLimitExceeded", "sharingRateLimitExceeded",
+})
+
+
+def _qua_toc_do(error) -> bool:
+    """403 này là giới hạn tốc độ (chờ được) hay lỗi vĩnh viễn?"""
+    try:
+        chi_tiet = json.loads(error.content.decode("utf-8"))
+        ly_do = {e.get("reason") for e in chi_tiet["error"].get("errors", [])}
+        ly_do.add(chi_tiet["error"].get("status"))
+    except Exception:
+        # Không đọc được thân lỗi thì dò trên chuỗi — thà thử lại thừa một lần
+        # còn hơn bỏ rơi một văn bản vì không parse được JSON.
+        return "rate limit" in str(error).lower()
+    return bool(ly_do & _LY_DO_QUA_TOC_DO)
+
+
+def _retry_api_call(func, *args, max_retries: int = 5, **kwargs) -> Any:
     """
     Execute a Google API call with exponential backoff retry.
-    Retries on: HttpError 429/500/503, ConnectionError, TimeoutError.
+    Retries on: HttpError 429/500/503, 403 rate-limit, ConnectionError, TimeoutError.
     """
     from googleapiclient.errors import HttpError
 
@@ -105,10 +132,15 @@ def _retry_api_call(func, *args, max_retries: int = 3, **kwargs) -> Any:
             return func(*args, **kwargs)
         except HttpError as e:
             status = e.resp.status if hasattr(e, "resp") else 0
-            if status in (429, 500, 503) and attempt < max_retries:
-                wait = (2 ** attempt) + 0.5  # 1.5s, 2.5s, 4.5s
+            dang_bi_chan = status in (429, 500, 503) or (
+                status == 403 and _qua_toc_do(e)
+            )
+            if dang_bi_chan and attempt < max_retries:
+                # Backoff dài hơn cho giới hạn tốc độ: cửa sổ tính hạn mức của
+                # Google là 100 giây, nên 1,5s là quá ngắn để thoát ra.
+                wait = min(2 ** attempt, 32) + random.uniform(0, 1)
                 logger.warning(
-                    "GDrive API %d error (attempt %d/%d), retrying in %.1fs: %s",
+                    "GDrive API %d (lần %d/%d), chờ %.1fs rồi thử lại: %s",
                     status, attempt + 1, max_retries, wait, e,
                 )
                 time.sleep(wait)

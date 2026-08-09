@@ -64,6 +64,87 @@ class TestThoatKyTuTruyVanDrive:
         assert _escape_query_value("18_2024_TT-BCT") == "18_2024_TT-BCT"
 
 
+class TestThuLaiKhiBiGioiHanTocDo:
+    """Google trả giới hạn tốc độ dưới dạng 403, không phải 429.
+
+    Bộ thử lại cũ chỉ xét mã trạng thái nên coi mọi 403 là lỗi vĩnh viễn và ném
+    ngay — 22 văn bản rơi vào hàng đợi lỗi trong một đợt upload dù chỉ cần chờ
+    vài giây. Nhưng cũng không được gộp chung mọi 403: hết dung lượng và sai
+    quyền là vĩnh viễn, thử lại chỉ tốn thời gian.
+    """
+
+    def _loi(self, status: int, reason: str):
+        import json as _json
+
+        from googleapiclient.errors import HttpError
+
+        class _Resp:
+            def __init__(self, s):
+                self.status = s
+                self.reason = ""
+        body = _json.dumps({"error": {"errors": [{"reason": reason}],
+                                      "code": status}}).encode()
+        return HttpError(_Resp(status), body)
+
+    @pytest.mark.parametrize("reason", [
+        "rateLimitExceeded", "userRateLimitExceeded", "sharingRateLimitExceeded",
+    ])
+    def test_nhan_dien_403_qua_toc_do(self, reason):
+        from src.storage.gdrive import _qua_toc_do
+
+        assert _qua_toc_do(self._loi(403, reason))
+
+    @pytest.mark.parametrize("reason", [
+        "storageQuotaExceeded", "insufficientFilePermissions", "forbidden",
+    ])
+    def test_403_vinh_vien_khong_bi_nham_la_qua_toc_do(self, reason):
+        from src.storage.gdrive import _qua_toc_do
+
+        assert not _qua_toc_do(self._loi(403, reason))
+
+    def test_than_loi_khong_doc_duoc_thi_do_tren_chuoi(self):
+        """Thà thử lại thừa một lần còn hơn bỏ rơi văn bản vì lỗi parse JSON."""
+        from googleapiclient.errors import HttpError
+
+        from src.storage.gdrive import _qua_toc_do
+
+        class _Resp:
+            status = 403
+            reason = "Rate Limit Exceeded"
+        assert _qua_toc_do(HttpError(_Resp(), b"khong phai json"))
+
+    def test_thu_lai_that_su_khi_qua_toc_do(self, monkeypatch):
+        from src.storage import gdrive
+
+        monkeypatch.setattr(gdrive.time, "sleep", lambda s: None)
+        lan = {"n": 0}
+
+        def hay_hay_hong():
+            lan["n"] += 1
+            if lan["n"] < 3:
+                raise self._loi(403, "userRateLimitExceeded")
+            return "xong"
+
+        assert gdrive._retry_api_call(hay_hay_hong) == "xong"
+        assert lan["n"] == 3
+
+    def test_khong_thu_lai_khi_het_dung_luong(self, monkeypatch):
+        from googleapiclient.errors import HttpError
+
+        from src.storage import gdrive
+
+        monkeypatch.setattr(gdrive.time, "sleep", lambda s: None)
+        lan = {"n": 0}
+
+        def luon_hong():
+            lan["n"] += 1
+            raise self._loi(403, "storageQuotaExceeded")
+
+        with pytest.raises(HttpError):
+            gdrive._retry_api_call(luon_hong)
+        assert lan["n"] == 1, "lỗi vĩnh viễn mà vẫn thử lại là phí thời gian"
+
+
 class TestChonNoiLuuTru:
     def test_doc_tu_bien_cau_hinh(self, monkeypatch):
         monkeypatch.setattr(cloud_drive, "CLOUD_DRIVE_PROVIDER", "gdrive")
