@@ -41,7 +41,51 @@ OUT_DIR = DATA_DIR / "reports" / "demo"
 NGANH_MAC_DINH = "K"
 
 
-def _ghi(ten: str, result, sidecar: dict | None = None) -> Path:
+TIEU_DE = {
+    "a": "Báo cáo tổng hợp pháp lý ngành",
+    "b": "Báo cáo cập nhật văn bản mới",
+    "c": "Báo cáo chuyên sâu cho doanh nghiệp",
+}
+
+
+def _branding() -> dict:
+    from src.config import PROJECT_ROOT
+
+    path = PROJECT_ROOT / "report_branding.json"
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+
+
+def _xuat_pdf(md_text: str, ten: str, loai: str, nhan: str) -> Path | None:
+    """Dựng PDF có bìa thương hiệu từ markdown.
+
+    Cùng bộ dựng với scripts/generate_industry_reports.py — không tự chế bản
+    thứ hai, vì quy ước markdown ở mục 7 của prompt được viết cho đúng bộ này.
+    """
+    import datetime
+
+    from src.utils.report_pdf import ReportMeta, build_report_pdf
+
+    brand = _branding()
+    hom_nay = datetime.date.today()
+    meta = ReportMeta(
+        industry=nhan,
+        period=f"{TIEU_DE[loai]} · {hom_nay:%m/%Y}",
+        cutoff=f"{hom_nay:%d/%m/%Y}",
+        scope=brand.get("scope", ""),
+        company=brand.get("company", ""),
+        contact=brand.get("footer", ""),
+    )
+    try:
+        return build_report_pdf(md_text, OUT_DIR / f"{ten}.pdf", meta)
+    except Exception as e:
+        # Không nuốt: thiếu font là lỗi hay gặp nhất khi đổi máy, và nếu im
+        # lặng thì người dùng chỉ thấy "không có file PDF" mà không biết vì sao.
+        print(f"    ✗ không dựng được PDF: {type(e).__name__}: {e}")
+        return None
+
+
+def _ghi(ten: str, loai: str, nhan: str, result,
+         sidecar: dict | None = None) -> Path:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     kiem = check_citations(result.markdown)
     hau_to = "" if kiem.ok else "_BI_CHAN"
@@ -58,8 +102,16 @@ def _ghi(ten: str, result, sidecar: dict | None = None) -> Path:
     if kiem.ok:
         print(f"    trích dẫn: {kiem.total} số hiệu, tất cả có trong kho")
     else:
+        # Bản bịa số hiệu KHÔNG được dựng thành PDF: PDF là dạng gửi cho khách,
+        # còn markdown là bản để soi lỗi.
         print(f"    ✗ CHẶN: {len(kiem.missing)} số hiệu không có trong kho — "
               f"{kiem.missing[:5]}")
+        print("    (không xuất PDF cho bản bị chặn)")
+        return md
+
+    pdf = _xuat_pdf(result.markdown, f"{ten}{hau_to}", loai, nhan)
+    if pdf:
+        print(f"    → {pdf}  ({pdf.stat().st_size / 1024:.0f} KB)")
     return md
 
 
@@ -87,7 +139,7 @@ def demo_a(session, rag, version: str, nganh: str) -> None:
         model = "(bộ sinh cũ)"
         truncated = False
 
-    _ghi("a_tong_hop_nganh", _R())
+    _ghi("a_tong_hop_nganh", "a", f"{nganh} · {ten_ngan}", _R())
 
 
 def demo_b(session, rag, version: str, doc_num: str | None) -> tuple[Path, dict] | None:
@@ -119,7 +171,8 @@ def demo_b(session, rag, version: str, doc_num: str | None) -> tuple[Path, dict]
     print(f"\n=== (b) Văn bản mới — {', '.join(d.doc_num for d in docs)} ===")
     result = generators.generate_update_report(
         session, rag, [d.doc_key for d in docs], version)
-    md = _ghi("b_van_ban_moi", result, sidecar=result.sidecar)
+    nhan = ", ".join(d.doc_num for d in docs)
+    md = _ghi("b_van_ban_moi", "b", nhan, result, sidecar=result.sidecar)
     return md, result.sidecar
 
 
@@ -138,7 +191,9 @@ def demo_c(session, rag, version: str, parent: tuple[Path, dict], nganh: str) ->
     result = generators.generate_business_report(
         session, rag, nganh,
         md_path.read_text(encoding="utf-8"), sidecar, version)
-    _ghi("c_doanh_nghiep", result)
+    from src.obsidian.vsic import VSIC_LEVEL1
+    ten = next((n["ten_ngan"] for n in VSIC_LEVEL1 if n["ma"] == nganh), nganh)
+    _ghi("c_doanh_nghiep", "c", f"{nganh} · {ten}", result)
 
 
 def main() -> None:
