@@ -13,6 +13,25 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 mkdir -p "$PROJECT_DIR/data/logs"
 cd "$PROJECT_DIR" || exit 1
 
+# Nạp .env vào môi trường SHELL.
+#
+# python-dotenv nạp .env cho tiến trình Python, nhưng script này tự đọc hai công
+# tắc CLOSURE_ENABLED và REPORT_WORKER_ENABLED bằng cú pháp ${VAR:-false} — mà
+# launchd chạy với môi trường trống, nên chúng luôn rỗng và hai bước đó bị bỏ
+# qua ÂM THẦM: script vẫn chạy hết, vẫn thoát mã 0, vẫn ghi "Pipeline xong".
+#
+# Chỉ lấy dòng KEY=VALUE, bỏ chú thích và dòng trống. Không dùng `source` trần:
+# .env chứa giá trị có dấu cách và ký tự đặc biệt (khoá API, tên thư mục tiếng
+# Việt), source sẽ diễn giải chúng như lệnh.
+if [ -f "$PROJECT_DIR/.env" ]; then
+    while IFS= read -r line; do
+        case "$line" in
+            ''|'#'*) continue ;;
+            *=*) export "${line%%=*}"="${line#*=}" ;;
+        esac
+    done < "$PROJECT_DIR/.env"
+fi
+
 if [ -x ".venv/bin/python" ]; then
     PY=".venv/bin/python"
 else

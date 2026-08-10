@@ -12,6 +12,17 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 mkdir -p "$PROJECT_DIR/data/logs"
 cd "$PROJECT_DIR" || exit 1
 
+# launchd chạy với môi trường trống. python-dotenv lo phần Python, nhưng nạp ở
+# đây cho nhất quán với run_daily.sh và để các lệnh shell về sau dùng được.
+if [ -f "$PROJECT_DIR/.env" ]; then
+    while IFS= read -r line; do
+        case "$line" in
+            ''|'#'*) continue ;;
+            *=*) export "${line%%=*}"="${line#*=}" ;;
+        esac
+    done < "$PROJECT_DIR/.env"
+fi
+
 if [ -x ".venv/bin/python" ]; then
     PY=".venv/bin/python"
 else
