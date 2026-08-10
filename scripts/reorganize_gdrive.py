@@ -44,6 +44,85 @@ def cha_theo_con(cache: dict[str, str]) -> dict[str, str]:
     return out
 
 
+def _co_con(service, folder_id: str) -> bool:
+    """Thư mục còn thứ gì bên trong không (kể cả file, không chỉ thư mục)?"""
+    r = gdrive._retry_api_call(
+        lambda: service.files().list(
+            q=f"'{gdrive._escape_query_value(folder_id)}' in parents and trashed=false",
+            fields="files(id)", pageSize=1,
+        ).execute()
+    )
+    return bool(r.get("files"))
+
+
+def don_thu_muc_rong(service, dry_run: bool) -> dict:
+    """Đưa các nhánh gốc cũ đã rỗng vào thùng rác sau khi chuyển.
+
+    Sau khi chuyển hết thư mục văn bản, 203 nhánh lĩnh vực cũ chỉ còn khung
+    Năm/Tháng rỗng. Để lại thì cây gốc vẫn 230 nhánh, tức việc sắp xếp lại
+    không giải quyết đúng thứ nó sinh ra để giải quyết.
+
+    Duyệt từ trong ra: xoá Tháng rỗng trước, rồi Năm, rồi Lĩnh vực. Chỉ xoá khi
+    ĐÃ KIỂM là rỗng — thư mục còn nội dung nghĩa là còn văn bản chưa chuyển, và
+    xoá nó là mất dữ liệu thật.
+    """
+    goc = gdrive.ensure_root_folder()
+    stats = {"xet": 0, "xoa": 0, "con_noi_dung": 0, "loi": 0}
+
+    def liet_ke(cha: str) -> list[dict]:
+        ds, tok = [], None
+        while True:
+            r = gdrive._retry_api_call(
+                lambda: service.files().list(
+                    q=(f"'{gdrive._escape_query_value(cha)}' in parents and "
+                       f"mimeType='application/vnd.google-apps.folder' and trashed=false"),
+                    fields="nextPageToken,files(id,name)", pageSize=1000,
+                    pageToken=tok,
+                ).execute()
+            )
+            ds += r.get("files", [])
+            tok = r.get("nextPageToken")
+            if not tok:
+                return ds
+
+    def xoa_neu_rong(fid: str, ten: str, muc: int) -> bool:
+        """Trả True nếu đã xoá. Đệ quy trước để xoá từ trong ra."""
+        for con in liet_ke(fid):
+            xoa_neu_rong(con["id"], con["name"], muc + 1)
+        stats["xet"] += 1
+        if _co_con(service, fid):
+            if muc == 1:
+                stats["con_noi_dung"] += 1
+            return False
+        if dry_run:
+            stats["xoa"] += 1
+            return True
+        try:
+            # ĐƯA VÀO THÙNG RÁC, không files().delete(). delete() xoá vĩnh viễn
+            # ngay lập tức; thùng rác giữ 30 ngày nên một phán đoán sai về
+            # "rỗng" còn cứu lại được. Đây là dữ liệu trên Drive của người dùng,
+            # không phải file tạm của hệ thống.
+            gdrive._retry_api_call(
+                lambda: service.files().update(
+                    fileId=fid, body={"trashed": True}, fields="id",
+                ).execute()
+            )
+            stats["xoa"] += 1
+            return True
+        except Exception as e:
+            stats["loi"] += 1
+            logger.warning("Không dọn được %s: %s", ten, e)
+            return False
+
+    for nhanh in liet_ke(goc):
+        # Nhánh mới có mã hai chữ số ở đầu — tuyệt đối không đụng vào.
+        if nhanh["name"][:2].isdigit():
+            continue
+        xoa_neu_rong(nhanh["id"], nhanh["name"], 1)
+
+    return stats
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     ap = argparse.ArgumentParser(description=__doc__)
@@ -57,6 +136,17 @@ def main() -> None:
     service = gdrive._get_service()
     if not service:
         print("Chưa cấu hình Google Drive.")
+        return
+
+    if args.don_thu_muc_rong:
+        print("\n=== Dọn nhánh gốc cũ đã rỗng ==="
+              + ("  (DRY RUN)" if args.dry_run else ""))
+        st = don_thu_muc_rong(service, args.dry_run)
+        for k in ("xet", "xoa", "con_noi_dung", "loi"):
+            print(f"  {k:16} {st[k]}")
+        if st["con_noi_dung"]:
+            print(f"\n  {st['con_noi_dung']} nhánh CÒN NỘI DUNG — không xoá. "
+                  f"Chạy lại phần chuyển trước.")
         return
 
     cache = dict(gdrive._folder_cache)

@@ -13,6 +13,7 @@ dependencies = [
     "python-telegram-bot>=21.0",
     "google-api-python-client>=2.150",
     "google-auth>=2.35",
+    "google-auth-oauthlib>=1.2",
     "python-dotenv>=1.0",
     "structlog>=24.0",
     # Kết xuất báo cáo PDF — pdf_exporter và report_pdf phụ thuộc trực tiếp,
