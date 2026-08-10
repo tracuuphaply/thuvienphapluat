@@ -123,19 +123,84 @@ def don_thu_muc_rong(service, dry_run: bool) -> dict:
     return stats
 
 
+TEN_KHO_CU = "00. Nhánh cũ — xoá tay được"
+
+
+def gom_nhanh_cu(service, dry_run: bool) -> dict:
+    """Gom các nhánh cũ không dọn được vào MỘT thư mục.
+
+    Phạm vi `drive.file` cho ứng dụng đụng vào file do chính nó tạo. Thư mục
+    lĩnh vực cũ do ứng dụng tạo nên DI CHUYỂN được, nhưng ĐƯA VÀO THÙNG RÁC thì
+    không: Drive đòi quyền trên toàn bộ con, mà một số con nằm ngoài phạm vi
+    (403 appNotAuthorizedToChild). `capabilities.canTrash` báo True vì nó nói về
+    quyền của NGƯỜI DÙNG, không phải của ứng dụng.
+
+    Không xoá được thì ít nhất đừng để chúng rải khắp gốc. Gom lại một chỗ để
+    người dùng xoá một lần bằng giao diện Drive — quyền của họ cao hơn nên
+    không vướng.
+    """
+    goc = gdrive.ensure_root_folder()
+    r = gdrive._retry_api_call(
+        lambda: service.files().list(
+            q=(f"'{gdrive._escape_query_value(goc)}' in parents and "
+               f"mimeType='application/vnd.google-apps.folder' and trashed=false"),
+            fields="files(id,name)", pageSize=1000,
+        ).execute()
+    )
+    cu = [f for f in r.get("files", [])
+          if not f["name"][:2].isdigit() and f["name"] != TEN_KHO_CU]
+
+    stats = {"tim_thay": len(cu), "gom": 0, "loi": 0}
+    if not cu or dry_run:
+        return stats
+
+    kho = gdrive.ensure_folder(goc, TEN_KHO_CU)
+    if not kho:
+        stats["loi"] = len(cu)
+        return stats
+
+    for f in cu:
+        try:
+            gdrive._retry_api_call(
+                lambda: service.files().update(
+                    fileId=f["id"], addParents=kho, removeParents=goc,
+                    fields="id",
+                ).execute()
+            )
+            stats["gom"] += 1
+        except Exception as e:
+            stats["loi"] += 1
+            logger.warning("Không gom được %s: %s", f["name"], e)
+    return stats
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--don-thu-muc-rong", action="store_true",
-                    help="Sau khi chuyển, xoá các thư mục lĩnh vực cũ đã rỗng")
+                    help="Sau khi chuyển, dọn các thư mục lĩnh vực cũ đã rỗng")
+    ap.add_argument("--gom-nhanh-cu", action="store_true",
+                    help="Gom nhánh cũ không dọn được vào một thư mục")
     args = ap.parse_args()
 
     init_db()
     service = gdrive._get_service()
     if not service:
         print("Chưa cấu hình Google Drive.")
+        return
+
+    if args.gom_nhanh_cu:
+        print("\n=== Gom nhánh cũ còn sót ==="
+              + ("  (DRY RUN)" if args.dry_run else ""))
+        st = gom_nhanh_cu(service, args.dry_run)
+        for k in ("tim_thay", "gom", "loi"):
+            print(f"  {k:12} {st[k]}")
+        if st["gom"]:
+            print(f"\n  Đã gom vào \"{TEN_KHO_CU}\". Xoá thư mục đó bằng giao "
+                  f"diện Drive — quyền của bạn cao hơn quyền ứng dụng nên không "
+                  f"vướng 403.")
         return
 
     if args.don_thu_muc_rong:

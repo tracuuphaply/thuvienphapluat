@@ -581,3 +581,59 @@ class TestGoKhoiMaBocBaoCao:
     @pytest.mark.parametrize("text", ["", "   ", None])
     def test_dau_vao_rong_khong_no(self, text):
         assert self._strip(text) == text
+
+
+class TestDanhSachSoHieuHopLe:
+    """Danh sách số hiệu phải nổi bật, không chìm trong JSON.
+
+    Đo được: báo cáo ngành Y tế dẫn "Luật số 51/2024/QH15" và "Nghị quyết
+    66.18/2026/NQ-CP" — cả hai không có trong ngữ cảnh, mô hình lấy từ kiến
+    thức nền. Ngữ cảnh lúc đó KHÔNG mỏng (22 văn bản, ngang ngành chạy trót
+    lọt), nên nguyên nhân là danh sách khó thấy giữa 22 bản ghi × 15 trường.
+    """
+
+    def _payload(self):
+        return {
+            "danh_sach_van_ban": [{"doc_num": "292/2026/NĐ-CP"},
+                                  {"doc_num": "83/2015/QH13"}],
+            "van_ban_bi_tac_dong": [{"doc_num": "63/2024/NĐ-CP"}],
+        }
+
+    def test_liet_ke_ca_van_ban_moi_va_van_ban_bi_tac_dong(self):
+        from src.rag.reports.generators import _danh_sach_so_hieu
+
+        out = _danh_sach_so_hieu(self._payload())
+        for n in ("292/2026/NĐ-CP", "83/2015/QH13", "63/2024/NĐ-CP"):
+            assert n in out
+        assert "3 văn bản" in out
+
+    def test_khong_trung_lap_va_sap_xep_on_dinh(self):
+        from src.rag.reports.generators import _danh_sach_so_hieu
+
+        p = {"danh_sach_van_ban": [{"doc_num": "A"}, {"doc_num": "A"}],
+             "van_ban_bi_tac_dong": [{"doc_num": "A"}]}
+        assert _danh_sach_so_hieu(p).count("  A\n") == 1
+
+    def test_rong_thi_khong_chen_khoi_thua(self):
+        from src.rag.reports.generators import _danh_sach_so_hieu
+
+        assert _danh_sach_so_hieu({}) == ""
+
+    def test_noi_ro_phai_sao_chep_nguyen_van(self):
+        """Lỗi đã gặp là BÓP MÉO số hiệu ("66.18/2026/NQ-CP"), không phải bịa
+        hoàn toàn — nên chỉ dẫn phải cấm ghép và rút gọn.
+        """
+        from src.rag.reports.generators import _danh_sach_so_hieu
+
+        out = _danh_sach_so_hieu(self._payload())
+        assert "NGUYÊN VĂN" in out
+        assert "Không ghép" in out
+
+    def test_co_trong_message_gui_mo_hinh(self):
+        from src.rag.reports.generators import _user_message
+
+        msg = _user_message({"NGANH": "K"}, self._payload(), ["ghi chú"])
+        assert "DANH SÁCH SỐ HIỆU ĐƯỢC PHÉP TRÍCH DẪN" in msg
+        # Phải nằm SAU khối JSON và TRƯỚC phần lưu ý — chỗ mô hình đọc cuối.
+        assert msg.index("DANH SÁCH SỐ HIỆU") > msg.index("DỮ LIỆU THỰC TẾ")
+        assert msg.index("DANH SÁCH SỐ HIỆU") < msg.index("LƯU Ý QUAN TRỌNG")

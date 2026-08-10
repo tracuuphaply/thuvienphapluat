@@ -67,12 +67,39 @@ def _header(lines: dict[str, str]) -> str:
     return "\n".join(f"{k.ljust(width)} : {v}" for k, v in lines.items())
 
 
+def _danh_sach_so_hieu(payload: dict[str, Any]) -> str:
+    """Danh sách phẳng các số hiệu được phép trích dẫn.
+
+    Số hiệu đã có trong `danh_sach_van_ban`, nhưng ở đó chúng nằm chìm giữa 22
+    bản ghi × 15 trường JSON. Đo được hậu quả: báo cáo ngành Y tế dẫn "Luật số
+    51/2024/QH15" và "Nghị quyết 66.18/2026/NQ-CP" — cả hai không có trong ngữ
+    cảnh, mô hình lấy từ kiến thức nền. Ngữ cảnh lúc đó KHÔNG mỏng (22 văn bản,
+    ngang với ngành chạy trót lọt), nên nguyên nhân là danh sách khó thấy chứ
+    không phải thiếu dữ liệu.
+
+    Một danh sách phẳng đặt ngay cạnh chỉ dẫn khó bỏ qua hơn hẳn.
+    """
+    nums = [d.get("doc_num") for d in payload.get("danh_sach_van_ban") or []]
+    nums += [d.get("doc_num") for d in payload.get("van_ban_bi_tac_dong") or []]
+    nums = sorted({n for n in nums if n})
+    if not nums:
+        return ""
+    return (
+        "\n=== DANH SÁCH SỐ HIỆU ĐƯỢC PHÉP TRÍCH DẪN ({} văn bản) ===\n"
+        "Mọi số hiệu trong báo cáo PHẢI nằm trong danh sách này, sao chép "
+        "NGUYÊN VĂN. Không ghép, không rút gọn, không thêm tiền tố.\n"
+        "Cần một văn bản không có ở đây thì ghi vào phần hạn chế dữ liệu, "
+        "KHÔNG được viết số hiệu của nó ra.\n\n{}\n"
+    ).format(len(nums), "\n".join(f"  {n}" for n in nums))
+
+
 def _user_message(header: dict[str, str], payload: dict[str, Any],
                   notes: list[str]) -> str:
     return (
         _header(header)
         + "\n\n=== DỮ LIỆU THỰC TẾ TRÍCH XUẤT TỪ CƠ SỞ DỮ LIỆU PHÁP LUẬT ===\n"
         + json.dumps(payload, ensure_ascii=False, indent=2)
+        + _danh_sach_so_hieu(payload)
         + "\n\nLƯU Ý QUAN TRỌNG:\n"
         + "\n".join(f"{i}. {n}" for i, n in enumerate(notes, 1))
     )

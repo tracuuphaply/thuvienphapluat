@@ -429,9 +429,21 @@ class TestVectorSearchThucTe:
         if not embedder.api_key:
             pytest.skip("chưa cấu hình khoá API nhúng")
 
+        q = "doanh nghiệp phải làm gì khi muốn tạm ngừng kinh doanh"
+
+        # Nhúng TRƯỚC và tách bạch hai nguyên nhân thất bại. Nhúng được mà tầng
+        # vector vẫn rỗng là lỗi thật của hệ thống; không nhúng được là sự cố
+        # của dịch vụ bên ngoài. Gộp chúng lại thì test đỏ mỗi lần gateway trả
+        # 502 — đã xảy ra — và người đọc kết quả không biết nên sửa cái gì.
+        try:
+            vec = embedder.embed_texts([q])
+        except Exception as e:
+            pytest.skip(f"API nhúng không phản hồi: {type(e).__name__}: {e}")
+        if not vec or not vec[0]:
+            pytest.skip("API nhúng trả rỗng — sự cố dịch vụ, không phải lỗi kho")
+
         db = RAGDatabase()
         try:
-            q = "doanh nghiệp phải làm gì khi muốn tạm ngừng kinh doanh"
             ket_qua = hybrid_search(db, query=q, limit=5, embedder=embedder)
             assert ket_qua, "hybrid search không trả về gì"
             assert any(r.vec_rank is not None for r in ket_qua), \

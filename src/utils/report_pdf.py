@@ -38,21 +38,75 @@ _MARGIN = 54
 _CONTENT_W = _PAGE_W - 2 * _MARGIN
 
 
+# Bộ font ứng viên, xếp theo thứ tự ưu tiên. Mỗi mục là (thường, đậm, nghiêng).
+#
+# BẮT BUỘC phủ được chữ Việt có dấu. Font mặc định của ReportLab (Helvetica) chỉ
+# có Latin-1 nên "Nghị định" ra "Ngh nh" — mất chữ mà không báo lỗi, đúng kiểu
+# hỏng tệ nhất với một báo cáo pháp lý.
+_UNG_VIEN: tuple[tuple[str, str, str], ...] = (
+    # macOS
+    ("/System/Library/Fonts/Supplemental/Arial.ttf",
+     "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+     "/System/Library/Fonts/Supplemental/Arial Italic.ttf"),
+    # Windows
+    (r"C:\Windows\Fonts\arial.ttf",
+     r"C:\Windows\Fonts\arialbd.ttf",
+     r"C:\Windows\Fonts\ariali.ttf"),
+    (r"C:\Windows\Fonts\segoeui.ttf",
+     r"C:\Windows\Fonts\segoeuib.ttf",
+     r"C:\Windows\Fonts\segoeuii.ttf"),
+    # Linux — DejaVu có trong hầu hết bản phân phối và phủ đủ chữ Việt
+    ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf"),
+    ("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+     "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+     "/usr/share/fonts/truetype/liberation/LiberationSans-Italic.ttf"),
+)
+
+
+class FontKhongTimThay(RuntimeError):
+    """Không có font nào phủ được chữ Việt trên máy này."""
+
+
+def _bo_font_dung_duoc() -> tuple[str, str, str] | None:
+    for bo in _UNG_VIEN:
+        if Path(bo[0]).exists():
+            # Thiếu bản đậm/nghiêng thì dùng bản thường thay — xấu hơn nhưng
+            # vẫn đọc được, còn hơn không dựng được PDF.
+            return tuple(p if Path(p).exists() else bo[0] for p in bo)  # type: ignore[return-value]
+    return None
+
+
+_da_dang_ky = False
+
+
 def _register_fonts() -> None:
-    base = "/System/Library/Fonts/Supplemental"
-    for name, file in (
-        (FONT, "Arial.ttf"),
-        (FONT_B, "Arial Bold.ttf"),
-        (FONT_I, "Arial Italic.ttf"),
-    ):
-        try:
-            pdfmetrics.registerFont(TTFont(name, f"{base}/{file}"))
-        except Exception:
-            pdfmetrics.registerFont(TTFont(name, f"{base}/Arial.ttf"))
+    """Đăng ký font, gọi lúc DỰNG chứ không lúc import.
+
+    Bản trước hardcode đường dẫn macOS và gọi ngay ở cấp module — nhánh dự phòng
+    cũng trỏ vào chính đường dẫn đó, nên trên Windows/Linux cả hai lần đều hỏng
+    và lỗi thoát ra khỏi hàm. Hệ quả không phải "PDF hỏng" mà là `import
+    report_pdf` chết, kéo theo mọi thứ import nó — kể cả những đường không dựng
+    PDF.
+    """
+    global _da_dang_ky
+    if _da_dang_ky:
+        return
+
+    bo = _bo_font_dung_duoc()
+    if not bo:
+        raise FontKhongTimThay(
+            "Không tìm thấy font phủ chữ Việt. Đã thử: "
+            + ", ".join(b[0] for b in _UNG_VIEN)
+            + ". Cài một trong số đó (Linux: apt install fonts-dejavu-core) "
+            "hoặc đặt đường dẫn khác vào src/utils/report_pdf.py:_UNG_VIEN."
+        )
+
+    for ten, duong_dan in zip((FONT, FONT_B, FONT_I), bo):
+        pdfmetrics.registerFont(TTFont(ten, duong_dan))
     pdfmetrics.registerFontFamily(FONT, normal=FONT, bold=FONT_B, italic=FONT_I)
-
-
-_register_fonts()
+    _da_dang_ky = True
 
 
 DEFAULT_LOGO = Path(__file__).resolve().parents[2] / "assets" / "logo_thongtincty.png"
@@ -450,6 +504,9 @@ def build_report_pdf(md_text: str, out_path: Path, meta: ReportMeta) -> Path:
     """Dựng PDF hoàn chỉnh: bìa + nội dung + biểu đồ."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    # Đăng ký font ở đây, không ở cấp module: máy thiếu font thì lỗi phải nổ ra
+    # đúng lúc dựng PDF, chứ không làm chết cả việc import module.
+    _register_fonts()
     st = _styles()
 
     doc = BaseDocTemplate(
