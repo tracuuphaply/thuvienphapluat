@@ -362,6 +362,24 @@ def _m010_report_jobs(conn: Connection) -> None:
     ))
 
 
+def _m011_tvpl_field(conn: Connection) -> None:
+    """Lĩnh vực theo danh mục Thư viện Pháp luật, kèm nguồn của phân loại.
+
+    Không ghi đè `field_code`: cột đó giữ mã do CHÍNH TVPL gán (1.448 văn bản),
+    là dữ kiện. `tvpl_field_code` là kết quả đã giải quyết cho mọi văn bản, có
+    thể đến từ suy đoán — nên `tvpl_field_source` đi kèm để phân biệt. Gộp hai
+    thứ vào một cột thì về sau không ai biết đâu là dữ kiện, đâu là suy đoán.
+    """
+    _add_columns(conn, "documents", [
+        ("tvpl_field_code", "INTEGER"),
+        ("tvpl_field_source", "VARCHAR(20)"),
+    ])
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS idx_documents_tvpl_field "
+        "ON documents(tvpl_field_code)"
+    ))
+
+
 MIGRATIONS: list[Migration] = [
     Migration("001_legacy_document_columns",
               "Các cột documents từng thêm bằng vòng lặp hardcode",
@@ -393,6 +411,9 @@ MIGRATIONS: list[Migration] = [
     Migration("010_report_jobs",
               "Hàng đợi sinh báo cáo với cơ chế gộp chống ngập",
               _m010_report_jobs),
+    Migration("011_tvpl_field",
+              "Lĩnh vực theo danh mục TVPL (27 nhóm) kèm nguồn phân loại",
+              _m011_tvpl_field),
 ]
 
 

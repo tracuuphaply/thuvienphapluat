@@ -62,7 +62,13 @@ class Document(Base):
     agency_name = Column(String(255), comment="Cơ quan ban hành")
     signer = Column(String(255), comment="Người ký")
     field_name = Column(String(100), comment="Lĩnh vực")
-    field_code = Column(Integer, comment="Mã lĩnh vực TVPL")
+    field_code = Column(Integer, comment="Mã lĩnh vực TVPL, chỉ có khi TVPL gán")
+    # Lĩnh vực TVPL đã giải quyết cho MỌI văn bản. Tách khỏi field_code vì cột
+    # kia là dữ kiện còn cột này một phần là suy đoán — tvpl_field_source nói
+    # rõ đến từ đâu, để không ai đọc suy đoán như dữ kiện.
+    tvpl_field_code = Column(Integer, comment="Mã lĩnh vực TVPL 1-27, luôn có")
+    tvpl_field_source = Column(
+        String(20), comment="tvpl | moj_map | tu_khoa | khac")
 
     # Source flags
     source_tvpl = Column(Boolean, default=False)

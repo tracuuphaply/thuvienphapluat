@@ -385,15 +385,57 @@ def _year_month(doc_data: dict[str, Any]) -> tuple[str, str]:
     return "Chua_Phan_Loai", "Chua_Phan_Loai"
 
 
+def linh_vuc_thu_muc(doc_data: dict[str, Any]) -> str:
+    """Tên thư mục cấp 1: lĩnh vực theo danh mục Thư viện Pháp luật.
+
+    KHÔNG dùng `field_name` của Bộ Tư pháp. Trường đó là văn bản tự do: 4.466
+    văn bản rơi vào 203 giá trị, trong đó 75 giá trị chỉ có ĐÚNG MỘT văn bản —
+    cây thư mục thành 203 nhánh gốc, phần lớn chứa một file, và số nhánh còn
+    tăng theo mỗi văn bản mới.
+
+    Danh mục TVPL là tập đóng 27 nhóm nên cây có biên cố định, và đó cũng là
+    phân loại người dùng Việt Nam quen tra cứu.
+    """
+    from src.legal.field_mapper import phan_loai
+    from src.legal.tvpl_fields import thu_muc
+
+    ma = doc_data.get("tvpl_field_code")
+    if not ma:
+        ma = phan_loai(doc_data.get("field_code"),
+                       doc_data.get("field_name"),
+                       doc_data.get("title")).ma
+    return thu_muc(ma)
+
+
+def ensure_folder_path_parent(doc_data: dict[str, Any]) -> str | None:
+    """Thư mục CHA của văn bản: Gốc / Lĩnh vực TVPL / Năm / Tháng_MM.
+
+    Tách khỏi ensure_folder_path để việc sắp xếp lại cây chỉ cần đổi cha của
+    thư mục văn bản, không phải tạo lại thư mục lá — id thư mục lá đang được
+    tham chiếu ở documents.gdrive_folder_id.
+    """
+    root = ensure_root_folder()
+    if not root:
+        return None
+
+    year, month = _year_month(doc_data)
+    folder_id = root
+    for part in (_safe_name(linh_vuc_thu_muc(doc_data)), year, month):
+        folder_id = ensure_folder(folder_id, part)
+        if not folder_id:
+            return None
+    return folder_id
+
+
 def ensure_folder_path(doc_data: dict[str, Any]) -> str | None:
-    """Thư mục lá cho một văn bản: Gốc / Lĩnh vực / Năm / Tháng_MM / Số hiệu."""
+    """Thư mục lá cho một văn bản: Gốc / Lĩnh vực TVPL / Năm / Tháng_MM / Số hiệu."""
     root = ensure_root_folder()
     if not root:
         return None
 
     year, month = _year_month(doc_data)
     parts = [
-        _safe_name(doc_data.get("field_name") or "Chua_Phan_Loai"),
+        _safe_name(linh_vuc_thu_muc(doc_data)),
         year,
         month,
         _safe_name(doc_data.get("doc_num") or "Khong_so"),
