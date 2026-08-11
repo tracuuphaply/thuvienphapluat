@@ -46,12 +46,23 @@ def slugify_doc_num(doc_num: str) -> str:
 
     Bỏ dấu tiếng Việt thay vì giữ nguyên như sanitize_filename() của vault: URL
     có dấu bị mã hoá percent thành chuỗi không đọc nổi khi dán vào báo cáo.
+
+    CHỮ THƯỜNG, vì Quartz hạ chữ thường mọi đường dẫn nó phát ra còn GitHub
+    Pages thì phân biệt hoa/thường. Giữ slug dạng hoa nghĩa là mọi link trong
+    phụ lục PDF trỏ tới 404 — đúng thứ file này nói là tệ hơn không có link.
+    Hạ ở đây chứ không ở public_url() để slug BẰNG ĐÚNG đường dẫn URL: khi đó
+    ràng buộc duy nhất trên cột public_slug chính là bảo đảm URL không đụng
+    nhau, thay vì phải hy vọng hai slug khác nhau không cùng ra một URL.
+
+    Hạ chữ thường không phá phép mã hoá Đ → DD ở trên: "NĐ-CP" ra "ndd-cp" còn
+    "ND-CP" ra "nd-cp", vẫn phân biệt được vì khác nhau ở độ dài, không ở kiểu
+    chữ. Đã kiểm trên 4.467 slug thật: 0 va chạm sau khi hạ.
     """
     text = (doc_num or "").strip().translate(_DIACRITIC_MAP)
     text = unicodedata.normalize("NFKD", text)
     text = "".join(c for c in text if not unicodedata.combining(c))
     text = re.sub(r"[^A-Za-z0-9]+", "-", text)
-    return text.strip("-")
+    return text.strip("-").lower()
 
 
 # Dạng chuẩn của số hiệu Việt Nam: "292/2026/NĐ-CP", "47/2013/TT-BNNPTNT".

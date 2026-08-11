@@ -81,10 +81,12 @@ def main() -> None:
     for k, v in stats.as_dict().items():
         print(f"  {k:16} {v}")
     print(f"\nNội dung đã sẵn ở: {out_dir}")
-    print("Bước tiếp theo (người vận hành làm):")
-    print("  1. Tạo repo CÔNG KHAI riêng, ví dụ legal-vault-public")
-    print("  2. Cài Quartz v4 vào repo đó, chép thư mục content/ này vào")
-    print("  3. Bật GitHub Pages, đặt PUBLIC_VAULT_BASE_URL trong .env")
+    print("Đưa lên trang công khai:")
+    print("  cp -r %s/content ~/Downloads/legal-vault-public/" % out_dir)
+    print("  cd ~/Downloads/legal-vault-public && git add -A "
+          "&& git commit -m 'Cập nhật nội dung' && git push")
+    print("\nGitHub Actions tự dựng lại trang. Xem docs/VIEC_CAN_BAN_LAM.md "
+          "nếu cần dựng repo từ đầu.")
 
 
 if __name__ == "__main__":

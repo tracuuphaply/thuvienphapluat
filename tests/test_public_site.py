@@ -136,6 +136,34 @@ class TestVanBanNguCanh:
             "văn bản ngữ cảnh chôn mất phần cần đọc trong chỉ mục"
         )
 
+    def test_bang_hieu_luc_cong_dung_bang_con_so_neu_ra(self, master_session, tmp_path):
+        """Trang chủ nêu một con số rồi bày bảng — hai thứ phải là cùng một tập.
+
+        Bản trước đếm `docs` cho dòng tổng nhưng truy vấn lại toàn bộ kho cho
+        bảng, nên trang chủ ghi "946 văn bản" trên một bảng cộng ra 4.201.
+        Người đọc không có cách nào biết đó là hai tập khác nhau.
+        """
+        import datetime
+        import re
+
+        from src.publish import moc_static
+
+        for i, (num, nen) in enumerate([("01/2026/NĐ-CP", False),
+                                        ("03/2026/NĐ-CP", False),
+                                        ("02/2020/NĐ-CP", True)]):
+            upsert_document(master_session, {
+                "doc_num": num, "title": f"Nghị định {i}", "agency_name": "Chính phủ",
+                "moj_id": str(20 + i), "is_closure_node": nen,
+                "issue_date": datetime.date(2026, 1, 5)})
+        master_session.commit()
+
+        moc_static.export_indexes(master_session, tmp_path, "v-test")
+        home = (tmp_path / "index.md").read_text(encoding="utf-8")
+
+        neu_ra = int(re.search(r"\*\*(\d+)\*\* văn bản trong danh mục", home).group(1))
+        tong_bang = sum(int(m) for m in re.findall(r"\|\s*(\d+)\s*\|", home))
+        assert tong_bang == neu_ra, home
+
 
 class TestPhanGiaiWikilink:
     def test_so_hieu_duy_nhat_thi_phan_giai_duoc(self, kho):
@@ -168,7 +196,7 @@ class TestLinkVeTrangCongKhai:
         doc.published_hash = "abc"
         kho.commit()
         url = links.resolve_links(kho, ["135/2025/QH15"])["135/2025/QH15"]
-        assert url == "https://x.io/v/van-ban/135-2025-QH15"
+        assert url == "https://x.io/v/van-ban/135-2025-qh15"
 
     def test_so_hieu_bia_khong_bao_gio_ra_link(self, kho, monkeypatch):
         """URL do mô hình sinh là URL bịa — ở đây code tra bảng nên bịa là
@@ -204,3 +232,48 @@ class TestChiDangVanBanQPPL:
         second = site_exporter.export_documents(kho, tmp_path, version_tag())
         assert first.written > 0
         assert second.written == 0 and second.unchanged == first.written
+
+
+# ──────────────────────────────────────────────
+# Dọn trang mồ côi
+# ──────────────────────────────────────────────
+
+class TestDonTrangMoCoi:
+    def test_xoa_trang_khong_con_van_ban_tuong_ung(self, tmp_path):
+        """Slug đổi hoặc văn bản thôi đủ điều kiện đăng thì trang cũ phải biến mất.
+
+        Đo trên kho thật lúc thêm hàm này: 593/4.793 file là trang mồ côi tích
+        lại qua các lần vá quy tắc tạo slug.
+        """
+        # Không lấy ca đổi-chữ-hoa làm ví dụ: macOS không phân biệt hoa/thường
+        # ở tên file nên "X.md" và "x.md" là cùng một file, đổi tên slug sang
+        # chữ thường không sinh ra file mồ côi nào trên máy này. Ca mồ côi thật
+        # là slug đổi hình dạng (vá quy tắc tạo slug) và văn bản bị phân loại
+        # lại thành không-phải-QPPL.
+        for ten in ("292-2026-ndd-cp", "292-2026-nd-cp--a1b2", "cu-khong-con"):
+            (tmp_path / f"{ten}.md").write_text("x", encoding="utf-8")
+
+        n = site_exporter.remove_orphan_pages(tmp_path, {"292-2026-ndd-cp"})
+
+        assert n == 2
+        assert (tmp_path / "292-2026-ndd-cp.md").exists()
+        assert not (tmp_path / "cu-khong-con.md").exists()
+
+    def test_tap_rong_thi_khong_xoa_gi(self, tmp_path):
+        """Tập slug hợp lệ rỗng nghĩa là lượt chạy vừa hỏng, không phải kho rỗng.
+
+        Xoá lúc đó là xoá sạch trang công khai vì một lỗi tạm thời.
+        """
+        (tmp_path / "292-2026-ndd-cp.md").write_text("x", encoding="utf-8")
+
+        assert site_exporter.remove_orphan_pages(tmp_path, set()) == 0
+        assert (tmp_path / "292-2026-ndd-cp.md").exists()
+
+    def test_khong_dung_toi_file_khac_dinh_dang(self, tmp_path):
+        """Ảnh và file phụ trợ trong thư mục không phải trang mồ côi."""
+        (tmp_path / "292-2026-ndd-cp.md").write_text("x", encoding="utf-8")
+        (tmp_path / "so-do.png").write_bytes(b"\x89PNG")
+
+        site_exporter.remove_orphan_pages(tmp_path, {"292-2026-ndd-cp"})
+
+        assert (tmp_path / "so-do.png").exists()

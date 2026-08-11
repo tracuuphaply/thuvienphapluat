@@ -44,9 +44,18 @@ DISCLAIMER = """> **Bản sao không chính thức.** Trang này là bản tríc
 > công bố trên hệ thống của cơ quan nhà nước — xem mục *Nguồn gốc* bên dưới.
 > Trang này không đăng toàn văn và không phải một dịch vụ cơ sở dữ liệu pháp luật."""
 
+# `created` và `modified` là hai trường Quartz đọc để hiện ngày dưới tiêu đề.
+# Không phát ra thì nó lùi về ngày commit git, rồi ngày sửa file — tức mọi trang
+# đều mang ngày crawler tình cờ ghi file. Trên trang tra cứu pháp luật, ngày
+# dưới tiêu đề mà không phải ngày ban hành là một dữ kiện sai, và người đọc
+# không có cách nào tự phát hiện.
+#
+# Cả hai cùng bằng ngày ban hành: văn bản QPPL không bị "sửa" theo nghĩa của
+# Quartz — nó bị văn bản khác sửa đổi, và quan hệ đó đã nằm ở phần dẫn chiếu.
+# Để `modified` trống thì Quartz lại rơi về git cho đúng trường đó.
 PAGE_TEMPLATE = """---
 title: "{doc_num} — {short_title}"
-doc_num: "{doc_num}"
+{khoi_ngay}doc_num: "{doc_num}"
 doc_type: "{doc_type}"
 hierarchy_level: {hierarchy_level}
 is_vbqppl: {is_vbqppl}
@@ -115,6 +124,7 @@ class PublishStats:
     unchanged: int = 0
     skipped_junk: int = 0
     mocs: int = 0
+    orphan_removed: int = 0
 
     def as_dict(self) -> dict:
         return dict(self.__dict__)
@@ -237,7 +247,14 @@ def render_page(session, doc: Document, impacts: list[dict],
     if state:
         tags.append(state.replace("_", "-"))
 
+    # Bỏ hẳn hai dòng khi không có ngày ban hành (18 văn bản), chứ không phát ra
+    # chuỗi rỗng: Quartz coi "" là ngày không hợp lệ và hiện "Invalid Date".
+    # Không có trường thì nó lùi về git, tức một ngày vô nghĩa nhưng đọc được.
+    khoi_ngay = (f'created: "{doc.issue_date}"\nmodified: "{doc.issue_date}"\n'
+                 if doc.issue_date else "")
+
     return PAGE_TEMPLATE.format(
+        khoi_ngay=khoi_ngay,
         is_context=bool(doc.is_closure_node),
         context_note=CONTEXT_NOTE if doc.is_closure_node else "",
         doc_num=doc.doc_num,
@@ -294,6 +311,10 @@ def export_documents(session, out_dir: Path, version: str,
     docs_dir = out_dir / "van-ban"
     docs_dir.mkdir(parents=True, exist_ok=True)
 
+    # Slug của mọi trang ĐÁNG LẼ phải có, để đối chiếu với những gì đang nằm
+    # trên đĩa. Xem chú thích ở remove_orphan_pages().
+    slug_hop_le: set[str] = set()
+
     slug_by_num = build_slug_index(session)
     impacts = impacts_by_doc(session, version)
 
@@ -308,6 +329,7 @@ def export_documents(session, out_dir: Path, version: str,
             stats.skipped_junk += 1
             continue
 
+        slug_hop_le.add(doc.public_slug)
         page = render_page(session, doc, impacts.get(doc.doc_key, []), slug_by_num)
         digest = content_hash(page)
         path = docs_dir / f"{doc.public_slug}.md"
@@ -320,4 +342,32 @@ def export_documents(session, out_dir: Path, version: str,
         doc.published_hash = digest
         stats.written += 1
 
+    stats.orphan_removed = remove_orphan_pages(docs_dir, slug_hop_le)
     return stats
+
+
+def remove_orphan_pages(docs_dir: Path, slug_hop_le: set[str]) -> int:
+    """Xoá trang không còn văn bản nào tương ứng.
+
+    Bộ đăng trang chỉ biết GHI, nên thư mục tích dần trang mồ côi từ hai nguồn:
+    văn bản đổi slug (mỗi lần vá quy tắc tạo slug là một lượt) và văn bản bị
+    phân loại lại thành không-phải-QPPL nên thôi đủ điều kiện đăng. Đo lúc viết
+    hàm này: 4.793 file trên đĩa cho 4.200 trang hợp lệ — 593 trang mồ côi.
+
+    Vì sao phải xoá chứ không mặc kệ: trang mồ côi vẫn nằm trên mạng dưới một
+    URL trông y hệt URL chính thức, mang dữ kiện pháp lý cũ, và không có gì trên
+    trang cho biết nó đã hết hạn. Đó tệ hơn hẳn một trang thiếu — người đọc
+    không thể tự phát hiện. Chúng cũng làm hỏng đồ thị: link tới slug cũ vẫn
+    phân giải được nên sơ đồ hiện hai nút cho cùng một văn bản.
+
+    Chỉ đụng tới `*.md` trong đúng thư mục van-ban, và chỉ khi tập slug hợp lệ
+    không rỗng — tập rỗng nghĩa là lượt chạy vừa hỏng, xoá lúc đó là xoá sạch.
+    """
+    if not slug_hop_le:
+        return 0
+    n = 0
+    for f in docs_dir.glob("*.md"):
+        if f.stem not in slug_hop_le:
+            f.unlink()
+            n += 1
+    return n

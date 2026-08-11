@@ -380,6 +380,40 @@ def _m011_tvpl_field(conn: Connection) -> None:
     ))
 
 
+def _m012_slug_chu_thuong(conn: Connection) -> None:
+    """Hạ chữ thường mọi public_slug đã có.
+
+    Quartz phát ra đường dẫn chữ thường, GitHub Pages phân biệt hoa/thường, nên
+    slug dạng hoa làm mọi link trong phụ lục PDF trỏ tới 404. Phải chạy TRƯỚC
+    khi trang công khai lên mạng: sau đó thì đổi slug là làm chết những URL đã
+    in ra giấy, mà yêu cầu số 1 của public_slug là ổn định vĩnh viễn.
+
+    DỪNG NẾU CÓ VA CHẠM. Cột có ràng buộc duy nhất phân biệt hoa/thường, nên
+    hai slug chỉ khác nhau kiểu chữ vẫn lọt vào được; hạ chúng xuống sẽ vi phạm
+    ràng buộc. Kiểm trước rồi báo lỗi rõ ràng còn hơn để UPDATE nổ giữa chừng
+    với một nửa số dòng đã đổi. (Đo trên kho thật lúc viết: 4.467 slug, 0 va
+    chạm.)
+    """
+    va = conn.execute(text(
+        "SELECT LOWER(public_slug) s, COUNT(*) n FROM documents "
+        "WHERE public_slug IS NOT NULL GROUP BY s HAVING n > 1"
+    )).fetchall()
+    if va:
+        vi_du = ", ".join(r[0] for r in va[:5])
+        raise RuntimeError(
+            f"{len(va)} slug đụng nhau sau khi hạ chữ thường: {vi_du}. "
+            f"Phải đặt lại slug cho các văn bản này trước khi chạy migration."
+        )
+    conn.execute(text(
+        "UPDATE documents SET public_slug = LOWER(public_slug) "
+        "WHERE public_slug IS NOT NULL AND public_slug <> LOWER(public_slug)"
+    ))
+    # published_hash về NULL: tên file trang công khai đổi theo slug, nên bản đã
+    # đăng dưới tên cũ coi như chưa đăng. Không xoá thì bộ đăng trang bỏ qua
+    # chúng vì hash nội dung không đổi, và link vẫn trỏ tới tên file cũ.
+    conn.execute(text("UPDATE documents SET published_hash = NULL"))
+
+
 MIGRATIONS: list[Migration] = [
     Migration("001_legacy_document_columns",
               "Các cột documents từng thêm bằng vòng lặp hardcode",
@@ -414,6 +448,9 @@ MIGRATIONS: list[Migration] = [
     Migration("011_tvpl_field",
               "Lĩnh vực theo danh mục TVPL (27 nhóm) kèm nguồn phân loại",
               _m011_tvpl_field),
+    Migration("012_slug_chu_thuong",
+              "Hạ chữ thường public_slug để khớp đường dẫn Quartz phát ra",
+              _m012_slug_chu_thuong),
 ]
 
 

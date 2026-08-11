@@ -19,6 +19,7 @@ from sqlalchemy import text
 from src.legal import effectivity
 from src.legal.provinces import province_name
 from src.obsidian.vsic import BY_CODE, VSIC_LEVEL1
+from src.publish import site_exporter
 from src.storage.models import Document
 
 logger = logging.getLogger(__name__)
@@ -68,6 +69,12 @@ def export_indexes(session, out_dir: Path, version: str) -> int:
         .order_by(Document.issue_date.desc())
         .all()
     )
+    # Bỏ số hiệu rác đúng như bên sinh trang. Bộ sinh trang bỏ chúng, chỉ mục
+    # thì không, nên trang chủ đếm dư một so với số trang thật sự tồn tại — và
+    # mục đó dẫn tới 404. "Không số" là chỗ dồn của mọi số hiệu không parse
+    # được, không phải một văn bản.
+    docs = [d for d in docs
+            if (d.doc_num or "").strip() not in site_exporter.JUNK_TARGETS]
     by_key = {d.doc_key: d for d in docs}
 
     # ── Theo ngành VSIC: lấy ngành đứng đầu của mỗi văn bản ──
@@ -144,10 +151,24 @@ def export_indexes(session, out_dir: Path, version: str) -> int:
 
 
 def _home_page(session, docs, by_industry, by_province, by_year) -> str:
-    state_counts = session.execute(text(
-        "SELECT eff_state, COUNT(*) n FROM documents WHERE is_vbqppl = 1 "
-        "GROUP BY eff_state ORDER BY n DESC"
-    )).mappings().all()
+    # Đếm NGAY TRÊN `docs` chứ không truy vấn lại. Bản trước hỏi SQL toàn bộ
+    # `is_vbqppl = 1` trong khi dòng ngay trên đó đếm `docs` — tức trang chủ ghi
+    # "946 văn bản" rồi bày một bảng cộng lại ra 4.201. Hai tập khác nhau trình
+    # bày như một, và người đọc không có cách nào biết. Dùng chung một tập là
+    # cách duy nhất khiến chúng không lệch được nữa.
+    dem: dict[str, int] = defaultdict(int)
+    for d in docs:
+        dem[d.eff_state or ""] += 1
+    state_counts = [{"eff_state": k, "n": v}
+                    for k, v in sorted(dem.items(), key=lambda kv: -kv[1])]
+
+    # Văn bản nền có trang riêng (để link dẫn chiếu không gãy) nhưng cố tình
+    # không nằm trong danh mục. Không nói ra thì tổng số trang trên trang web
+    # không khớp con số ở đây.
+    so_nen = session.execute(text(
+        "SELECT COUNT(*) FROM documents WHERE is_vbqppl = 1 "
+        "AND public_slug IS NOT NULL AND is_closure_node = 1"
+    )).scalar() or 0
 
     lines = [
         "# Kho văn bản pháp luật — tra cứu và kiểm chứng",
@@ -164,9 +185,13 @@ def _home_page(session, docs, by_industry, by_province, by_year) -> str:
         "",
         "## Kho hiện có",
         "",
-        f"- **{len(docs)}** văn bản quy phạm pháp luật",
+        f"- **{len(docs)}** văn bản trong danh mục tra cứu",
+        f"- **{so_nen}** văn bản nền — vào kho vì bị dẫn chiếu tới, có trang "
+        f"riêng nhưng không liệt kê ở các danh mục dưới đây",
         f"- **{len(by_province)}** địa bàn cấp tỉnh",
         f"- Năm ban hành: {min(by_year)}–{max(by_year)}" if by_year else "",
+        "",
+        f"Tình trạng hiệu lực của {len(docs)} văn bản trong danh mục:",
         "",
         "| Tình trạng hiệu lực | Số văn bản |",
         "|---|---:|",

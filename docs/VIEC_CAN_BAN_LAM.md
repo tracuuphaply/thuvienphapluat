@@ -18,7 +18,7 @@ thì cần bấm vào số hiệu và thấy văn bản gốc. Trang này là đ
 Hiện `PUBLIC_VAULT_BASE_URL` để trống nên **PDF không phát link nào** — có chủ ý:
 một báo cáo trỏ tới 404 làm người đọc nghi ngờ cả những phần đúng.
 
-Nội dung đã sinh sẵn: **4.879 trang, 27 MB**, nằm ở `build/public-vault/content`.
+Nội dung đã sinh sẵn: **4.286 trang, 17 MB**, nằm ở `build/public-vault/content` — và đã chép sẵn sang repo công khai.
 
 ### Vì sao phải là repo RIÊNG
 
@@ -39,59 +39,61 @@ Repo riêng chỉ chứa nội dung sinh ra thì không có gì để rò.
 Vào github.com → New repository → tên `legal-vault-public` → chọn **Public** →
 không tích thêm README/`.gitignore` gì cả.
 
-**2. Dựng repo trên máy**
+**2–6. Đã làm sẵn cho bạn**
+
+Repo đã dựng xong ở `~/Downloads/legal-vault-public`, đã commit, đã nối remote
+tới `minhle2412/legal-vault-public`. Bạn chỉ cần đẩy lên:
+
+```bash
+cd ~/Downloads/legal-vault-public && git push -u origin main
+```
+
+Repo lúc này gồm 4.442 file: 4.286 trang nội dung (4.200 trang văn bản + 86
+trang chỉ mục) và phần khung Quartz. `node_modules` và `public` đã được bỏ qua.
+
+<details>
+<summary>Nếu cần dựng lại từ đầu (đã làm rồi, ghi lại để tham chiếu)</summary>
 
 ```bash
 cd ~/Downloads
 git clone https://github.com/jackyzha0/quartz.git legal-vault-public
-cd legal-vault-public
-rm -rf .git && git init
-npm install
-```
+cd legal-vault-public && rm -rf .git && git init && npm install
 
-**3. Chép nội dung đã sinh sẵn vào**
-
-```bash
 DU=~/Downloads/thuvienphapluat/build/public-vault
-rm -rf content
-cp -r "$DU/content" .
-cp "$DU/quartz.config.ts" .
+rm -rf content && cp -r "$DU/content" .
+cp "$DU/quartz.config.yaml" .          # v5 dùng YAML
 mkdir -p .github/workflows
+rm -f .github/workflows/*.yaml         # gỡ workflow của chính dự án Quartz
 cp "$DU/.github/workflows/build.yml" .github/workflows/
 ```
 
-**4. Sửa một dòng trong `quartz.config.ts`**
+**Quartz đã lên v5 và đổi cấu hình từ TypeScript sang YAML.** Bản hướng dẫn
+trước ghi `quartz.config.ts` — v5 không còn file đó, nó đọc
+`quartz.config.yaml`. Năm dòng đã sửa so với bản mặc định: `pageTitle`,
+`locale: vi-VN`, `baseUrl`, `defaultDateType: created`, và `analytics: null`
+(v5 mặc định gửi số liệu truy cập sang Plausible — đã tắt để dữ liệu người đọc
+không đi ra ngoài).
 
-Tìm `baseUrl` và đổi thành tên GitHub của bạn:
+Bản clone của Quartz mang theo 5 workflow của chính dự án họ (build docs, đẩy
+Docker image). Chạy trên repo của bạn thì vừa tốn phút Actions vừa đỏ CI, nên
+phải gỡ.
 
-```ts
-baseUrl: "TEN_GITHUB_CUA_BAN.github.io/legal-vault-public",
-```
+</details>
 
-**5. Xem thử trên máy trước khi đẩy lên**
-
-```bash
-npx quartz build --serve
-```
-
-Mở http://localhost:8080. Cần thấy: trang chủ có mục lục theo lĩnh vực, bấm vào
-một văn bản ra trang dữ kiện, và **sơ đồ quan hệ** (graph view) hiện các văn bản
-dẫn chiếu lẫn nhau. Không thấy sơ đồ nghĩa là wikilink chưa phân giải — báo tôi.
-
-**6. Đẩy lên**
+**Xem thử trên máy** (không bắt buộc, tôi đã dựng và kiểm rồi):
 
 ```bash
-git add -A
-git commit -m "Kho tra cứu văn bản pháp luật"
-git branch -M main
-git remote add origin https://github.com/TEN_GITHUB_CUA_BAN/legal-vault-public.git
-git push -u origin main
+cd ~/Downloads/legal-vault-public && npx quartz build --serve
 ```
+
+Mở http://localhost:8080. Đã kiểm: trang chủ có mục lục theo ngành/địa bàn/năm,
+trang văn bản hiện đúng ngày ban hành, sơ đồ quan hệ hiện các văn bản dẫn chiếu
+lẫn nhau, và 4.200/4.200 địa chỉ mà PDF sẽ phát ra đều trỏ tới trang có thật.
 
 **7. Bật GitHub Pages**
 
 Repo `legal-vault-public` → **Settings** → **Pages** → mục *Source* chọn
-**GitHub Actions**. Đợi tab Actions chạy xong (khoảng 2–4 phút với 4.879 trang).
+**GitHub Actions**. Đợi tab Actions chạy xong (khoảng 6–10 phút với 4.286 trang — trên máy tôi mất 4 phút, máy chạy Actions chậm hơn).
 
 **8. Báo lại địa chỉ cho hệ thống**
 

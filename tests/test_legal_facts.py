@@ -174,7 +174,7 @@ class TestTuDienKhiGhi:
         assert doc.province_code_current == "ca-mau"
         assert doc.eff_state == effectivity.CON_HIEU_LUC
         assert doc.eff_state_as_of is not None
-        assert doc.public_slug and doc.public_slug.startswith("40-2026-QDD-UBND--")
+        assert doc.public_slug and doc.public_slug.startswith("40-2026-qdd-ubnd--")
         assert doc.is_closure_node is False
 
     def test_doi_trang_thai_thi_co_hieu_luc_doi_theo(self, master_session):

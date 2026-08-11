@@ -10,6 +10,8 @@ Ba lỗ hổng được vá cùng lúc vì chúng cùng trả lời một câu h
   3. `targetDocument.id` bị vứt khi parse → mất đường tải văn bản được dẫn
      chiếu, vì /doc/all bỏ qua mọi tham số lọc nên không tra ngược số hiệu được.
 """
+import re
+
 import pytest
 from sqlalchemy import create_engine, text
 
@@ -43,7 +45,7 @@ class TestMojUrl:
 
 class TestPublicSlug:
     def test_van_ban_trung_uong_giu_slug_tran(self):
-        assert make_public_slug("78/2025/QH15", "78/2025/qh15::quốc hội") == "78-2025-QH15"
+        assert make_public_slug("78/2025/QH15", "78/2025/qh15::quốc hội") == "78-2025-qh15"
 
     def test_bo_dau_tieng_viet(self):
         """URL có dấu bị mã hoá percent thành chuỗi không đọc nổi trong báo cáo."""
@@ -60,7 +62,7 @@ class TestPublicSlug:
         viet = make_public_slug("296/2026/NĐ-CP", "296/2026/nđ-cp::chính phủ")
         anh = make_public_slug("296/2026/ND-CP", "296/2026/nd-cp::")
         assert viet != anh
-        assert viet == "296-2026-NDD-CP"
+        assert viet == "296-2026-ndd-cp"
 
     def test_gach_cheo_khong_gop_voi_gach_ngang(self):
         """Ca thứ ba, và nó bác bỏ giả định từng viết thẳng vào public_slug.py.
@@ -73,7 +75,7 @@ class TestPublicSlug:
         cheo = make_public_slug("85/2005/TTLT/BTC-BCA", "85/2005/ttlt/btc-bca::btc")
         ngang = make_public_slug("85/2005/TTLT-BTC-BCA", "85/2005/ttlt-btc-bca::btc")
         assert cheo != ngang
-        assert ngang == "85-2005-TTLT-BTC-BCA"
+        assert ngang == "85-2005-ttlt-btc-bca"
 
     def test_so_hieu_khong_co_nam_duoc_phan_biet(self):
         """Quyết định cá biệt, Công điện, Thông báo đánh số lại mỗi năm, nên
@@ -95,7 +97,7 @@ class TestPublicSlug:
         doi = make_public_slug("05/2000/QĐ--BVHTT", "05/2000/qđ--bvhtt::bộ vhtt")
         don = make_public_slug("05/2000/QĐ-BVHTT", "05/2000/qđ-bvhtt::bộ vhtt")
         assert doi != don
-        assert don == "05-2000-QDD-BVHTT"
+        assert don == "05-2000-qdd-bvhtt"
 
     @pytest.mark.parametrize("doc_num", [
         "28/2024/QĐ-UBND..",      # dấu chấm cuối
@@ -116,7 +118,7 @@ class TestPublicSlug:
         đã in trong báo cáo cũ đều đổi.
         """
         assert make_public_slug("292/2026/NĐ-CP", "292/2026/nđ-cp::chính phủ") \
-            == "292-2026-NDD-CP"
+            == "292-2026-ndd-cp"
 
     def test_so_hieu_con_dau_khac_thi_them_phan_phan_biet(self):
         """Ký tự có dấu ngoài Đ vẫn bị gộp khi bỏ dấu — hiếm (7 lần trong kho)
@@ -130,7 +132,7 @@ class TestPublicSlug:
         a = make_public_slug("40/2026/QĐ-UBND", "40/2026/qđ-ubnd::ubnd tỉnh cà mau")
         b = make_public_slug("40/2026/QĐ-UBND", "40/2026/qđ-ubnd::ubnd tỉnh gia lai")
         assert a != b
-        assert a.startswith("40-2026-QDD-UBND--")
+        assert a.startswith("40-2026-qdd-ubnd--")
 
     def test_hdnd_cung_duoc_phan_biet(self):
         a = make_public_slug("12/2026/NQ-HĐND", "12/2026/nq-hđnd::hđnd tỉnh a")
@@ -145,7 +147,7 @@ class TestPublicSlug:
         a = make_public_slug("Không số", "không số::bộ tài chính")
         b = make_public_slug("Không số", "không số::bộ công thương")
         assert a != b
-        assert a.startswith("Khong-so--")
+        assert a.startswith("khong-so--")
 
     def test_on_dinh_giua_cac_lan_chay(self):
         """URL đã in vào báo cáo PDF không được đổi khi kho lớn lên.
@@ -266,3 +268,55 @@ class TestMigrations:
     def test_id_migration_khong_trung_nhau(self):
         ids = [m.id for m in MIGRATIONS]
         assert len(ids) == len(set(ids))
+
+
+# ──────────────────────────────────────────────
+# Slug phải BẰNG ĐÚNG đường dẫn Quartz phát ra
+# ──────────────────────────────────────────────
+#
+# Quartz hạ chữ thường mọi đường dẫn; GitHub Pages phân biệt hoa/thường. Slug
+# lệch một chữ hoa là mọi link trong phụ lục PDF trỏ tới 404 — hỏng im lặng,
+# vì báo cáo vẫn xuất ra bình thường.
+
+def test_slug_luon_chu_thuong():
+    assert slugify_doc_num("296/2026/NĐ-CP") == "296-2026-ndd-cp"
+    assert slugify_doc_num("47/2013/TT-BNNPTNT") == "47-2013-tt-bnnptnt"
+
+
+def test_ha_chu_thuong_khong_pha_phep_ma_hoa_dd():
+    """Bản tiếng Việt và bản dịch tiếng Anh vẫn phải khác slug.
+
+    Đ → DD phân biệt bằng độ dài chứ không bằng kiểu chữ, nên hạ chữ thường
+    không làm hai bản ghi này đụng nhau. Đây là ca đã từng làm gãy một lượt cào.
+    """
+    assert slugify_doc_num("296/2026/NĐ-CP") != slugify_doc_num("296/2026/ND-CP")
+
+
+def test_slug_chi_gom_ky_tu_url_khong_bi_viet_lai():
+    """Không ký tự nào để Quartz phải viết lại ngoài việc hạ chữ thường.
+
+    Nếu slug lọt ký tự khác [a-z0-9-] thì phép biến đổi của Quartz không còn là
+    "hạ chữ thường" nữa, và tương đương slug ↔ URL ở trên đứt mà không ai biết.
+    """
+    for doc_num in ("296/2026/NĐ-CP", "85/2005/TTLT/BTC-BCA", "Không số",
+                    "05/2000/QĐ--BVHTT", "40/2026/QĐ-UBND"):
+        slug = make_public_slug(doc_num, f"{doc_num}::Cơ quan X")
+        assert re.fullmatch(r"[a-z0-9-]+", slug), (doc_num, slug)
+
+
+def test_public_url_dung_nguyen_slug():
+    """public_url() không được tự sửa slug.
+
+    Mọi phép chuẩn hoá nằm trong slugify_doc_num. Sửa thêm ở tầng URL nghĩa là
+    có hai định nghĩa về địa chỉ của một văn bản, và chúng sẽ trôi khỏi nhau.
+    """
+    from src import config as _cfg
+    from src.publish import links
+
+    goc = _cfg.PUBLIC_VAULT_BASE_URL
+    links.PUBLIC_VAULT_BASE_URL = "https://vi-du.example/vault"
+    try:
+        assert links.public_url("296-2026-ndd-cp") == (
+            "https://vi-du.example/vault/van-ban/296-2026-ndd-cp")
+    finally:
+        links.PUBLIC_VAULT_BASE_URL = goc
