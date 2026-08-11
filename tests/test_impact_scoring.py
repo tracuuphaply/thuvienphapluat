@@ -264,3 +264,54 @@ class TestTaiLap:
         xuoi = build([(0, 10.0), (1, 50.0), (2, 100.0)])
         nguoc = build([(2, 100.0), (1, 50.0), (0, 10.0)])
         assert xuoi == nguoc
+
+
+# ──────────────────────────────────────────────
+# Phiên bản bộ chấm điểm — chống lỗi lọc trả về 0 dòng
+# ──────────────────────────────────────────────
+
+class TestPhienBanBoChamDiem:
+    def test_ten_bay_da_bien_mat(self):
+        """`IMPACT_SCORER_VERSION` không còn là thuộc tính của config.
+
+        Tên cũ nghe như đã đầy đủ nhưng giá trị lại thiếu tên model, nên lọc
+        bằng nó thì mọi truy vấn điểm tác động trả về 0 dòng — biểu đồ và bảng
+        điểm biến mất mà không có gì báo lỗi. Đã xảy ra thật khi viết
+        scripts/demo_pdf_bieu_do.py. Nay ai với nhầm sẽ nhận AttributeError.
+        """
+        from src import config
+
+        assert not hasattr(config, "IMPACT_SCORER_VERSION")
+        assert hasattr(config, "IMPACT_SCORER_BASE_VERSION")
+
+    def test_phien_ban_day_du_co_nhung_ten_model(self):
+        from src.config import IMPACT_SCORER_BASE_VERSION, impact_scorer_version
+        from src.rag.embeddings_api import active_embedding_model
+
+        day_du = impact_scorer_version()
+        assert day_du.startswith(IMPACT_SCORER_BASE_VERSION + "+")
+        assert active_embedding_model() in day_du
+
+    def test_bi_danh_cu_van_tra_ve_cung_gia_tri(self):
+        """Lệnh cũ đang gõ dở không được gãy giữa chừng."""
+        from scripts.compute_impact import version_tag
+        from src.config import impact_scorer_version
+
+        assert version_tag() == impact_scorer_version()
+
+    def test_khong_con_module_src_nao_import_tu_scripts(self):
+        """Mã thư viện không được phụ thuộc vào thư mục script.
+
+        src/rag/reports/jobs.py từng `from scripts.compute_impact import
+        version_tag` — chỉ chạy được nhờ thư mục gốc nằm trong sys.path, và sẽ
+        gãy ngay khi gói này được cài như một thư viện.
+        """
+        import pathlib
+
+        pham = []
+        for f in pathlib.Path("src").rglob("*.py"):
+            for i, dong in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+                bo = dong.split("#")[0]
+                if "from scripts" in bo or "import scripts" in bo:
+                    pham.append(f"{f}:{i}")
+        assert not pham, f"src/ import từ scripts/: {pham}"

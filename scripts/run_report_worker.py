@@ -81,13 +81,13 @@ def main() -> None:
         print(f"Một tiến trình khác đang giữ {LOCK_PATH}. Bỏ qua lần chạy này.")
         sys.exit(0)
 
-    from scripts.compute_impact import version_tag
+    from src.config import impact_scorer_version
 
     rag = RAGDatabase()
     try:
         with get_session() as session:
             stats = worker.drain(
-                session, rag, version_tag(),
+                session, rag, impact_scorer_version(),
                 max_jobs=args.max or MAX_REPORTS_PER_DAY,
             )
     finally:

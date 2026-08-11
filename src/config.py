@@ -223,8 +223,38 @@ MIN_FREE_DISK_GB = float(os.getenv("MIN_FREE_DISK_GB", "5"))
 # Chấm điểm tác động & báo cáo
 # ──────────────────────────────────────────────
 # Đổi công thức thì tăng version: kết quả cũ vẫn tra được để đối chiếu.
-# Nhúng luôn tên model vì EMBEDDING_MODEL đọc từ env nên có thể đổi thầm lặng.
-IMPACT_SCORER_VERSION = os.getenv("IMPACT_SCORER_VERSION", "v1.0.0")
+#
+# TÊN CÓ CHỮ "BASE" LÀ CỐ Ý. Đây là phần gốc, KHÔNG phải giá trị lưu trong
+# `document_industry_impact.scorer_version` — cột đó lưu bản đã nhúng tên model
+# ("v1.0.0+text-embedding-3-small"). Lọc bằng giá trị gốc trần thì truy vấn trả
+# về 0 dòng và biểu đồ, bảng điểm lặng lẽ biến mất, không có gì báo lỗi.
+#
+# Trước đây hằng số này mang tên IMPACT_SCORER_VERSION, nghe như đã đầy đủ, và
+# tôi đã mắc bẫy chính nó khi viết scripts/demo_pdf_bieu_do.py. Đổi tên để lần
+# sau ai với nhầm thì nhận ImportError ngay, thay vì nhận một báo cáo thiếu số
+# liệu mà vẫn trông bình thường.
+#
+# Cần giá trị để so với DB thì dùng impact_scorer_version() bên dưới.
+IMPACT_SCORER_BASE_VERSION = os.getenv("IMPACT_SCORER_VERSION", "v1.0.0")
+
+
+def impact_scorer_version() -> str:
+    """Phiên bản bộ chấm điểm ĐẦY ĐỦ — đúng giá trị lưu trong DB.
+
+    Nhúng tên model nhúng vì EMBEDDING_MODEL đọc từ env nên có thể đổi thầm
+    lặng; gắn vào version để điểm cũ và điểm mới không bao giờ bị lẫn.
+
+    Đặt ở config chứ không ở scripts/: sáu chỗ trong hệ thống cần giá trị này,
+    trong đó có src/rag/reports/jobs.py — tức mã thư viện đang import từ thư
+    mục script, chỉ chạy được nhờ thư mục gốc nằm trong sys.path.
+
+    Import bên trong hàm để tránh vòng lặp: embeddings_api import từ config.
+    Hàm được gọi chỉ đọc biến môi trường, không có I/O, nên gọi bao nhiêu lần
+    cũng được.
+    """
+    from src.rag.embeddings_api import active_embedding_model
+
+    return f"{IMPACT_SCORER_BASE_VERSION}+{active_embedding_model()}"
 MAX_REPORTS_PER_DAY = int(os.getenv("MAX_REPORTS_PER_DAY", "5"))
 REPORT_B_COOLDOWN_DAYS = int(os.getenv("REPORT_B_COOLDOWN_DAYS", "7"))
 

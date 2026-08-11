@@ -39,11 +39,11 @@ def main() -> None:
                     help="Đăng cả văn bản không phải QPPL (mặc định: chỉ QPPL)")
     args = ap.parse_args()
 
-    from scripts.compute_impact import version_tag
+    from src.config import impact_scorer_version
 
     init_db()
     out_dir = Path(args.out)
-    version = version_tag()
+    version = impact_scorer_version()
 
     with get_session() as session:
         if args.dry_run:

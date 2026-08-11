@@ -225,11 +225,11 @@ class TestChiDangVanBanQPPL:
 
     def test_ghi_nhan_ban_da_dang_de_lan_sau_khong_ghi_lai(self, kho, tmp_path):
         """Chỉ ghi trang có nội dung đổi — commit publish phải nhỏ."""
-        from scripts.compute_impact import version_tag
+        from src.config import impact_scorer_version
 
-        first = site_exporter.export_documents(kho, tmp_path, version_tag())
+        first = site_exporter.export_documents(kho, tmp_path, impact_scorer_version())
         kho.commit()
-        second = site_exporter.export_documents(kho, tmp_path, version_tag())
+        second = site_exporter.export_documents(kho, tmp_path, impact_scorer_version())
         assert first.written > 0
         assert second.written == 0 and second.unchanged == first.written
 

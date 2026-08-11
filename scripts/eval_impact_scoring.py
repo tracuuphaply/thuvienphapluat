@@ -162,10 +162,10 @@ def main() -> None:
     ap.add_argument("--version", default="", help="scorer_version cần kiểm")
     args = ap.parse_args()
 
-    from scripts.compute_impact import version_tag
+    from src.config import impact_scorer_version
 
     init_db()
-    version = args.version or version_tag()
+    version = args.version or impact_scorer_version()
     print(f"=== Kiểm chứng bộ chấm điểm {version} ===\n")
 
     with get_session() as session:

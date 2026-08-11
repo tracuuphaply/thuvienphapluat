@@ -52,13 +52,13 @@ def main() -> None:
 
     md = args.md_path.read_text(encoding="utf-8")
     kind = LOAI_THEO_THU_MUC.get(args.md_path.parent.name, "a")
-    # version_tag(), KHÔNG phải IMPACT_SCORER_VERSION trần. Hằng số trong config
+    # impact_scorer_version(), KHÔNG phải IMPACT_SCORER_VERSION trần. Hằng số trong config
     # là "v1.0.0" còn DB lưu "v1.0.0+text-embedding-3-small" — tên model nhúng
     # được gắn vào để điểm cũ và điểm mới không lẫn nhau. Lọc bằng hằng số trần
     # thì mọi truy vấn trả về 0 dòng và biểu đồ ngành lặng lẽ biến mất. Tôi vừa
     # mắc đúng lỗi này lúc viết script.
-    from scripts.compute_impact import version_tag
-    version = version_tag()
+    from src.config import impact_scorer_version
+    version = impact_scorer_version()
 
     init_db()
     with get_session() as session:

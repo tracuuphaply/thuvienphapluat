@@ -67,10 +67,10 @@ def main() -> None:
     ap.add_argument("--min-van-ban", type=int, default=MIN_VAN_BAN)
     args = ap.parse_args()
 
-    from scripts.compute_impact import version_tag
+    from src.config import impact_scorer_version
 
     init_db()
-    version = version_tag()
+    version = impact_scorer_version()
     hom_nay = datetime.date.today()
     ky = ky_bao_cao(hom_nay)
     ten_theo_ma = {n["ma"]: n["ten_ngan"] for n in VSIC_LEVEL1}

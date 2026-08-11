@@ -22,7 +22,7 @@ from sqlalchemy import text
 
 from src.analysis import centroids, scorer
 from src.analysis.restrictions import count_restrictions
-from src.config import IMPACT_SCORER_VERSION
+from src.config import impact_scorer_version
 from src.obsidian.industry_classifier import score_industries
 from src.obsidian.vsic import BY_CODE
 from src.rag.db_rag import RAGDatabase
@@ -32,14 +32,13 @@ logger = logging.getLogger(__name__)
 
 
 def version_tag() -> str:
-    """Version có nhúng tên model nhúng.
+    """Giữ lại làm bí danh; phần thực hiện đã chuyển vào src/config.py.
 
-    EMBEDDING_MODEL đọc từ biến môi trường nên có thể đổi mà không ai nhận ra;
-    gắn vào version để điểm cũ và điểm mới không bao giờ bị lẫn.
+    Sáu chỗ từng import hàm này TỪ MỘT SCRIPT, trong đó có src/rag/reports/
+    jobs.py — mã thư viện phụ thuộc vào thư mục script. Nay chúng gọi thẳng
+    config; hàm này chỉ còn cho ai đang gõ dở lệnh cũ.
     """
-    from src.rag.embeddings_api import active_embedding_model
-
-    return f"{IMPACT_SCORER_VERSION}+{active_embedding_model()}"
+    return impact_scorer_version()
 
 
 def _pack(vector: list[float]) -> bytes:

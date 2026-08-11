@@ -205,9 +205,9 @@ def main() -> None:
     ap.add_argument("--nganh", default=NGANH_MAC_DINH, help="Mã VSIC cấp 1")
     args = ap.parse_args()
 
-    from scripts.compute_impact import version_tag
+    from src.config import impact_scorer_version
 
-    version = version_tag()
+    version = impact_scorer_version()
     rag = RAGDatabase()
     try:
         with get_session() as session:

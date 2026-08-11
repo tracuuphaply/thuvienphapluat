@@ -267,6 +267,6 @@ def enqueue_update_reports(session, saved_docs: list[dict]) -> int:
 
 
 def _current_scorer_version() -> str:
-    from scripts.compute_impact import version_tag
+    from src.config import impact_scorer_version
 
-    return version_tag()
+    return impact_scorer_version()
