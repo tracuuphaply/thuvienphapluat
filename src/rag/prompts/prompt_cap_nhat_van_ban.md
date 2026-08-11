@@ -67,7 +67,7 @@ kinh tế**. Phải ghi câu này khi lần đầu nhắc tới điểm số.
 
 ```
 ### TÓM TẮT NHANH
-Bảng: Số hiệu | Tên gọi tắt | Cơ quan | Hiệu lực từ | Ngành chịu tác động mạnh nhất
+Bảng: Số hiệu | Gọi tắt là gì | Cơ quan ban hành | Bắt đầu áp dụng từ | Ngành bị ảnh hưởng nhiều nhất
 
 ### 1. CÓ GÌ MỚI
 Mỗi văn bản một mục con `#### {số hiệu} — {tên gọi tắt}`, gồm đủ bốn khối:
@@ -78,7 +78,7 @@ Mỗi văn bản một mục con `#### {số hiệu} — {tên gọi tắt}`, g�
   (d) Mốc thời gian — ngày ban hành, ngày có hiệu lực, hạn chuyển tiếp nếu có
 
 ### 2. NGHĨA VỤ MỚI PHÁT SINH
-Bảng: Nghĩa vụ | Đối tượng áp dụng | Căn cứ (số hiệu + Điều) | Hạn chót
+Bảng: Bạn phải làm gì | Ai phải làm | Theo văn bản nào (số hiệu + Điều) | Trước ngày nào
 
 ### 3. VĂN BẢN ĐANG ÁP DỤNG BỊ ẢNH HƯỞNG
 Văn bản cũ mà doanh nghiệp có thể đang dựa vào, nay bị sửa đổi/thay thế/bãi bỏ.
@@ -86,7 +86,7 @@ Ghi rõ còn hiệu lực một phần hay hết toàn bộ. Không có thì vi�
 
 Với mỗi văn bản cũ có `dieu_khoan_cu`, bắt buộc có bảng đối chiếu:
 
-Quy định | Trước đây (số hiệu + Điều) | Từ nay (số hiệu + Điều) | Doanh nghiệp phải làm gì khác
+Chuyện gì | Trước đây (số hiệu + Điều) | Từ nay (số hiệu + Điều) | Bạn phải làm khác đi thế nào
 
 Mỗi dòng là một thay đổi có hệ quả thực tế. Không đưa vào bảng những thay đổi
 thuần câu chữ. Ô nào không đối chiếu được thì ghi "chưa đối chiếu được", không
@@ -96,7 +96,7 @@ thuần câu chữ. Ô nào không đối chiếu được thì ghi "chưa đố
 Mỗi việc phải có mốc thời gian cụ thể. Không viết khuyến nghị chung chung.
 
 ### PHỤ LỤC — DANH MỤC VĂN BẢN THAM CHIẾU
-Bảng: Số hiệu | Tên đầy đủ | Cấp hiệu lực | Tình trạng hiệu lực | Phạm vi áp dụng
+Bảng: Số hiệu | Tên đầy đủ | Cấp văn bản | Còn áp dụng không | Áp dụng ở đâu
 
 ### PHỤ LỤC — HẠN CHẾ DỮ LIỆU
 Công bố nguyên khối `han_che_du_lieu`. Mọi văn bản có tình trạng hiệu lực
@@ -104,11 +104,9 @@ Công bố nguyên khối `han_che_du_lieu`. Mọi văn bản có tình trạng 
 như đang còn hiệu lực.
 ```
 
-## 5. VĂN PHONG
+{{include:_chung/giong_van_doanh_nghiep.md}}
 
-Câu mở đoạn in đậm chứa kết luận. Tiêu đề mục là luận điểm hoàn chỉnh, không
-phải nhãn phân loại. Dẫn điều khoản cụ thể ("Điều 12 khoản 3") chứ không dẫn cả
-văn bản. Không có văn bản dẫn chiếu thì không có nhận định.
+---
 
 {{include:_chung/quy_uoc_markdown.md}}
 

@@ -67,15 +67,7 @@ doanh nghiệp đọc qua email, không phải luật sư đọc hồ sơ — m�
 
 ---
 
-## 5. VĂN PHONG
-
-- Tiêu đề mục là **một luận điểm hoàn chỉnh**, không phải nhãn phân loại.
-  Viết "Nghĩa vụ công bố thông tin siết chặt từ 01/7/2026", không viết "Về công bố thông tin".
-- Câu mở đoạn **in đậm**, chứa kết luận của cả đoạn.
-- Đánh số luận cứ (1)… (2)… khi có nhiều lý lẽ.
-- Định lượng: nêu con số, ngày tháng, mức phạt cụ thể thay vì "một số", "nhiều".
-- Mỗi nhận định gắn với ít nhất một dẫn chiếu điều khoản.
-- Không dùng câu cảm thán, không thổi phồng, không hù doạ.
+{{include:_chung/giong_van_doanh_nghiep.md}}
 
 ---
 
@@ -85,7 +77,7 @@ doanh nghiệp đọc qua email, không phải luật sư đọc hồ sơ — m�
 ### TÓM TẮT ĐIỀU HÀNH
    3–5 gạch đầu dòng, mỗi dòng mở bằng cụm in đậm chứa kết luận.
    Kèm bảng "Những thay đổi đáng chú ý nhất trong kỳ":
-   | Văn bản | Nội dung thay đổi | Đối tượng chịu tác động | Mốc phải tuân thủ |
+   | Văn bản | Có gì thay đổi | Ai bị ảnh hưởng | Hạn chót phải làm xong |
 
 ### CHƯƠNG I — TỔNG QUAN KHUNG PHÁP LÝ NGÀNH
    1. Bản đồ văn bản điều chỉnh ngành (theo tầng: Luật → Nghị định → Thông tư → địa phương)
@@ -101,10 +93,10 @@ doanh nghiệp đọc qua email, không phải luật sư đọc hồ sơ — m�
    Với 2–3 văn bản quan trọng nhất, mỗi văn bản:
    - Số hiệu, cơ quan ban hành, ngày ban hành, ngày có hiệu lực, tình trạng, đối tượng áp dụng
    - Luận điểm pháp lý (đánh số)
-   - Bảng: | Điều/khoản | Nội dung quy định | Nghĩa vụ phát sinh | Thời hạn |
+   - Bảng: | Điều/khoản | Quy định nói gì | Bạn phải làm gì | Trước ngày nào |
 
 ### CHƯƠNG CUỐI — TỔNG HỢP & LỘ TRÌNH TUÂN THỦ
-   Bảng: | Mốc thời gian | Nghĩa vụ | Căn cứ pháp lý | Bộ phận phụ trách | Mức độ ưu tiên |
+   Bảng: | Trước ngày | Phải làm gì | Theo văn bản nào | Ai trong công ty lo | Mức khẩn |
 
 ### PHỤ LỤC
    1. Danh mục văn bản đã tham chiếu

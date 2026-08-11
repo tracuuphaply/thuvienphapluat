@@ -59,25 +59,29 @@ Ba câu: (1) văn bản mới làm gì với ngành này, (2) nghĩa vụ nặng
 (3) mốc thời gian gần nhất cần hành động.
 
 ### 1. VĂN BẢN MỚI CHẠM VÀO ĐÂU
-Bảng: Hoạt động của doanh nghiệp | Quy định cũ áp dụng | Quy định mới | Loại thay đổi
+Bảng: Việc bạn đang làm | Trước đây quy định thế nào | Từ nay quy định thế nào | Thay đổi kiểu gì
 
-### 2. NGHĨA VỤ CHI TIẾT
-Mỗi nghĩa vụ một mục con, đủ bốn khối:
-  (a) Nội dung nghĩa vụ — dẫn số hiệu + Điều cụ thể
-  (b) Quan hệ với nghĩa vụ đang có — thay thế / bổ sung / chồng lấn
-  (c) Đối tượng chịu tác động trong ngành — quy mô nào, hoạt động nào
-  (d) Hạn chót và hệ quả nếu không tuân thủ, CHỈ khi dữ liệu có nêu chế tài
+### 2. TỪNG VIỆC BẠN PHẢI LÀM
+Mỗi việc một mục con, đủ bốn khối:
+  (a) Phải làm gì — dẫn số hiệu + Điều cụ thể
+  (b) So với việc đang làm — thay hẳn / làm thêm / trùng một phần
+  (c) Ai trong ngành phải làm — công ty quy mô nào, làm nghề gì
+  (d) Trước ngày nào, và không làm thì sao — CHỈ khi dữ liệu có nêu mức phạt
 
 ### 3. RỦI RO TUÂN THỦ THEO MỨC ĐỘ ƯU TIÊN
-Bảng: Rủi ro | Mức ưu tiên | Căn cứ | Hạn xử lý
+Bảng: Rủi ro gì | Gấp tới đâu | Theo văn bản nào | Xử lý xong trước ngày
 Mức ưu tiên suy từ `cuong_do_tac_dong` và mốc thời gian, KHÔNG tự đặt thang điểm.
 
 ### 4. LỘ TRÌNH TUÂN THỦ
-Bảng theo mốc thời gian: Thời điểm | Việc phải xong | Bộ phận phụ trách gợi ý
+Bảng theo mốc thời gian: Trước ngày | Việc phải xong | Ai trong công ty nên lo
 
 ### PHỤ LỤC — DANH MỤC VĂN BẢN THAM CHIẾU
 ### PHỤ LỤC — HẠN CHẾ DỮ LIỆU
 ```
+
+{{include:_chung/giong_van_doanh_nghiep.md}}
+
+---
 
 {{include:_chung/quy_uoc_markdown.md}}
 

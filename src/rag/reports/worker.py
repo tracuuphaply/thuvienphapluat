@@ -23,6 +23,7 @@ from sqlalchemy import text
 
 from src.config import DATA_DIR
 from src.rag.citation_check import check_citations
+from src.rag.reports import figures as figures_mod
 from src.rag.db_rag import RAGDatabase
 from src.rag.reports import generators, jobs
 from src.rag.reports.llm import LLMUnavailable
@@ -84,7 +85,17 @@ def _build_pdf(job: dict, md_path: Path,
              if brand_path.exists() else {})
     hom_nay = datetime.date.today()
 
+    # Biểu đồ dựng từ chính khối dữ kiện mô hình đã nhận, nên hình và chữ không
+    # thể nói hai chuyện khác nhau. Hỏng thì bỏ hình chứ không bỏ PDF.
+    try:
+        figures = figures_mod.build_figures(job["kind"], result.payload or {})
+    except Exception as e:
+        logger.warning("Job %d: không dựng được biểu đồ — %s: %s",
+                       job["id"], type(e).__name__, e)
+        figures = []
+
     meta = ReportMeta(
+        figures=figures,
         industry=_nhan_bia(job, result),
         industry_code=job.get("vsic_code") or "",
         period=f"{TIEU_DE[job['kind']]} · {hom_nay:%m/%Y}",
