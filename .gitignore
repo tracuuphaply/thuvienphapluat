@@ -60,3 +60,7 @@ Legal-Vault/
 
 # Thông tin thương hiệu riêng của từng người dùng
 report_branding.json
+
+# Cấu hình cục bộ của app Obsidian — chứa trạng thái workspace
+# và đường dẫn trên máy người dùng, không phải cấu hình của dự án.
+.obsidian/
