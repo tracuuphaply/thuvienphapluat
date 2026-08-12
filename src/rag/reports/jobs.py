@@ -209,8 +209,17 @@ def enqueue_update_reports(session, saved_docs: list[dict]) -> int:
     if not saved_docs:
         return 0
 
+    from src.legal.business_relevance import field_scope_by_key, is_business_document, reason_excluded
+
     today = _dt.date.today()
     version = _current_scorer_version()
+
+    # Bộ lọc "liên quan doanh nghiệp": bỏ văn bản ngoài lĩnh vực kinh doanh và
+    # văn bản cấp tỉnh trước khi xét trọng yếu. Đây là chốt chặn để một quyết
+    # định y tế cấp tỉnh không thành báo cáo gửi chủ doanh nghiệp. Tra một lượt
+    # cho cả lô.
+    meta = field_scope_by_key(
+        session, [d.get("doc_key") for d in saved_docs if d.get("doc_key")])
 
     # (mã ngành) → {doc_key}, kèm cấp cao nhất và cường độ mạnh nhất của nhóm
     groups: dict[str, dict] = {}
@@ -218,6 +227,11 @@ def enqueue_update_reports(session, saved_docs: list[dict]) -> int:
     for doc in saved_docs:
         doc_key = doc.get("doc_key")
         if not doc_key or doc.get("is_closure_node"):
+            continue
+
+        field, scope = meta.get(doc_key, (None, None))
+        if not is_business_document(field, scope):
+            record_skip(session, "b", doc_key, reason_excluded(field, scope), today)
             continue
 
         rows = session.execute(_text("""

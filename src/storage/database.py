@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from src.config import CLOSURE_SEED_FLOOR, CRAWL_OVERLAP_DAYS, DATABASE_URL
 from src.legal import effectivity
+from src.legal.field_mapper import phan_loai
 from src.legal.hierarchy import classify, resolve_province
 from src.storage.migrations import run_migrations
 from src.storage.public_slug import make_public_slug
@@ -294,6 +295,15 @@ def apply_derived_facts(doc: Document, as_of: date | None = None) -> None:
     doc.doc_type_norm = facts.doc_type_norm
     doc.is_vbqppl = facts.is_vbqppl
     doc.territorial_scope = facts.territorial_scope
+
+    # Lĩnh vực TVPL — cùng lý do như cả hàm này: bỏ ở đây thì văn bản cào MỚI có
+    # tvpl_field_code rỗng và lặng lẽ rơi khỏi bộ lọc "liên quan doanh nghiệp"
+    # của báo cáo (b) — không bao giờ có báo cáo tự động nào ra. Trước đây cột
+    # này chỉ được điền bằng scripts/backfill_tvpl_field.py chạy tay. Dùng đúng
+    # phan_loai như script đó nên phân loại nhất quán ở mọi đường ghi.
+    linh_vuc = phan_loai(doc.field_code, doc.field_name, doc.title)
+    doc.tvpl_field_code = linh_vuc.ma
+    doc.tvpl_field_source = linh_vuc.nguon
 
     raw_code, current = resolve_province(doc.agency_name or "")
     doc.province_code_raw = raw_code

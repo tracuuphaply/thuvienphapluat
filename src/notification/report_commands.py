@@ -147,13 +147,31 @@ def _van_ban_moi_chua_bao_cao(session, gioi_han: int = 40) -> list[str]:
     Lấy theo event_type như trigger tự động, nhưng KHÔNG áp ngưỡng trọng yếu:
     người dùng gõ lệnh tay là đã cố ý muốn báo cáo về chúng, còn ngưỡng sinh ra
     để chặn hệ thống tự phát báo cáo tràn lan.
+
+    Vẫn áp bộ lọc "liên quan doanh nghiệp": lệnh tay bỏ qua ngưỡng trọng yếu chứ
+    không bỏ qua mục tiêu người đọc — văn bản y tế hay cấp tỉnh vẫn bị loại. Lọc
+    ngay trong SQL để LIMIT tính trên phần đã lọc, không phải lấy 40 rồi còn vài.
     """
-    rows = session.execute(text("""
+    from src.config import report_central_only
+    from src.legal.business_relevance import CENTRAL_SCOPE, business_field_codes
+
+    codes = sorted(business_field_codes())
+    ph = ",".join(f":f{i}" for i in range(len(codes)))
+    params: dict = {f"f{i}": c for i, c in enumerate(codes)}
+    params["n"] = gioi_han
+    scope_cond = ""
+    if report_central_only():
+        scope_cond = "AND territorial_scope = :scope"
+        params["scope"] = CENTRAL_SCOPE
+
+    rows = session.execute(text(f"""
         SELECT doc_key FROM documents
         WHERE event_type IS NOT NULL AND doc_key IS NOT NULL
+          AND tvpl_field_code IN ({ph})
+          {scope_cond}
         ORDER BY COALESCE(issue_date, created_at) DESC
         LIMIT :n
-    """), {"n": gioi_han}).scalars().all()
+    """), params).scalars().all()
     return [r for r in rows if r]
 
 

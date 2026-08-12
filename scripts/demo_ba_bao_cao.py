@@ -87,7 +87,8 @@ def _xuat_pdf(md_text: str, ten: str, loai: str, nhan: str) -> Path | None:
 def _ghi(ten: str, loai: str, nhan: str, result,
          sidecar: dict | None = None) -> Path:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    kiem = check_citations(result.markdown)
+    kiem = check_citations(
+        result.markdown, extra_allowed=getattr(result, "allowed_doc_nums", None))
     hau_to = "" if kiem.ok else "_BI_CHAN"
 
     md = OUT_DIR / f"{ten}{hau_to}.md"
@@ -118,28 +119,21 @@ def _ghi(ten: str, loai: str, nhan: str, result,
 def demo_a(session, rag, version: str, nganh: str) -> None:
     """(a) Tổng hợp pháp lý một ngành.
 
-    Vẫn dùng bộ sinh cũ: (a) chưa được chuyển vào gói reports/ như (b) và (c).
+    Dùng ĐÚNG bộ sinh của worker (generators.generate_industry_report), không
+    dùng report_generator.generate_compliance_report cũ nữa: đường theo lịch
+    (enqueue_quarterly_reports → worker) chạy bộ mới, nên demo phải khớp — nhất
+    là để thấy bước ĐỌC insight từng văn bản, thứ bản cũ không có.
     """
     from src.obsidian.vsic import VSIC_LEVEL1
-    from src.rag.report_generator import generate_compliance_report
 
-    # official_name() nhận TÊN ngành chứ không nhận mã: truyền "K" vào nó trả
-    # lại đúng "K", và bộ truy xuất đi tìm chữ "K" thay vì tìm ngành tài chính.
-    # Báo cáo vẫn ra, vẫn đủ trích dẫn hợp lệ — chỉ là dựa trên truy vấn sai.
     ten_ngan = next((n["ten_ngan"] for n in VSIC_LEVEL1 if n["ma"] == nganh), None)
     if not ten_ngan:
         print(f"\n  ✗ (a) mã ngành {nganh!r} không có trong VSIC cấp 1.")
         return
 
     print(f"\n=== (a) Tổng hợp ngành — {nganh} · {ten_ngan} ===")
-    md = generate_compliance_report(rag, industry=ten_ngan)
-
-    class _R:
-        markdown = md
-        model = "(bộ sinh cũ)"
-        truncated = False
-
-    _ghi("a_tong_hop_nganh", "a", f"{nganh} · {ten_ngan}", _R())
+    result = generators.generate_industry_report(session, rag, nganh, version)
+    _ghi("a_tong_hop_nganh", "a", f"{nganh} · {ten_ngan}", result)
 
 
 def demo_b(session, rag, version: str, doc_num: str | None) -> tuple[Path, dict] | None:
@@ -153,19 +147,24 @@ def demo_b(session, rag, version: str, doc_num: str | None) -> tuple[Path, dict]
     else:
         # Ưu tiên văn bản CÓ sửa đổi/thay thế văn bản khác — đó là ca cho thấy
         # rõ nhất giá trị của bao đóng: đối chiếu quy định cũ với quy định mới.
-        docs = q.filter(Document.doc_key.in_(
+        # Lấy rộng rồi lọc "liên quan doanh nghiệp", giữ 2 văn bản mới nhất — để
+        # demo không rơi vào một quyết định y tế cấp tỉnh như trước.
+        from src.legal.business_relevance import filter_business_docs
+
+        candidates = q.filter(Document.doc_key.in_(
             session.execute(text("""
                 SELECT DISTINCT s.doc_key FROM document_references r
                 JOIN documents s ON s.id = r.source_doc_id
                 JOIN documents t ON t.id = r.target_doc_id
                 WHERE r.relation_type IN ('Sửa đổi, bổ sung','Thay thế','Bãi bỏ')
                   AND t.has_chunks = 1 AND COALESCE(s.is_closure_node,0) = 0
-                ORDER BY s.issue_date DESC LIMIT 2
+                ORDER BY s.issue_date DESC LIMIT 40
             """)).scalars().all()
-        )).all()
+        )).order_by(Document.issue_date.desc()).all()
+        docs = filter_business_docs(candidates)[:2]
 
     if not docs:
-        print("\n=== (b) — không tìm được văn bản phù hợp, bỏ qua ===")
+        print("\n=== (b) — không tìm được văn bản liên quan doanh nghiệp, bỏ qua ===")
         return None
 
     print(f"\n=== (b) Văn bản mới — {', '.join(d.doc_num for d in docs)} ===")

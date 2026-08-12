@@ -95,9 +95,12 @@ class TestXepBaoCao:
             text("SELECT COUNT(*) FROM report_jobs")).scalar() == 0
 
     def test_bao_cao_b_gom_van_ban_moi(self, master_session):
+        # field_name "Doanh nghiệp" → lĩnh vực 1 (liên quan DN); NĐ-CP → trung
+        # ương. Phải qua được bộ lọc "liên quan doanh nghiệp" mới xếp hàng.
         upsert_document(master_session, {
             "doc_num": "01/2026/NĐ-CP", "title": "Nghị định thử",
             "agency_name": "Chính phủ", "moj_id": "1", "event_type": "A",
+            "field_name": "Doanh nghiệp",
             "issue_date": datetime.date(2026, 1, 5)})
         master_session.commit()
 
