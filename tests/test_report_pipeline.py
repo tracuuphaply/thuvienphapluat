@@ -639,47 +639,46 @@ class TestDanhSachSoHieuHopLe:
         assert msg.index("DANH SÁCH SỐ HIỆU") < msg.index("LƯU Ý QUAN TRỌNG")
 
 
-class TestBoCucTapChi:
-    """Dải tiêu đề bảng và dòng nguồn kiểu tạp chí khoa học."""
+class TestChanTrangHopTac:
+    """Lời ngỏ hợp tác ở chân trang."""
 
-    def _dung(self, md, tmp_path):
+    def _dung(self, tmp_path, **kw):
+        from pypdf import PdfReader
+
         from src.utils.report_pdf import ReportMeta, build_report_pdf
         out = tmp_path / "t.pdf"
-        build_report_pdf(md, out, ReportMeta(
-            industry="Thử", period="Kỳ thử", cutoff="12/08/2026"))
-        from pypdf import PdfReader
+        build_report_pdf("### MỤC\n\n" + ("Một đoạn. " * 300), out,
+                         ReportMeta(industry="Thử", period="Kỳ", cutoff="12/08/2026", **kw))
         return "\n".join(p.extract_text() or "" for p in PdfReader(str(out)).pages)
 
-    def test_dong_trong_giua_tieu_de_va_bang_khong_lam_mat_tieu_de(self, tmp_path):
-        """Dòng trống cũng đi qua flush_table().
+    def test_loi_ngo_hien_du_khong_bi_cat(self, tmp_path):
+        """Nửa câu cụt trên khối quảng bá là hỏng hẳn, không phải xấu đi một chút."""
+        pitch = ("Quý công ty luật tài trợ chi phí gửi email; đổi lại, thương hiệu "
+                 "và dịch vụ của quý công ty đến đúng những doanh nghiệp vừa nhận "
+                 "cảnh báo pháp lý và đang cần tư vấn.")
+        txt = self._dung(tmp_path, partner_title="ĐỒNG HÀNH", partner_pitch=pitch)
+        gop = txt.replace("\n", " ")
+        assert "và đang cần tư vấn." in gop
+        assert "…" not in gop.split("ĐỒNG HÀNH")[1][:300]
 
-        Bản đầu xoá tiêu đề đang chờ vô điều kiện ở đó, nên MỌI tiêu đề bảng
-        đều biến mất — bảng vẫn ra, chỉ mất tên, và không có gì báo lỗi.
-        """
-        md = ("BẢNG 1: TÌNH TRẠNG HIỆU LỰC\n\n"
-              "| Số hiệu | Tình trạng |\n|---|---|\n| 01/2026/NĐ-CP | Còn hiệu lực |\n\n"
-              "Nguồn: Cơ sở dữ liệu văn bản\n")
-        txt = self._dung(md, tmp_path)
-        assert "BẢNG 1:" in txt
-        assert "TÌNH TRẠNG HIỆU LỰC" in txt
-        assert "Nguồn:" in txt
+    def test_khong_co_loi_ngo_thi_lui_ve_chan_trang_gon(self, tmp_path):
+        """Để trống phải tắt được khối hợp tác mà không phải sửa code."""
+        txt = self._dung(tmp_path, company="thongtincty")
+        assert "HỢP TÁC" not in txt
+        assert "thongtincty" in txt
 
-    def test_tieu_de_khong_co_bang_thi_khong_troi_sang_bang_sau(self, tmp_path):
-        md = ("BẢNG 1: TIÊU ĐỀ MỒ CÔI\n\n"
-              "### I. MỘT MỤC\n\n"
-              "| A | B |\n|---|---|\n| 1 | 2 |\n")
-        txt = self._dung(md, tmp_path)
-        assert "TIÊU ĐỀ MỒ CÔI" not in txt
+    def test_loi_ngo_qua_dai_thi_bao_bang_ba_cham(self, tmp_path):
+        """Không nuốt im lặng phần thừa — người viết phải biết là nó không vừa."""
+        txt = self._dung(tmp_path, partner_title="T",
+                         partner_pitch="Từ khoá dài. " * 60)
+        assert "…" in txt
 
-    def test_khong_giu_so_hinh_do_mo_hinh_tu_danh(self, tmp_path):
-        """Biểu đồ do hệ thống chèn và tự đánh số.
-
-        Giữ lại dòng "HÌNH n:" của mô hình sẽ thành hai số hiệu cho cùng một hình.
-        """
-        md = "HÌNH 1: BIỂU ĐỒ MÔ HÌNH TỰ ĐẶT\n\nMột đoạn văn.\n"
-        assert "BIỂU ĐỒ MÔ HÌNH TỰ ĐẶT" not in self._dung(md, tmp_path)
-
-    def test_chan_trang_co_so_trang(self, tmp_path):
-        md = "### I. MỤC\n\n" + ("Một đoạn văn dài. " * 200)
-        txt = self._dung(md, tmp_path)
-        assert "Trang 2" in txt
+    def test_ngat_theo_tu_khong_cat_giua_tu(self, tmp_path):
+        from src.utils.report_pdf import FONT, _ngat_dong, _register_fonts
+        _register_fonts()
+        goc = "Quý công ty luật tài trợ chi phí gửi thư điện tử hằng tháng"
+        dong = _ngat_dong(goc, 160, FONT, 6.2, toi_da=2)
+        assert len(dong) <= 2
+        for d in dong:
+            for tu in d.replace("…", "").split():
+                assert tu in goc, f"cắt giữa từ: {tu!r}"

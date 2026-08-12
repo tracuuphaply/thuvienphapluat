@@ -71,49 +71,37 @@ doanh nghiệp đọc qua email, không phải luật sư đọc hồ sơ — m�
 
 ---
 
-{{include:_chung/cau_truc_tap_chi.md}}
-
----
-
 ## 6. CẤU TRÚC BẮT BUỘC
 
-Áp khung tạp chí ở mục trên vào báo cáo tổng hợp ngành:
-
 ```
-**Tóm tắt.** 150–200 chữ.
-**Từ khoá:** 4–6 cụm.
-**Phạm vi và thời điểm.** Số văn bản đã rà, khoảng thời gian, ngày chốt.
+### TÓM TẮT ĐIỀU HÀNH
+   3–5 gạch đầu dòng, mỗi dòng mở bằng cụm in đậm chứa kết luận.
+   Kèm bảng "Những thay đổi đáng chú ý nhất trong kỳ":
+   | Văn bản | Có gì thay đổi | Ai bị ảnh hưởng | Hạn chót phải làm xong |
 
-### I. GIỚI THIỆU
-   1. Vì sao ngành này cần rà soát pháp lý kỳ này
-   2. Những thay đổi đáng chú ý nhất trong kỳ
-      Kèm BẢNG 1: | Văn bản | Có gì thay đổi | Ai bị ảnh hưởng | Hạn chót phải làm xong |
+### CHƯƠNG I — TỔNG QUAN KHUNG PHÁP LÝ NGÀNH
+   1. Bản đồ văn bản điều chỉnh ngành (theo tầng: Luật → Nghị định → Thông tư → địa phương)
+   2. Trạng thái hiệu lực trong kỳ
+   3. Những chuyển động chính sách nổi bật
+   4. Khoảng trống pháp lý
 
-### II. PHẠM VI RÀ SOÁT VÀ NGUỒN DỮ LIỆU
-   1. Nguồn dữ liệu và cách chọn văn bản
-   2. Bản đồ văn bản điều chỉnh ngành, xếp theo cấp: Luật → Nghị định → Thông tư → địa phương
-   3. Tình trạng hiệu lực trong kỳ
-   4. Những gì KHÔNG nằm trong phạm vi rà soát
+### CHƯƠNG II…N — CHUYÊN ĐỀ
+   Mỗi chương đủ 4 khối: quy định hiện hành → điểm thay đổi → tác động tới
+   doanh nghiệp → rủi ro & khuyến nghị hành động.
 
-   Đây là mục thay cho "phương pháp nghiên cứu" của tạp chí. Nói thật về cách
-   dữ liệu được chọn, KHÔNG bịa ra phương pháp định lượng hay cỡ mẫu.
+### KHỐI "VĂN BẢN TRỌNG TÂM"
+   Với 2–3 văn bản quan trọng nhất, mỗi văn bản:
+   - Số hiệu, cơ quan ban hành, ngày ban hành, ngày có hiệu lực, tình trạng, đối tượng áp dụng
+   - Luận điểm pháp lý (đánh số)
+   - Bảng: | Điều/khoản | Quy định nói gì | Bạn phải làm gì | Trước ngày nào |
 
-### III. KẾT QUẢ RÀ SOÁT
-   Mỗi chuyên đề một mục con `#### n. Tên chuyên đề`, đủ bốn khối:
-   quy định hiện hành → điểm thay đổi → ảnh hưởng tới doanh nghiệp → việc cần làm.
+### CHƯƠNG CUỐI — TỔNG HỢP & LỘ TRÌNH TUÂN THỦ
+   Bảng: | Trước ngày | Phải làm gì | Theo văn bản nào | Ai trong công ty lo | Mức khẩn |
 
-   Với 2–3 văn bản quan trọng nhất, mỗi văn bản có một bảng:
-   | Điều/khoản | Quy định nói gì | Bạn phải làm gì | Trước ngày nào |
-
-### IV. KẾT LUẬN VÀ KHUYẾN NGHỊ
-   1. Kết luận
-   2. Lộ trình tuân thủ
-      BẢNG cuối: | Trước ngày | Phải làm gì | Theo văn bản nào | Ai trong công ty lo | Mức khẩn |
-   3. Hạn chế của báo cáo này
-
-### TÀI LIỆU VÀ CĂN CỨ PHÁP LÝ
-### TUYÊN BỐ MIỄN TRÁCH NHIỆM
-### HẠN CHẾ DỮ LIỆU
+### PHỤ LỤC
+   1. Danh mục văn bản đã tham chiếu
+   2. Tuyên bố miễn trách nhiệm
+   3. Hạn chế dữ liệu
 ```
 
 ---

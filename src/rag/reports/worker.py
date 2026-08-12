@@ -103,6 +103,10 @@ def _build_pdf(job: dict, md_path: Path,
         scope=brand.get("scope", ""),
         company=brand.get("company", ""),
         contact=brand.get("footer", ""),
+        partner_title=brand.get("partner_title", ""),
+        partner_pitch=brand.get("partner_pitch", ""),
+        partner_cta=brand.get("partner_cta", ""),
+        partner_contact=brand.get("partner_contact", ""),
     )
     try:
         return str(build_report_pdf(

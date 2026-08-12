@@ -89,6 +89,10 @@ def main() -> None:
         scope=brand.get("scope", ""),
         company=brand.get("company", ""),
         contact=brand.get("footer", ""),
+        partner_title=brand.get("partner_title", ""),
+        partner_pitch=brand.get("partner_pitch", ""),
+        partner_cta=brand.get("partner_cta", ""),
+        partner_contact=brand.get("partner_contact", ""),
     )
 
     out = args.out or args.md_path.with_name(args.md_path.stem + "_DEMO.pdf")

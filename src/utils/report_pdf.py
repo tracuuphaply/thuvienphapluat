@@ -124,6 +124,12 @@ class ReportMeta:
     contact: str = ""
     figures: list[Figure] = field(default_factory=list)
     logo_path: Path | None = None
+    # Lời ngỏ hợp tác ở chân trang. Để trống thì chân trang lùi về dạng gọn
+    # (chỉ tên đơn vị + số trang), nên bật/tắt được mà không phải sửa code.
+    partner_title: str = ""
+    partner_pitch: str = ""
+    partner_cta: str = ""
+    partner_contact: str = ""
 
     def logo(self) -> Path | None:
         path = self.logo_path or DEFAULT_LOGO
@@ -163,10 +169,6 @@ def _styles() -> dict[str, ParagraphStyle]:
         "fig_title": ParagraphStyle(
             "fig_title", fontName=FONT_B, fontSize=12, leading=15,
             textColor=colors.HexColor(ORANGE), spaceAfter=6,
-        ),
-        "caption": ParagraphStyle(
-            "caption", fontName=FONT_B, fontSize=8, leading=11,
-            textColor=colors.white, alignment=1,
         ),
         "source": ParagraphStyle(
             "source", fontName=FONT_I, fontSize=7.5, leading=10,
@@ -234,71 +236,120 @@ class _Canvas(rl_canvas.Canvas):
         self.restoreState()
 
     def _chan_trang(self) -> None:
-        """Chân trang dựng bằng vector theo bố cục của banner mẫu.
+        """Chân trang: lời ngỏ hợp tác, dựng bằng vector.
 
-        Mẫu người dùng đưa là một banner tuyển dụng: khối logo bên trái, dải
-        ngang đậm chạy giữa, khối nhấn bo góc bên phải, các góc vát chéo. Ở đây
-        lấy đúng bố cục đó nhưng VẼ LẠI BẰNG VECTOR thay vì nhúng ảnh, vì hai lý
-        do: ảnh raster kéo ngang một trang A4 sẽ rỗ khi in, và màu cam của banner
-        chọi với xanh #003CA7 đang dùng cho bìa, đầu bảng và biểu đồ.
+        Lấy bố cục từ banner mẫu người dùng gửi — dải ngang đậm, khối nhấn bo
+        góc bên phải, góc vát chéo — nhưng VẼ LẠI BẰNG VECTOR chứ không nhúng
+        ảnh, vì hai lý do: ảnh raster kéo ngang khổ A4 sẽ rỗ khi in, và màu cam
+        của banner chọi với xanh #003CA7 đang dùng cho bìa, đầu bảng và biểu đồ.
 
-        Chân trang nằm dưới đáy khung nội dung (bottomMargin = 54) nên không
-        đụng chữ.
+        Nội dung lấy từ report_branding.json, không hardcode: lời chào mời thay
+        đổi theo chiến dịch, mà sửa lời chào mời không nên phải sửa code.
+
+        LƯU Ý VỀ VĂN PHONG: mục 7 của prompt cấm mô hình viết khối kêu gọi liên
+        hệ trong thân báo cáo. Lệnh cấm đó vẫn giữ nguyên và không mâu thuẫn với
+        chân trang này — thân bài là tài liệu pháp lý do mô hình viết, chân
+        trang là phần thương hiệu cố định do code chèn. Trộn hai thứ mới là vấn
+        đề.
         """
-        y = 20            # đáy dải
-        h = 15            # chiều cao dải
-        vat = 9           # độ vát của góc chéo, lấy theo tỷ lệ banner mẫu
+        pitch = (self._meta.partner_pitch or "").strip()
+        if not pitch:
+            foot = self._meta.contact or self._meta.company or ""
+            if foot:
+                self.drawString(_MARGIN, 30, foot[:110])
+            return
 
-        trai = _MARGIN
-        phai = _PAGE_W - _MARGIN
-        # Khối nhấn bên phải giữ chỗ cho số trang; phần còn lại là dải chính.
-        w_nhan = 58
-        x_nhan = phai - w_nhan
+        trai, phai = _MARGIN, _PAGE_W - _MARGIN
+        y, h, vat = 22, 34, 12
+        w_cta = 64
+        x_cta = phai - w_cta
 
         # ── Dải chính, vát góc trên-phải để dẫn mắt sang khối nhấn ──
         self.setFillColor(colors.HexColor(BRAND_DEEP))
         dai = self.beginPath()
         dai.moveTo(trai, y)
-        dai.lineTo(x_nhan - vat, y)
-        dai.lineTo(x_nhan - vat + vat, y + h)
+        dai.lineTo(x_cta, y)
+        dai.lineTo(x_cta + vat, y + h)
         dai.lineTo(trai, y + h)
         dai.close()
         self.drawPath(dai, stroke=0, fill=1)
 
-        # ── Khối nhấn bên phải, vát góc dưới-trái để khớp với dải ──
+        # ── Khối nhấn bên phải ──
         self.setFillColor(colors.HexColor(BRAND))
-        nhan = self.beginPath()
-        nhan.moveTo(x_nhan, y)
-        nhan.lineTo(phai, y)
-        nhan.lineTo(phai, y + h)
-        nhan.lineTo(x_nhan - vat + vat, y + h)
-        nhan.close()
-        self.drawPath(nhan, stroke=0, fill=1)
+        cta = self.beginPath()
+        cta.moveTo(x_cta + vat, y)
+        cta.lineTo(phai, y)
+        cta.lineTo(phai, y + h)
+        cta.lineTo(x_cta + vat, y + h)
+        cta.close()
+        self.drawPath(cta, stroke=0, fill=1)
 
-        # ── Vạch mảnh phía trên, tách chân trang khỏi thân bài ──
-        self.setStrokeColor(colors.HexColor(BRAND))
-        self.setLineWidth(1.6)
-        self.line(trai, y + h + 5, trai + 46, y + h + 5)
+        # ── Chữ trên dải: tiêu đề rồi lời ngỏ, hai dòng ──
+        self.setFillColor(colors.white)
+        rong_chu = x_cta - trai - 16
+        tieu_de = (self._meta.partner_title or "").strip()
+        y_chu = y + h - 10
+        if tieu_de:
+            self.setFont(FONT_B, 6.8)
+            self.drawString(trai + 8, y_chu, tieu_de[:70])
+            y_chu -= 9.5
+        self.setFont(FONT, 6.2)
+        for dong in _ngat_dong(pitch, rong_chu, FONT, 6.2, toi_da=2):
+            self.drawString(trai + 8, y_chu, dong)
+            y_chu -= 8
 
-        # ── Chữ trên dải: tên đơn vị và kỳ báo cáo ──
-        nhan_trai = (self._meta.company or "").strip()
-        ky = (self._meta.period or "").strip()
-        text = " · ".join(x for x in (nhan_trai, ky) if x)
+        # ── Khối nhấn: chữ CTA và số trang ──
+        giua = x_cta + vat + (phai - x_cta - vat) / 2
         self.setFillColor(colors.white)
         self.setFont(FONT_B, 7)
-        self.drawString(trai + 8, y + 5, text[:78])
+        self.drawCentredString(giua, y + h - 13, (self._meta.partner_cta or "HỢP TÁC")[:12])
+        self.setFont(FONT, 6.5)
+        self.drawCentredString(giua, y + 9, f"Trang {self._pageNumber}")
 
-        # ── Số trang trong khối nhấn ──
-        self.setFont(FONT_B, 8)
-        self.drawCentredString(x_nhan + w_nhan / 2 + 2, y + 4.5,
-                               f"Trang {self._pageNumber}")
-
-        # ── Dòng liên hệ dưới dải, cỡ nhỏ ──
-        lien_he = (self._meta.contact or "").strip()
+        # ── Dòng liên hệ dưới dải ──
+        lien_he = (self._meta.partner_contact or self._meta.contact or "").strip()
         if lien_he:
-            self.setFont(FONT, 6.5)
+            self.setFont(FONT, 6)
             self.setFillColor(colors.HexColor(INK_SOFT))
             self.drawString(trai, y - 9, lien_he[:120])
+
+
+def _ngat_dong(text: str, rong: float, font: str, co: float,
+               toi_da: int = 2) -> list[str]:
+    """Ngắt chuỗi thành tối đa `toi_da` dòng vừa bề ngang.
+
+    Đo bằng stringWidth chứ không đếm ký tự: chữ Việt có dấu và chữ hoa rộng
+    khác nhau đáng kể, cắt theo số ký tự thì lúc hụt lúc tràn ra ngoài dải màu.
+
+    Ngắt theo TỪ. Bản trước cắt giữa từ và thêm ba chấm, nên lời chào mời hiện
+    ra thành nửa câu cụt — với một khối quảng bá thì đó là hỏng hẳn, không phải
+    xấu đi một chút.
+    """
+    tu = text.split()
+    dong: list[str] = []
+    hien = ""
+    for t in tu:
+        thu = f"{hien} {t}".strip()
+        if pdfmetrics.stringWidth(thu, font, co) <= rong:
+            hien = thu
+            continue
+        if hien:
+            dong.append(hien)
+        hien = t
+        if len(dong) == toi_da:
+            break
+    if hien and len(dong) < toi_da:
+        dong.append(hien)
+
+    # Còn chữ chưa đặt được thì báo bằng ba chấm ở cuối dòng chót, chứ không
+    # lặng lẽ nuốt mất.
+    da_dat = " ".join(dong)
+    if len(da_dat.split()) < len(tu) and dong:
+        chot = dong[-1]
+        while chot and pdfmetrics.stringWidth(chot + "…", font, co) > rong:
+            chot = chot[:-1]
+        dong[-1] = chot.rstrip() + "…"
+    return dong
 
 
 def _draw_cover(canv: rl_canvas.Canvas, doc) -> None:
@@ -377,31 +428,6 @@ def _inline(text: str) -> str:
     text = re.sub(r"(?<!\*)\*([^*]+?)\*(?!\*)", r"<i>\1</i>", text)
     text = re.sub(r"`(.+?)`", r"<font face='Courier'>\1</font>", text)
     return text
-
-
-# Tiêu đề bảng và dòng nguồn, theo lối trình bày của tạp chí khoa học: một dải
-# nền đậm chạy hết bề ngang mang tên bảng viết hoa, và ngay dưới bảng là dòng
-# "Nguồn: …" cỡ nhỏ nghiêng, canh phải.
-#
-# Vì sao dòng nguồn quan trọng đến mức có riêng cách trình bày: một con số không
-# nói rõ lấy từ đâu thì không kiểm chứng được. Đó là ranh giới giữa báo cáo và
-# ý kiến, và là lý do tạp chí bắt buộc ghi nguồn dưới mọi bảng.
-_RE_CAPTION = re.compile(r"^(BẢNG|HÌNH)\s+(\d+)\s*[:.]\s*(.+)$", re.IGNORECASE)
-_RE_NGUON = re.compile(r"^(Nguồn|Đơn vị)\s*:\s*(.+)$", re.IGNORECASE)
-
-
-def _caption_bar(text: str, st: dict) -> Table:
-    """Dải tiêu đề bảng — nền đậm, chữ trắng, chạy hết bề ngang."""
-    t = Table([[Paragraph(_inline(text.upper()), st["caption"])]],
-              colWidths=[_CONTENT_W])
-    t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(BRAND)),
-        ("LEFTPADDING", (0, 0), (-1, -1), 6),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-        ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-    ]))
-    return t
 
 
 def _figure_block(fig: Figure, st: dict) -> KeepTogether:
@@ -496,26 +522,12 @@ def _parse(md: str, meta: ReportMeta, st: dict) -> list:
     in_disclaimer = False
     figures_placed = False
 
-    pending_caption = ""
-
     def flush_table():
-        """Dựng bảng, kèm dải tiêu đề "BẢNG n: …" nếu có.
-
-        Tiêu đề và bảng đi trong một KeepTogether: tạp chí đặt tiêu đề ngay trên
-        bảng, nên để chúng rơi sang hai trang là mất hẳn nghĩa của tiêu đề.
-        """
-        nonlocal pending_table, pending_caption
+        nonlocal pending_table
         if len(pending_table) >= 2:
-            khoi = [Spacer(1, 6)]
-            if pending_caption:
-                khoi.append(_caption_bar(pending_caption, st))
-            khoi.append(_table(pending_table, st))
-            story.append(KeepTogether(khoi))
             story.append(Spacer(1, 4))
-            # Chỉ xoá tiêu đề khi ĐÃ dựng bảng. Giữa dòng "BẢNG n: …" và bảng
-            # luôn có một dòng trống, mà dòng trống cũng đi qua flush_table() —
-            # xoá vô điều kiện ở đây thì tiêu đề bị mất sạch trước khi bảng tới.
-            pending_caption = ""
+            story.append(_table(pending_table, st))
+            story.append(Spacer(1, 10))
         pending_table = []
 
     # Cụm cho biết khối trích dẫn thực chất là lời miễn trách nhiệm, không phải
@@ -547,23 +559,6 @@ def _parse(md: str, meta: ReportMeta, st: dict) -> list:
         line = raw.rstrip()
         stripped = line.strip()
 
-        # "BẢNG n: …" là tiêu đề của bảng ngay bên dưới, không phải một đoạn văn.
-        m = _RE_CAPTION.match(stripped)
-        if m:
-            flush_table()
-            if m.group(1).upper() == "BẢNG":
-                pending_caption = f"{m.group(1).upper()} {m.group(2)}: {m.group(3)}"
-            # HÌNH thì bỏ qua: biểu đồ do hệ thống chèn và tự đánh số, giữ lại
-            # dòng chữ của mô hình sẽ thành hai số hiệu cho cùng một hình.
-            continue
-
-        # "Nguồn: …" đi liền sau bảng nên phải xả bảng trước rồi mới in.
-        m = _RE_NGUON.match(stripped)
-        if m:
-            flush_table()
-            story.append(Paragraph(_inline(stripped), st["source"]))
-            continue
-
         if stripped.startswith("|"):
             cells = [c.strip() for c in stripped.strip("|").split("|")]
             if all(re.fullmatch(r":?-{2,}:?", c or "-") for c in cells):
@@ -588,9 +583,6 @@ def _parse(md: str, meta: ReportMeta, st: dict) -> list:
             continue
 
         if stripped.startswith("#"):
-            # Tiêu đề bảng chưa dùng tới thì bỏ tại đây, đừng để nó trôi xuống
-            # gắn nhầm vào bảng của mục sau.
-            pending_caption = ""
             flush_disclaimer()
             level = len(stripped) - len(stripped.lstrip("#"))
             text = stripped.lstrip("# ").strip()

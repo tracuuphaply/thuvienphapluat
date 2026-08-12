@@ -65,58 +65,46 @@ kinh tế**. Phải ghi câu này khi lần đầu nhắc tới điểm số.
 
 ## 4. CẤU TRÚC BẮT BUỘC
 
-Áp khung tạp chí, rút gọn cho một bản tin đọc trong hai phút:
-
 ```
-**Tóm tắt.** 120–180 chữ: có mấy văn bản mới, cái nào nặng nhất, hạn gần nhất.
-**Từ khoá:** 4–6 cụm.
-**Phạm vi và thời điểm.** Số văn bản trong kỳ, ngày chốt dữ liệu.
+### TÓM TẮT NHANH
+Bảng: Số hiệu | Gọi tắt là gì | Cơ quan ban hành | Bắt đầu áp dụng từ | Ngành bị ảnh hưởng nhiều nhất
 
-BẢNG 1: VĂN BẢN MỚI TRONG KỲ
-| Số hiệu | Gọi tắt là gì | Cơ quan ban hành | Bắt đầu áp dụng từ | Ngành bị ảnh hưởng nhiều nhất |
-
-### I. CÓ GÌ MỚI
-Mỗi văn bản một mục con `#### n. {số hiệu} — {tên gọi tắt}`, đủ bốn khối:
+### 1. CÓ GÌ MỚI
+Mỗi văn bản một mục con `#### {số hiệu} — {tên gọi tắt}`, gồm đủ bốn khối:
   (a) Văn bản này làm gì — một câu
   (b) Thay đổi so với quy định cũ — dẫn điều khoản cụ thể hai bên; chưa đối
       chiếu được thì nói thẳng là chưa đối chiếu được
   (c) Ai chịu tác động — dẫn `diem_tac_dong_nganh`, kèm phạm vi lãnh thổ
   (d) Mốc thời gian — ngày ban hành, ngày có hiệu lực, hạn chuyển tiếp nếu có
 
-### II. BẠN PHẢI LÀM GÌ
-BẢNG: | Bạn phải làm gì | Ai phải làm | Theo văn bản nào (số hiệu + Điều) | Trước ngày nào |
+### 2. NGHĨA VỤ MỚI PHÁT SINH
+Bảng: Bạn phải làm gì | Ai phải làm | Theo văn bản nào (số hiệu + Điều) | Trước ngày nào
 
-### III. VĂN BẢN ĐANG ÁP DỤNG BỊ ẢNH HƯỞNG
+### 3. VĂN BẢN ĐANG ÁP DỤNG BỊ ẢNH HƯỞNG
 Văn bản cũ mà doanh nghiệp có thể đang dựa vào, nay bị sửa đổi/thay thế/bãi bỏ.
 Ghi rõ còn hiệu lực một phần hay hết toàn bộ. Không có thì viết "Không ghi nhận".
 
 Với mỗi văn bản cũ có `dieu_khoan_cu`, bắt buộc có bảng đối chiếu:
-BẢNG: | Chuyện gì | Trước đây (số hiệu + Điều) | Từ nay (số hiệu + Điều) | Bạn phải làm khác đi thế nào |
+
+Chuyện gì | Trước đây (số hiệu + Điều) | Từ nay (số hiệu + Điều) | Bạn phải làm khác đi thế nào
 
 Mỗi dòng là một thay đổi có hệ quả thực tế. Không đưa vào bảng những thay đổi
 thuần câu chữ. Ô nào không đối chiếu được thì ghi "chưa đối chiếu được", không
 để trống và không đoán.
 
-### IV. VIỆC CẦN LÀM THEO MỐC THỜI GIAN
-Mỗi việc phải có mốc cụ thể. Không viết khuyến nghị chung chung.
+### 4. VIỆC CẦN LÀM
+Mỗi việc phải có mốc thời gian cụ thể. Không viết khuyến nghị chung chung.
 
-### TÀI LIỆU VÀ CĂN CỨ PHÁP LÝ
-Kèm cột tình trạng hiệu lực và phạm vi áp dụng cho từng văn bản.
+### PHỤ LỤC — DANH MỤC VĂN BẢN THAM CHIẾU
+Bảng: Số hiệu | Tên đầy đủ | Cấp văn bản | Còn áp dụng không | Áp dụng ở đâu
 
-### TUYÊN BỐ MIỄN TRÁCH NHIỆM
-### HẠN CHẾ DỮ LIỆU
+### PHỤ LỤC — HẠN CHẾ DỮ LIỆU
 Công bố nguyên khối `han_che_du_lieu`. Mọi văn bản có tình trạng hiệu lực
 "Chưa xác minh được" phải được ghi rõ là CHƯA XÁC MINH, không được trình bày
 như đang còn hiệu lực.
 ```
 
----
-
 {{include:_chung/giong_van_doanh_nghiep.md}}
-
----
-
-{{include:_chung/cau_truc_tap_chi.md}}
 
 ---
 
