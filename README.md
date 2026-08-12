@@ -39,7 +39,7 @@ python -m scripts.setup_db
 
 ```bash
 python -m src.main                       # pipeline cào đầy đủ
-python -m src.main --dry-run             # xem trước, không gửi Telegram
+python -m src.main --dry-run             # xem trước, không ghi gì
 python -m src.main --moj-only            # bỏ TVPL, không cần đăng nhập
 python -m src.main --upload-only         # chỉ đẩy phần còn nợ lên mây
 python -m src.main --limit 5             # chạy thử trên 5 văn bản
@@ -67,7 +67,7 @@ Chạy tự động: `scripts/install_scheduler.sh` cài hai launchd agent — `
 | `src/rag/` | Truy xuất lai (FTS5 + sqlite-vec + RRF), prompt, bộ sinh 3 loại báo cáo, kiểm trích dẫn |
 | `src/obsidian/` | Vault Markdown cho Obsidian cục bộ |
 | `src/publish/` | Sinh trang tra cứu công khai và link từ PDF về trang đó |
-| `src/notification/` | Digest Telegram |
+| `src/notification/` | Bot Telegram điều khiển báo cáo, cảnh báo lỗi |
 
 ## Điều khiển qua Telegram
 
@@ -126,7 +126,7 @@ repo kia và push.
 | Khoá | Dùng cho | Lấy ở đâu |
 |---|---|---|
 | Tài khoản TVPL | Tải bản `.docx` biên tập | Tài khoản công ty |
-| Telegram Bot Token | Digest hằng ngày | @BotFather |
+| Telegram Bot Token | Điều khiển báo cáo, cảnh báo lỗi | @BotFather |
 | Google Drive **OAuth** | Lưu trữ đám mây | Xem cảnh báo bên dưới |
 | Khoá LLM | Sinh báo cáo + nhúng vector | Xem cảnh báo bên dưới |
 
@@ -157,5 +157,5 @@ repo kia và push.
 python -m pytest -q
 ```
 
-596 test, 1 bỏ qua. Nhiều test ghi lại **lỗi đã xảy ra thật** kèm số đo — đọc docstring
+623 test, 1 bỏ qua. Nhiều test ghi lại **lỗi đã xảy ra thật** kèm số đo — đọc docstring
 của chúng trước khi sửa phần liên quan.
