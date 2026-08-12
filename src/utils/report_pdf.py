@@ -18,6 +18,7 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas as rl_canvas
 from reportlab.platypus import (
     BaseDocTemplate, Flowable, Frame, Image, KeepTogether, NextPageTemplate,
@@ -314,15 +315,26 @@ class KhoiThuNgo(Flowable):
     trang cuối không đủ chỗ, thay vì đè lên chữ.
     """
 
-    CO_MUC = 6.8          # cỡ chữ mục trong cột
-    CAO_DONG = 8.4        # khoảng cách dòng trong một mục
-    CACH_MUC = 3.5        # khoảng hở giữa hai mục
-    CAO_DAU = 46          # logo + tên đơn vị
-    CAO_DAI = 30          # dải tiêu đề
-    CAO_CUOI = 34         # nút CTA và dòng liên hệ
-    HO_TREN_COT = 16      # hở giữa dải tiêu đề và tiêu đề cột
-    CAO_PHU_DE = 12       # dòng phụ đề dưới dải
-    CAO_TIEU_DE_COT = 13
+    # ĐO CHO MÀN HÌNH, KHÔNG CHO BẢN IN.
+    #
+    # Bản trước lấy tỷ lệ của banner mẫu làm chuẩn nên chữ trong cột bị ép
+    # xuống 6,8pt — cỡ đó chỉ đọc được khi phóng to, mà PDF này người ta mở
+    # bằng trình xem ở 100%. Nay lấy DANH MỤC NỘI DUNG làm chuẩn còn kích
+    # thước thì theo mức đọc được: 8,5pt là ngưỡng dưới cho chữ thân trên màn
+    # hình, ngang với chú thích bảng ở phần còn lại của báo cáo.
+    #
+    # Khối vì vậy cao hơn banner gốc. Không sao — nó nằm cuối báo cáo, và một
+    # khối cao mà đọc được thì hơn một khối vừa khung mà phải phóng to.
+    CO_MUC = 8.5          # cỡ chữ mục trong cột
+    CAO_DONG = 11         # khoảng cách dòng trong một mục
+    CACH_MUC = 5          # khoảng hở giữa hai mục
+    CAO_DAU = 52          # logo + tên đơn vị
+    CAO_DAI = 34          # dải tiêu đề
+    CAO_CUOI = 42         # nút CTA và dòng liên hệ
+    HO_TREN_COT = 18      # hở giữa dải tiêu đề và tiêu đề cột
+    CAO_PHU_DE = 16       # dòng phụ đề dưới dải
+    LE = 18               # lề trong của khối
+    CAO_TIEU_DE_COT = 16
 
     def __init__(self, meta: ReportMeta, rong: float):
         super().__init__()
@@ -331,11 +343,11 @@ class KhoiThuNgo(Flowable):
         self.vat = 16
         self.w_anh = rong * 0.30
         self.x_anh = rong - self.w_anh
-        self.rong_cot = (self.x_anh - 28) / 2
+        self.rong_cot = (self.x_anh - self.LE * 2 - 10) / 2
 
         # Ngắt chữ TRƯỚC, vì chiều cao phụ thuộc số dòng thật.
         self.cot = [
-            [(t, _ngat_dong(t, self.rong_cot - 12, FONT, self.CO_MUC, 2))
+            [(t, _ngat_dong(t, self.rong_cot - 14, FONT, self.CO_MUC, 2))
              for t in (muc or [])[:4]]
             for muc in (meta.partner_col1, meta.partner_col2)
         ]
@@ -351,7 +363,7 @@ class KhoiThuNgo(Flowable):
         # đâu cả — người sửa report_branding.json sẽ tưởng mình gõ vào chỗ vô
         # dụng.
         self.phu_de = _ngat_dong((meta.partner_pitch or "").strip(),
-                                 self.x_anh - 28, FONT_I, 8, 1)
+                                 self.x_anh - self.LE * 2, FONT_I, 9, 1)
         cao_phu_de = self.CAO_PHU_DE if self.phu_de else 0
         self.height = (self.CAO_DAU + self.CAO_DAI + cao_phu_de
                        + cao_cot + self.CAO_CUOI)
@@ -378,23 +390,32 @@ class KhoiThuNgo(Flowable):
             p.lineTo(x_anh, H)
             p.close()
             c.clipPath(p, stroke=0)
-            c.drawImage(str(anh), x_anh - vat, 0, width=w_anh + vat * 2,
-                        height=H, mask=None, preserveAspectRatio=False)
+            # PHỦ KHUNG, GIỮ TỶ LỆ. Kéo giãn cho vừa khung làm bàn tay méo —
+            # thấy rõ khi khối cao lên còn ảnh thì vuông. Phóng theo cạnh thiếu
+            # rồi để đường cắt xén phần thừa, giống background-size: cover.
+            rong_khung = w_anh + vat * 2
+            iw, ih = ImageReader(str(anh)).getSize()
+            ty_le = max(rong_khung / iw, H / ih)
+            w_ve, h_ve = iw * ty_le, ih * ty_le
+            c.drawImage(str(anh),
+                        x_anh - vat - (w_ve - rong_khung) / 2,
+                        -(h_ve - H) / 2,
+                        width=w_ve, height=h_ve, mask=None)
             c.restoreState()
         else:
             c.setFillColor(colors.HexColor(BRAND_SOFT))
             c.rect(x_anh, 0, w_anh, H, stroke=0, fill=1)
 
         # ── Logo và tên đơn vị ──
-        x_chu = 14
+        x_chu = self.LE
         logo = m.logo()
         if logo:
-            c.drawImage(str(logo), 14, H - 34, width=22, height=22,
+            c.drawImage(str(logo), self.LE, H - 38, width=26, height=26,
                         mask="auto", preserveAspectRatio=True)
-            x_chu = 42
+            x_chu = self.LE + 32
         c.setFillColor(colors.HexColor(BRAND_DEEP))
-        c.setFont(FONT_B, 12)
-        c.drawString(x_chu, H - 27, (m.company or "")[:30])
+        c.setFont(FONT_B, 13.5)
+        c.drawString(x_chu, H - 30, (m.company or "")[:30])
 
         # ── Dải tiêu đề đậm, vát mép phải ──
         y_dai = H - self.CAO_DAU - self.CAO_DAI
@@ -407,15 +428,16 @@ class KhoiThuNgo(Flowable):
         d.close()
         c.drawPath(d, stroke=0, fill=1)
         c.setFillColor(colors.white)
-        c.setFont(FONT_B, 13)
-        c.drawString(14, y_dai + 10, (m.partner_title or "THƯ NGỎ HỢP TÁC")[:44])
+        c.setFont(FONT_B, 14.5)
+        c.drawString(self.LE, y_dai + 11.5,
+                     (m.partner_title or "THƯ NGỎ HỢP TÁC")[:44])
 
         # ── Phụ đề dưới dải ──
         y_moc = y_dai
         if self.phu_de:
             c.setFillColor(colors.HexColor(INK_SOFT))
-            c.setFont(FONT_I, 8)
-            c.drawString(14, y_dai - 11, self.phu_de[0])
+            c.setFont(FONT_I, 9)
+            c.drawString(self.LE, y_dai - 13, self.phu_de[0])
             y_moc -= self.CAO_PHU_DE
 
         # ── Hai cột giá trị ──
@@ -423,38 +445,38 @@ class KhoiThuNgo(Flowable):
         for i, muc in enumerate(self.cot):
             if not muc:
                 continue
-            x = 14 + i * (self.rong_cot + 8)
+            x = self.LE + i * (self.rong_cot + 10)
             y = y_moc - self.HO_TREN_COT
             c.setFillColor(colors.HexColor(BRAND))
-            c.setFont(FONT_B, 8)
+            c.setFont(FONT_B, 9.5)
             c.drawString(x, y, (tieu_de_cot[i] or "")[:34])
             y -= self.CAO_TIEU_DE_COT
             for _, dong in muc:
                 c.setFillColor(colors.HexColor(BRAND))
-                c.circle(x + 2.5, y + 2.2, 1.7, stroke=0, fill=1)
+                c.circle(x + 3, y + 2.8, 2, stroke=0, fill=1)
                 c.setFillColor(colors.HexColor(INK))
                 c.setFont(FONT, self.CO_MUC)
                 for k, phan in enumerate(dong):
-                    c.drawString(x + 8, y - k * self.CAO_DONG, phan)
+                    c.drawString(x + 10, y - k * self.CAO_DONG, phan)
                 y -= len(dong) * self.CAO_DONG + self.CACH_MUC
 
         # ── Nút gọi hành động, đè lên ảnh như banner mẫu ──
         cta = (m.partner_cta or "").strip()
         if cta:
-            c.setFont(FONT_B, 8)
-            w_nut = pdfmetrics.stringWidth(cta, FONT_B, 8) + 22
-            x_nut = W - w_nut - 10
+            c.setFont(FONT_B, 9.5)
+            w_nut = pdfmetrics.stringWidth(cta, FONT_B, 9.5) + 28
+            x_nut = W - w_nut - 14
             c.setFillColor(colors.HexColor(BRAND))
-            c.rect(x_nut, 13, w_nut, 20, stroke=0, fill=1)
+            c.rect(x_nut, 15, w_nut, 25, stroke=0, fill=1)
             c.setFillColor(colors.white)
-            c.drawCentredString(x_nut + w_nut / 2, 19.5, cta)
+            c.drawCentredString(x_nut + w_nut / 2, 23, cta)
 
         # ── Dòng liên hệ, nằm trong vùng CAO_CUOI nên không đụng cột ──
         lien_he = (m.partner_contact or "").strip()
         if lien_he:
             c.setFillColor(colors.HexColor(INK_SOFT))
-            c.setFont(FONT, 7)
-            c.drawString(14, 19, lien_he[:70])
+            c.setFont(FONT, 8)
+            c.drawString(self.LE, 24, lien_he[:70])
 
 
 def _draw_cover(canv: rl_canvas.Canvas, doc) -> None:
