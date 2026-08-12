@@ -64,6 +64,26 @@ def _nhan_bia(job: dict, result: generators.ReportResult) -> str:
     return f"{ma} · {ten}".strip(" ·") or "Chưa xác định"
 
 
+def _khoa_hop_tac(brand: dict) -> dict:
+    """Mọi khoá partner_* trong file thương hiệu, lấy theo TIỀN TỐ.
+
+    Trước đây chỗ này liệt kê tay từng trường, và ba lần liên tiếp việc thêm một
+    trường mới vào ReportMeta bị quên nối ở đây — hai cột giá trị không hiện,
+    rồi tuỳ chọn tắt chấm đầu dòng không có tác dụng. Cả ba đều hỏng IM LẶNG:
+    khối vẫn dựng, chỉ thiếu phần vừa thêm.
+
+    Lọc theo tên trường có thật trên ReportMeta để một khoá lạ trong JSON không
+    làm nổ TypeError — file cấu hình do người sửa tay, gõ nhầm là chuyện thường.
+    """
+    from dataclasses import fields
+
+    from src.utils.report_pdf import ReportMeta
+
+    hop_le = {f.name for f in fields(ReportMeta)}
+    return {k: v for k, v in brand.items()
+            if k.startswith("partner_") and k in hop_le}
+
+
 def _build_pdf(job: dict, md_path: Path,
                result: generators.ReportResult) -> str | None:
     """Dựng PDF từ markdown đã qua cổng trích dẫn.
@@ -114,14 +134,7 @@ def _build_pdf(job: dict, md_path: Path,
     ban = [("khach", {})]
     if (brand.get("partner_pitch") or "").strip():
         ban.append(("doitac", dict(
-            partner_title=brand.get("partner_title", ""),
-            partner_pitch=brand.get("partner_pitch", ""),
-            partner_cta=brand.get("partner_cta", ""),
-            partner_contact=brand.get("partner_contact", ""),
-            partner_col1_title=brand.get("partner_col1_title", ""),
-            partner_col1=brand.get("partner_col1", []),
-            partner_col2_title=brand.get("partner_col2_title", ""),
-            partner_col2=brand.get("partner_col2", []),
+            **_khoa_hop_tac(brand),
         )))
 
     duong_dan: dict[str, str] = {}

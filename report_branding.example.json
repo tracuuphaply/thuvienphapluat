@@ -5,23 +5,23 @@
   "website": "congty.vn",
   "header": "",
   "footer": "",
-  "_ghi_chu_chan_trang": "Khối thư ngỏ in ở CUỐI báo cáo (trang chót), không lặp mỗi trang. Để partner_pitch rỗng thì khối tắt hẳn và chỉ còn bản gửi khách. Hai cột ĐỐI XỨNG TỪNG DÒNG: dòng n bên phải là giá trị của giải pháp ở dòng n bên trái, nên phải cùng số mục. Mỗi mục giữ dưới khoảng 34 ký tự để gọn trong một dòng; dài hơn sẽ xuống hai dòng và lệch thế đối chiếu.",
+  "_ghi_chu_chan_trang": "Khối thư ngỏ in ở CUỐI báo cáo (trang chót), không lặp mỗi trang. Để partner_pitch rỗng thì khối tắt hẳn và chỉ còn bản gửi khách. Cột trái liệt kê giải pháp (có chấm đầu dòng); cột phải là khối liên hệ nên đặt partner_col2_cham = false — khi đó dòng đầu in đậm và chữ sát lề. Mỗi mục dưới ~34 ký tự thì gọn trong một dòng; dài hơn sẽ tự xuống dòng thứ hai, tối đa hai dòng.",
   "partner_title": "THƯ NGỎ HỢP TÁC TRUYỀN THÔNG",
   "partner_pitch": "Chúng tôi tìm quý doanh nghiệp đồng hành cùng congty.vn.",
   "partner_cta": "HỢP TÁC CÙNG CHÚNG TÔI",
-  "partner_contact": "Liên hệ hợp tác: lienhe@congty.vn",
+  "partner_contact": "congty.vn",
   "partner_col1_title": "Giải pháp chúng tôi mang đến",
   "partner_col1": [
-    "Dữ liệu hơn 80.000 doanh nghiệp",
+    "Mạng lưới hơn 80.000 doanh nghiệp",
     "Kết nối cơ hội kinh doanh",
-    "Quảng bá thương hiệu bằng email",
+    "Sự kiện và truyền thông doanh nghiệp",
     "Báo cáo pháp lý theo ngành"
   ],
-  "partner_col2_title": "Giá trị doanh nghiệp nhận được",
+  "partner_col2_title": "Thông tin liên hệ",
   "partner_col2": [
-    "Tìm đúng khách hàng tiềm năng",
-    "Thêm đối tác và hợp đồng mới",
-    "Thương hiệu đến người quyết định",
-    "Xuất hiện trên tài liệu khách đọc"
-  ]
+    "Công ty TNHH Của Bạn",
+    "lienhe@congty.vn",
+    "0900 000 000"
+  ],
+  "partner_col2_cham": false
 }

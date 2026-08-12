@@ -744,3 +744,52 @@ class TestKhoiThuNgo:
         from src.utils import report_pdf
         monkeypatch.setattr(report_pdf.ReportMeta, "anh_hop_tac", lambda self: None)
         assert "THƯ NGỎ HỢP TÁC TRUYỀN THÔNG" in self._txt(tmp_path, self._meta())
+
+
+class TestNoiTruongHopTac:
+    """Mọi khoá partner_* trong file thương hiệu phải tới được ReportMeta.
+
+    Ba lần liên tiếp việc thêm một trường mới bị quên nối ở chỗ gọi: hai cột
+    giá trị không hiện, rồi tuỳ chọn tắt chấm đầu dòng không có tác dụng. Cả ba
+    hỏng IM LẶNG — khối vẫn dựng, chỉ thiếu đúng phần vừa thêm.
+    """
+
+    def test_lay_moi_khoa_partner_theo_tien_to(self):
+        from src.rag.reports.worker import _khoa_hop_tac
+        brand = {
+            "company": "x",
+            "partner_title": "T", "partner_col1": ["a"],
+            "partner_col2_cham": False,
+        }
+        ra = _khoa_hop_tac(brand)
+        assert ra == {"partner_title": "T", "partner_col1": ["a"],
+                      "partner_col2_cham": False}
+        assert "company" not in ra
+
+    def test_khoa_la_khong_lam_no_TypeError(self):
+        """File cấu hình do người sửa tay; gõ nhầm tên khoá là chuyện thường."""
+        from src.utils.report_pdf import ReportMeta
+        from src.rag.reports.worker import _khoa_hop_tac
+        ra = _khoa_hop_tac({"partner_khoa_khong_ton_tai": "x", "partner_title": "T"})
+        assert ra == {"partner_title": "T"}
+        ReportMeta(industry="a", period="b", cutoff="c", **ra)   # không được nổ
+
+    def test_worker_va_script_demo_dung_chung_cach(self):
+        """Hai nơi dựng PDF phải nối trường giống nhau, nếu không lại lệch."""
+        import pathlib
+        for f in ("src/rag/reports/worker.py", "scripts/demo_pdf_bieu_do.py"):
+            src = pathlib.Path(f).read_text(encoding="utf-8")
+            assert "_khoa_hop_tac(brand)" in src, f
+
+    def test_tat_cham_thi_khong_ve_cham(self, tmp_path):
+        from pypdf import PdfReader
+
+        from src.utils.report_pdf import ReportMeta, build_report_pdf
+        out = tmp_path / "t.pdf"
+        build_report_pdf("### M\n\nĐoạn.", out, ReportMeta(
+            industry="x", period="y", cutoff="z", company="c",
+            partner_pitch="p", partner_col2_title="Thông tin liên hệ",
+            partner_col2=["Công ty TNHH Gatlas", "a@b.com"],
+            partner_col2_cham=False))
+        txt = "\n".join(p.extract_text() or "" for p in PdfReader(str(out)).pages)
+        assert "Công ty TNHH Gatlas" in txt

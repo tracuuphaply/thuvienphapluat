@@ -136,6 +136,11 @@ class ReportMeta:
     partner_col1: list[str] = field(default_factory=list)
     partner_col2_title: str = ""
     partner_col2: list[str] = field(default_factory=list)
+    # Cột liệt kê giải pháp thì có chấm đầu dòng; cột thông tin liên hệ thì
+    # không — chấm trước tên công ty và số điện thoại đọc ra như một danh sách
+    # lựa chọn, trong khi đó là một khối thông tin liền mạch.
+    partner_col1_cham: bool = True
+    partner_col2_cham: bool = True
 
     def anh_hop_tac(self) -> Path | None:
         p = Path(__file__).resolve().parents[2] / "assets" / "bat_tay_xanh.png"
@@ -349,10 +354,14 @@ class KhoiThuNgo(Flowable):
         self.rong_cot = (self.x_anh - self.LE * 2 - 10) / 2
 
         # Ngắt chữ TRƯỚC, vì chiều cao phụ thuộc số dòng thật.
+        # Cột không có chấm thì chữ bắt đầu sát lề nên rộng hơn 10pt; ngắt
+        # dòng phải dùng đúng bề rộng đó, nếu không dòng bị xuống hàng sớm.
         self.cot = [
-            [(t, _ngat_dong(t, self.rong_cot - 14, FONT, self.CO_MUC, 2))
+            [(t, _ngat_dong(t, self.rong_cot - (14 if cham else 4),
+                            FONT, self.CO_MUC, 2))
              for t in (muc or [])[:4]]
-            for muc in (meta.partner_col1, meta.partner_col2)
+            for muc, cham in ((meta.partner_col1, meta.partner_col1_cham),
+                              (meta.partner_col2, meta.partner_col2_cham))
         ]
         # Dùng ĐÚNG các hằng số mà draw() dùng. Bản trước dự trữ 14pt cho tiêu
         # đề cột trong khi lúc vẽ tiêu đề chiếm 16 + 13 = 29pt, nên mục cuối
@@ -445,6 +454,7 @@ class KhoiThuNgo(Flowable):
 
         # ── Hai cột giá trị ──
         tieu_de_cot = (m.partner_col1_title, m.partner_col2_title)
+        co_cham = (m.partner_col1_cham, m.partner_col2_cham)
         for i, muc in enumerate(self.cot):
             if not muc:
                 continue
@@ -454,13 +464,20 @@ class KhoiThuNgo(Flowable):
             c.setFont(FONT_B, 9.5)
             c.drawString(x, y, (tieu_de_cot[i] or "")[:34])
             y -= self.CAO_TIEU_DE_COT
-            for _, dong in muc:
-                c.setFillColor(colors.HexColor(BRAND))
-                c.circle(x + 3, y + 2.8, 2, stroke=0, fill=1)
+            for j, (_, dong) in enumerate(muc):
+                if co_cham[i]:
+                    c.setFillColor(colors.HexColor(BRAND))
+                    c.circle(x + 3, y + 2.8, 2, stroke=0, fill=1)
+                    x_chu_muc = x + 10
+                else:
+                    x_chu_muc = x
                 c.setFillColor(colors.HexColor(INK))
-                c.setFont(FONT, self.CO_MUC)
+                # Không chấm thì dòng ĐẦU in đậm: với khối liên hệ, dòng đầu là
+                # tên công ty và nó phải nổi hơn email với số điện thoại.
+                c.setFont(FONT_B if (not co_cham[i] and j == 0) else FONT,
+                          self.CO_MUC)
                 for k, phan in enumerate(dong):
-                    c.drawString(x + 10, y - k * self.CAO_DONG, phan)
+                    c.drawString(x_chu_muc, y - k * self.CAO_DONG, phan)
                 y -= len(dong) * self.CAO_DONG + self.CACH_MUC
 
         # ── Nút gọi hành động, đè lên ảnh như banner mẫu ──
