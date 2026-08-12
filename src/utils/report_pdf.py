@@ -20,7 +20,8 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas as rl_canvas
 from reportlab.platypus import (
-    BaseDocTemplate, Frame, Image, KeepTogether, NextPageTemplate, PageBreak,
+    BaseDocTemplate, Flowable, Frame, Image, KeepTogether, NextPageTemplate,
+    PageBreak,
     PageTemplate, Paragraph, Spacer, Table, TableStyle,
 )
 
@@ -130,6 +131,14 @@ class ReportMeta:
     partner_pitch: str = ""
     partner_cta: str = ""
     partner_contact: str = ""
+    partner_col1_title: str = ""
+    partner_col1: list[str] = field(default_factory=list)
+    partner_col2_title: str = ""
+    partner_col2: list[str] = field(default_factory=list)
+
+    def anh_hop_tac(self) -> Path | None:
+        p = Path(__file__).resolve().parents[2] / "assets" / "bat_tay_xanh.png"
+        return p if p.exists() else None
 
     def logo(self) -> Path | None:
         path = self.logo_path or DEFAULT_LOGO
@@ -236,89 +245,15 @@ class _Canvas(rl_canvas.Canvas):
         self.restoreState()
 
     def _chan_trang(self) -> None:
-        """Chân trang: lời ngỏ hợp tác, dựng bằng vector.
+        """Chân trang mọi trang — một dòng liên hệ, không hơn."""
+        # Chân trang MỌI TRANG chỉ là một dòng gọn. Khối thư ngỏ hợp tác là một
+        # khối lớn chiếm gần một phần ba trang, in ở CUỐI báo cáo — lặp nó trên
+        # cả chục trang thì báo cáo thành tờ rơi.
+        foot = self._meta.contact or self._meta.company or ""
+        if foot:
+            self.drawString(_MARGIN, 30, foot[:110])
+        return
 
-        Lấy bố cục từ banner mẫu người dùng gửi — dải ngang đậm, khối nhấn bo
-        góc bên phải, góc vát chéo — nhưng VẼ LẠI BẰNG VECTOR chứ không nhúng
-        ảnh, vì hai lý do: ảnh raster kéo ngang khổ A4 sẽ rỗ khi in, và màu cam
-        của banner chọi với xanh #003CA7 đang dùng cho bìa, đầu bảng và biểu đồ.
-
-        Nội dung lấy từ report_branding.json, không hardcode: lời chào mời thay
-        đổi theo chiến dịch, mà sửa lời chào mời không nên phải sửa code.
-
-        LƯU Ý VỀ VĂN PHONG: mục 7 của prompt cấm mô hình viết khối kêu gọi liên
-        hệ trong thân báo cáo. Lệnh cấm đó vẫn giữ nguyên và không mâu thuẫn với
-        chân trang này — thân bài là tài liệu pháp lý do mô hình viết, chân
-        trang là phần thương hiệu cố định do code chèn. Trộn hai thứ mới là vấn
-        đề.
-        """
-        pitch = (self._meta.partner_pitch or "").strip()
-        if not pitch:
-            foot = self._meta.contact or self._meta.company or ""
-            if foot:
-                self.drawString(_MARGIN, 30, foot[:110])
-            return
-
-        trai, phai = _MARGIN, _PAGE_W - _MARGIN
-        y, h, vat = 22, 34, 12
-        w_cta = 64
-        x_cta = phai - w_cta
-
-        # ── Dải chính, vát góc trên-phải để dẫn mắt sang khối nhấn ──
-        self.setFillColor(colors.HexColor(BRAND_DEEP))
-        dai = self.beginPath()
-        dai.moveTo(trai, y)
-        dai.lineTo(x_cta, y)
-        dai.lineTo(x_cta + vat, y + h)
-        dai.lineTo(trai, y + h)
-        dai.close()
-        self.drawPath(dai, stroke=0, fill=1)
-
-        # ── Khối nhấn bên phải ──
-        #
-        # Cạnh trái vát SONG SONG với cạnh phải của dải, cách một khoảng đều.
-        # Bản đầu để cạnh này thẳng đứng trong khi cạnh kia vát, nên giữa hai
-        # khối hở ra một nêm trắng hình tam giác — nhìn như lỗi dựng chứ không
-        # ra chủ ý. Song song thì khe hở đều, đọc được là một nhịp thiết kế.
-        khe = 4
-        self.setFillColor(colors.HexColor(BRAND))
-        cta = self.beginPath()
-        cta.moveTo(x_cta + khe, y)
-        cta.lineTo(phai, y)
-        cta.lineTo(phai, y + h)
-        cta.lineTo(x_cta + vat + khe, y + h)
-        cta.close()
-        self.drawPath(cta, stroke=0, fill=1)
-
-        # ── Chữ trên dải: tiêu đề rồi lời ngỏ, hai dòng ──
-        self.setFillColor(colors.white)
-        rong_chu = x_cta - trai - 16
-        tieu_de = (self._meta.partner_title or "").strip()
-        y_chu = y + h - 10
-        if tieu_de:
-            self.setFont(FONT_B, 6.8)
-            self.drawString(trai + 8, y_chu, tieu_de[:70])
-            y_chu -= 9.5
-        self.setFont(FONT, 6.2)
-        for dong in _ngat_dong(pitch, rong_chu, FONT, 6.2, toi_da=2):
-            self.drawString(trai + 8, y_chu, dong)
-            y_chu -= 8
-
-        # ── Khối nhấn: chữ CTA và số trang ──
-        giua = x_cta + vat / 2 + khe + (phai - x_cta - vat - khe) / 2
-        self.setFillColor(colors.white)
-        # CHỈ chữ CTA, không in số trang ở đây: đầu trang đã có số trang rồi
-        # (dòng drawRightString phía trên), in lại là hai số cho một trang.
-        self.setFont(FONT_B, 8)
-        self.drawCentredString(giua, y + h / 2 - 3,
-                               (self._meta.partner_cta or "HỢP TÁC")[:14])
-
-        # ── Dòng liên hệ dưới dải ──
-        lien_he = (self._meta.partner_contact or self._meta.contact or "").strip()
-        if lien_he:
-            self.setFont(FONT, 6)
-            self.setFillColor(colors.HexColor(INK_SOFT))
-            self.drawString(trai, y - 9, lien_he[:120])
 
 
 def _ngat_dong(text: str, rong: float, font: str, co: float,
@@ -357,6 +292,169 @@ def _ngat_dong(text: str, rong: float, font: str, co: float,
             chot = chot[:-1]
         dong[-1] = chot.rstrip() + "…"
     return dong
+
+
+class KhoiThuNgo(Flowable):
+    """Khối thư ngỏ hợp tác, in ở cuối báo cáo.
+
+    Lấy bố cục từ banner mẫu người dùng gửi: logo góc trên trái, dải tiêu đề
+    đậm vát chéo, hai cột liệt kê giá trị, nút gọi hành động, ảnh bên phải.
+
+    VẼ BẰNG VECTOR, chỉ ảnh là raster. Các mảng màu và góc vát của banner gốc
+    là ảnh bitmap; kéo chúng ngang khổ A4 sẽ rỗ khi in. Ảnh bắt tay đã đổi sang
+    tone xanh hai màu (assets/bat_tay_xanh.png) để không chọi với xanh #003CA7
+    dùng cho bìa, đầu bảng và biểu đồ — bản gốc màu cam.
+
+    CHIỀU CAO TỰ TÍNH THEO NỘI DUNG. Bản đầu cố định 150pt, nên cột nào có mục
+    dài phải xuống hai dòng là tràn ra ngoài khối và đè lên dòng liên hệ. Số
+    dòng chỉ biết được sau khi ngắt chữ, nên phải ngắt trước rồi mới biết cao
+    bao nhiêu.
+
+    Là Flowable chứ không vẽ thẳng lên canvas: như vậy nó tự xuống trang mới khi
+    trang cuối không đủ chỗ, thay vì đè lên chữ.
+    """
+
+    CO_MUC = 6.8          # cỡ chữ mục trong cột
+    CAO_DONG = 8.4        # khoảng cách dòng trong một mục
+    CACH_MUC = 3.5        # khoảng hở giữa hai mục
+    CAO_DAU = 46          # logo + tên đơn vị
+    CAO_DAI = 30          # dải tiêu đề
+    CAO_CUOI = 34         # nút CTA và dòng liên hệ
+    HO_TREN_COT = 16      # hở giữa dải tiêu đề và tiêu đề cột
+    CAO_PHU_DE = 12       # dòng phụ đề dưới dải
+    CAO_TIEU_DE_COT = 13
+
+    def __init__(self, meta: ReportMeta, rong: float):
+        super().__init__()
+        self.meta = meta
+        self.width = rong
+        self.vat = 16
+        self.w_anh = rong * 0.30
+        self.x_anh = rong - self.w_anh
+        self.rong_cot = (self.x_anh - 28) / 2
+
+        # Ngắt chữ TRƯỚC, vì chiều cao phụ thuộc số dòng thật.
+        self.cot = [
+            [(t, _ngat_dong(t, self.rong_cot - 12, FONT, self.CO_MUC, 2))
+             for t in (muc or [])[:4]]
+            for muc in (meta.partner_col1, meta.partner_col2)
+        ]
+        # Dùng ĐÚNG các hằng số mà draw() dùng. Bản trước dự trữ 14pt cho tiêu
+        # đề cột trong khi lúc vẽ tiêu đề chiếm 16 + 13 = 29pt, nên mục cuối
+        # cùng luôn thò xuống đè lên dòng liên hệ.
+        cao_cot = max(
+            (self.HO_TREN_COT + self.CAO_TIEU_DE_COT
+             + sum(len(d) * self.CAO_DONG + self.CACH_MUC for _, d in c)
+             for c in self.cot if c), default=0)
+        # partner_pitch hiện thành phụ đề một dòng dưới dải tiêu đề. Bản trước
+        # chỉ dùng nó làm công tắc bật/tắt nên câu chào mời không xuất hiện ở
+        # đâu cả — người sửa report_branding.json sẽ tưởng mình gõ vào chỗ vô
+        # dụng.
+        self.phu_de = _ngat_dong((meta.partner_pitch or "").strip(),
+                                 self.x_anh - 28, FONT_I, 8, 1)
+        cao_phu_de = self.CAO_PHU_DE if self.phu_de else 0
+        self.height = (self.CAO_DAU + self.CAO_DAI + cao_phu_de
+                       + cao_cot + self.CAO_CUOI)
+
+    def wrap(self, *_):
+        return self.width, self.height
+
+    def draw(self):
+        c, W, H, m = self.canv, self.width, self.height, self.meta
+        vat, w_anh, x_anh = self.vat, self.w_anh, self.x_anh
+
+        # ── Nền thẻ ──
+        c.setFillColor(colors.HexColor(SURFACE))
+        c.rect(0, 0, W, H, stroke=0, fill=1)
+
+        # ── Ảnh bên phải, cắt vát mép trái ──
+        anh = m.anh_hop_tac()
+        if anh:
+            c.saveState()
+            p = c.beginPath()
+            p.moveTo(x_anh + vat, 0)
+            p.lineTo(W, 0)
+            p.lineTo(W, H)
+            p.lineTo(x_anh, H)
+            p.close()
+            c.clipPath(p, stroke=0)
+            c.drawImage(str(anh), x_anh - vat, 0, width=w_anh + vat * 2,
+                        height=H, mask=None, preserveAspectRatio=False)
+            c.restoreState()
+        else:
+            c.setFillColor(colors.HexColor(BRAND_SOFT))
+            c.rect(x_anh, 0, w_anh, H, stroke=0, fill=1)
+
+        # ── Logo và tên đơn vị ──
+        x_chu = 14
+        logo = m.logo()
+        if logo:
+            c.drawImage(str(logo), 14, H - 34, width=22, height=22,
+                        mask="auto", preserveAspectRatio=True)
+            x_chu = 42
+        c.setFillColor(colors.HexColor(BRAND_DEEP))
+        c.setFont(FONT_B, 12)
+        c.drawString(x_chu, H - 27, (m.company or "")[:30])
+
+        # ── Dải tiêu đề đậm, vát mép phải ──
+        y_dai = H - self.CAO_DAU - self.CAO_DAI
+        c.setFillColor(colors.HexColor(BRAND_DEEP))
+        d = c.beginPath()
+        d.moveTo(0, y_dai)
+        d.lineTo(x_anh - 6, y_dai)
+        d.lineTo(x_anh - 6 + vat, y_dai + self.CAO_DAI)
+        d.lineTo(0, y_dai + self.CAO_DAI)
+        d.close()
+        c.drawPath(d, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.setFont(FONT_B, 13)
+        c.drawString(14, y_dai + 10, (m.partner_title or "THƯ NGỎ HỢP TÁC")[:44])
+
+        # ── Phụ đề dưới dải ──
+        y_moc = y_dai
+        if self.phu_de:
+            c.setFillColor(colors.HexColor(INK_SOFT))
+            c.setFont(FONT_I, 8)
+            c.drawString(14, y_dai - 11, self.phu_de[0])
+            y_moc -= self.CAO_PHU_DE
+
+        # ── Hai cột giá trị ──
+        tieu_de_cot = (m.partner_col1_title, m.partner_col2_title)
+        for i, muc in enumerate(self.cot):
+            if not muc:
+                continue
+            x = 14 + i * (self.rong_cot + 8)
+            y = y_moc - self.HO_TREN_COT
+            c.setFillColor(colors.HexColor(BRAND))
+            c.setFont(FONT_B, 8)
+            c.drawString(x, y, (tieu_de_cot[i] or "")[:34])
+            y -= self.CAO_TIEU_DE_COT
+            for _, dong in muc:
+                c.setFillColor(colors.HexColor(BRAND))
+                c.circle(x + 2.5, y + 2.2, 1.7, stroke=0, fill=1)
+                c.setFillColor(colors.HexColor(INK))
+                c.setFont(FONT, self.CO_MUC)
+                for k, phan in enumerate(dong):
+                    c.drawString(x + 8, y - k * self.CAO_DONG, phan)
+                y -= len(dong) * self.CAO_DONG + self.CACH_MUC
+
+        # ── Nút gọi hành động, đè lên ảnh như banner mẫu ──
+        cta = (m.partner_cta or "").strip()
+        if cta:
+            c.setFont(FONT_B, 8)
+            w_nut = pdfmetrics.stringWidth(cta, FONT_B, 8) + 22
+            x_nut = W - w_nut - 10
+            c.setFillColor(colors.HexColor(BRAND))
+            c.rect(x_nut, 13, w_nut, 20, stroke=0, fill=1)
+            c.setFillColor(colors.white)
+            c.drawCentredString(x_nut + w_nut / 2, 19.5, cta)
+
+        # ── Dòng liên hệ, nằm trong vùng CAO_CUOI nên không đụng cột ──
+        lien_he = (m.partner_contact or "").strip()
+        if lien_he:
+            c.setFillColor(colors.HexColor(INK_SOFT))
+            c.setFont(FONT, 7)
+            c.drawString(14, 19, lien_he[:70])
 
 
 def _draw_cover(canv: rl_canvas.Canvas, doc) -> None:
@@ -659,6 +757,12 @@ def build_report_pdf(md_text: str, out_path: Path, meta: ReportMeta) -> Path:
     # và dải màu đè lên toàn bộ nội dung.
     story: list = [NextPageTemplate("body"), PageBreak()]
     story += _parse(_strip_own_cover(md_text), meta, st)
+
+    # Thư ngỏ hợp tác đóng lại báo cáo. Là Flowable nên nó tự xuống trang mới
+    # khi trang cuối không đủ chỗ, thay vì đè lên chữ.
+    if (meta.partner_pitch or "").strip():
+        story.append(Spacer(1, 22))
+        story.append(KhoiThuNgo(meta, _CONTENT_W))
 
     doc.build(story, canvasmaker=lambda *a, **k: _Canvas(*a, meta=meta, **k))
     return out_path

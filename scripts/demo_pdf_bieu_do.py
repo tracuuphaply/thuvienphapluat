@@ -99,6 +99,10 @@ def main() -> None:
             partner_pitch=brand.get("partner_pitch", ""),
             partner_cta=brand.get("partner_cta", ""),
             partner_contact=brand.get("partner_contact", ""),
+            partner_col1_title=brand.get("partner_col1_title", ""),
+            partner_col1=brand.get("partner_col1", []),
+            partner_col2_title=brand.get("partner_col2_title", ""),
+            partner_col2=brand.get("partner_col2", []),
         )))
 
     goc = args.out or args.md_path.with_name(args.md_path.stem + "_DEMO.pdf")

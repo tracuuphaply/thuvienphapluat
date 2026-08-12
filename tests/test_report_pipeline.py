@@ -651,15 +651,15 @@ class TestChanTrangHopTac:
                          ReportMeta(industry="Thử", period="Kỳ", cutoff="12/08/2026", **kw))
         return "\n".join(p.extract_text() or "" for p in PdfReader(str(out)).pages)
 
-    def test_loi_ngo_hien_du_khong_bi_cat(self, tmp_path):
-        """Nửa câu cụt trên khối quảng bá là hỏng hẳn, không phải xấu đi một chút."""
-        pitch = ("Quý công ty luật tài trợ chi phí gửi email; đổi lại, thương hiệu "
-                 "và dịch vụ của quý công ty đến đúng những doanh nghiệp vừa nhận "
-                 "cảnh báo pháp lý và đang cần tư vấn.")
-        txt = self._dung(tmp_path, partner_title="ĐỒNG HÀNH", partner_pitch=pitch)
-        gop = txt.replace("\n", " ")
-        assert "và đang cần tư vấn." in gop
-        assert "…" not in gop.split("ĐỒNG HÀNH")[1][:300]
+    def test_loi_ngo_hien_ra_lam_phu_de(self, tmp_path):
+        """partner_pitch phải hiện ở đâu đó, không chỉ làm công tắc bật/tắt.
+
+        Bản trước chỉ dùng nó để quyết định có dựng khối hay không, nên người
+        sửa report_branding.json gõ câu chào mời vào một chỗ vô dụng.
+        """
+        txt = self._dung(tmp_path, partner_title="ĐỒNG HÀNH",
+                         partner_pitch="Tìm công ty luật đồng hành.")
+        assert "Tìm công ty luật đồng hành." in txt.replace("\n", " ")
 
     def test_khong_co_loi_ngo_thi_lui_ve_chan_trang_gon(self, tmp_path):
         """Để trống phải tắt được khối hợp tác mà không phải sửa code."""
@@ -667,10 +667,10 @@ class TestChanTrangHopTac:
         assert "HỢP TÁC" not in txt
         assert "thongtincty" in txt
 
-    def test_loi_ngo_qua_dai_thi_bao_bang_ba_cham(self, tmp_path):
+    def test_phu_de_qua_dai_thi_bao_bang_ba_cham(self, tmp_path):
         """Không nuốt im lặng phần thừa — người viết phải biết là nó không vừa."""
         txt = self._dung(tmp_path, partner_title="T",
-                         partner_pitch="Từ khoá dài. " * 60)
+                         partner_pitch="Từ khoá rất dài. " * 30)
         assert "…" in txt
 
     def test_ngat_theo_tu_khong_cat_giua_tu(self, tmp_path):
@@ -682,3 +682,65 @@ class TestChanTrangHopTac:
         for d in dong:
             for tu in d.replace("…", "").split():
                 assert tu in goc, f"cắt giữa từ: {tu!r}"
+
+
+class TestKhoiThuNgo:
+    """Khối thư ngỏ hợp tác ở cuối báo cáo."""
+
+    def _meta(self, **kw):
+        from src.utils.report_pdf import ReportMeta
+        nen = dict(industry="Thử", period="Kỳ", cutoff="12/08/2026",
+                   company="thongtincty",
+                   partner_title="THƯ NGỎ HỢP TÁC TRUYỀN THÔNG",
+                   partner_pitch="Tìm công ty luật đồng hành.",
+                   partner_cta="HỢP TÁC CÙNG CHÚNG TÔI",
+                   partner_contact="Liên hệ: thongtincty.com",
+                   partner_col1_title="Chúng tôi cung cấp",
+                   partner_col1=["Hệ thống rà soát tự động",
+                                 "Báo cáo pháp lý theo ngành"],
+                   partner_col2_title="Công ty luật nhận được",
+                   partner_col2=["Thương hiệu trên mọi báo cáo",
+                                 "Thông tin liên hệ khách tiềm năng"])
+        nen.update(kw)
+        return ReportMeta(**nen)
+
+    def _txt(self, tmp_path, meta):
+        from pypdf import PdfReader
+
+        from src.utils.report_pdf import build_report_pdf
+        out = tmp_path / "t.pdf"
+        build_report_pdf("### MỤC\n\n" + ("Một đoạn. " * 120), out, meta)
+        return "\n".join(p.extract_text() or "" for p in PdfReader(str(out)).pages)
+
+    def test_in_o_cuoi_bao_cao_khong_lap_moi_trang(self, tmp_path):
+        """Khối chiếm gần một phần ba trang; lặp mỗi trang thì báo cáo thành tờ rơi."""
+        txt = self._txt(tmp_path, self._meta())
+        assert txt.count("THƯ NGỎ HỢP TÁC TRUYỀN THÔNG") == 1
+
+    def test_hai_cot_gia_tri_deu_hien(self, tmp_path):
+        """Hai cột lấy từ report_branding.json; nơi gọi quên truyền thì chúng
+        biến mất mà khối vẫn dựng bình thường — đã xảy ra thật."""
+        txt = self._txt(tmp_path, self._meta())
+        for c in ("Chúng tôi cung cấp", "Công ty luật nhận được",
+                  "Hệ thống rà soát tự động", "Thương hiệu trên mọi báo cáo"):
+            assert c in txt, c
+
+    def test_chieu_cao_tang_theo_so_muc(self, tmp_path):
+        """Cố định chiều cao thì mục dài tràn ra ngoài và đè lên dòng liên hệ."""
+        from src.utils.report_pdf import KhoiThuNgo, _register_fonts
+        _register_fonts()
+        it = KhoiThuNgo(self._meta(partner_col1=["Một mục"]), 480)
+        nhieu = KhoiThuNgo(self._meta(
+            partner_col1=[f"Mục số {i} viết dài để phải xuống dòng thứ hai" for i in range(4)]), 480)
+        assert nhieu.height > it.height
+
+    def test_khong_co_loi_ngo_thi_khong_co_khoi(self, tmp_path):
+        txt = self._txt(tmp_path, self._meta(partner_pitch=""))
+        assert "THƯ NGỎ" not in txt
+        assert "HỢP TÁC CÙNG CHÚNG TÔI" not in txt
+
+    def test_anh_thieu_thi_van_dung_duoc(self, tmp_path, monkeypatch):
+        """Thiếu file ảnh không được làm chết cả bản PDF."""
+        from src.utils import report_pdf
+        monkeypatch.setattr(report_pdf.ReportMeta, "anh_hop_tac", lambda self: None)
+        assert "THƯ NGỎ HỢP TÁC TRUYỀN THÔNG" in self._txt(tmp_path, self._meta())

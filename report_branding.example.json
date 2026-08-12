@@ -5,11 +5,23 @@
   "website": "congty.vn",
   "header": "",
   "footer": "",
-
-  "_ghi_chu_chan_trang": "Bốn khoá dưới đây dựng khối lời ngỏ hợp tác ở chân mỗi trang PDF. Để partner_pitch rỗng thì khối này tắt và chân trang lùi về dạng gọn (tên công ty + số trang). Lời ngỏ dài quá hai dòng sẽ bị cắt và báo bằng dấu ba chấm — giữ dưới khoảng 170 ký tự.",
-
-  "partner_title": "ĐỒNG HÀNH CÙNG BẢN TIN PHÁP LÝ NÀY",
-  "partner_pitch": "Quý công ty luật tài trợ chi phí gửi email; đổi lại, thương hiệu và dịch vụ của quý công ty đến đúng những doanh nghiệp vừa nhận cảnh báo pháp lý và đang cần tư vấn.",
-  "partner_cta": "HỢP TÁC",
-  "partner_contact": "Liên hệ hợp tác: lienhe@congty.vn"
+  "_ghi_chu_chan_trang": "Khối thư ngỏ hợp tác in ở CUỐI báo cáo (trang chót), không lặp mỗi trang. Để partner_pitch rỗng thì khối này tắt hẳn và chỉ còn bản gửi khách. Mỗi cột nên giữ 3–4 dòng, mỗi dòng dưới 60 ký tự.",
+  "partner_title": "THƯ NGỎ HỢP TÁC TRUYỀN THÔNG",
+  "partner_pitch": "Chúng tôi tìm công ty luật đồng hành cùng bản tin pháp lý này.",
+  "partner_cta": "HỢP TÁC CÙNG CHÚNG TÔI",
+  "partner_contact": "Liên hệ hợp tác: lienhe@congty.vn",
+  "partner_col1_title": "Chúng tôi cung cấp",
+  "partner_col1": [
+    "Hệ thống tự động rà soát văn bản pháp luật mới",
+    "Báo cáo pháp lý theo ngành, gửi định kỳ",
+    "Danh sách doanh nghiệp đang cần tư vấn pháp lý",
+    "Kênh email marketing đã có sẵn người đọc"
+  ],
+  "partner_col2_title": "Công ty luật nhận được",
+  "partner_col2": [
+    "Thương hiệu xuất hiện trên mọi bản báo cáo",
+    "Tiếp cận doanh nghiệp đúng lúc họ cần",
+    "Thông tin liên hệ khách hàng tiềm năng",
+    "Đổi lại: tài trợ chi phí gửi email"
+  ]
 }
