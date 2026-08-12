@@ -32,8 +32,8 @@ là mã ngành ghi trên giấy chứng nhận đăng ký doanh nghiệp của h
 ## 3. QUY TRÌNH BẮT BUỘC
 
 **Bước 1 — Đọc hết dữ liệu trước khi viết.** Không viết một dòng nào trước khi
-đã duyệt xong `danh_sach_van_ban`, `chi_tiet_dieu_khoan_chunks`,
-`do_thi_quan_he_van_ban_edges` và `han_che_du_lieu`.
+đã duyệt xong `insight_tung_van_ban` (nguồn nội dung chính), `danh_sach_van_ban`,
+`chi_tiet_dieu_khoan_chunks` và `do_thi_quan_he_van_ban_edges`.
 
 **Bước 2 — Dựng bảng kiểm hiệu lực.** Với mỗi văn bản: số hiệu · loại · cơ quan
 ban hành · ngày ban hành · ngày có hiệu lực · tình trạng · văn bản tác động.
@@ -43,8 +43,9 @@ ban hành · ngày ban hành · ngày có hiệu lực · tình trạng · văn 
   trích dẫn có thuộc phần đã bị sửa hay không; nếu dữ liệu không đủ để biết thì
   ghi `[Cần xác minh: điều khoản này còn hiệu lực không]`.
 - `eff_status = "Chưa có hiệu lực"` → nêu như nghĩa vụ SẮP tới, kèm ngày `eff_from`.
-- `eff_status = "Chưa xác định"` → **cấm** trình bày như đang còn hiệu lực; đưa
-  vào danh mục hạn chế dữ liệu.
+- `eff_status = "Chưa xác định"` → **cấm** trình bày như đang còn hiệu lực; nếu
+  vẫn nhắc tới thì kèm lưu ý "cần kiểm tra lại hiệu lực trước khi áp dụng", KHÔNG
+  lập một mục thống kê dữ liệu.
 - Đoạn nào có trường `canh_bao_hieu_luc` thì phải chuyển cảnh báo đó vào báo cáo.
 
 **Bước 3 — Xử lý mâu thuẫn** theo thứ tự: (1) văn bản có hiệu lực pháp lý cao hơn
@@ -67,6 +68,10 @@ doanh nghiệp đọc qua email, không phải luật sư đọc hồ sơ — m�
 
 ---
 
+{{include:_chung/doc_va_tong_hop_insight.md}}
+
+---
+
 {{include:_chung/giong_van_doanh_nghiep.md}}
 
 ---
@@ -86,14 +91,23 @@ doanh nghiệp đọc qua email, không phải luật sư đọc hồ sơ — m�
    4. Khoảng trống pháp lý
 
 ### CHƯƠNG II…N — CHUYÊN ĐỀ
-   Mỗi chương đủ 4 khối: quy định hiện hành → điểm thay đổi → tác động tới
-   doanh nghiệp → rủi ro & khuyến nghị hành động.
+   Mỗi chương gom insight của các văn bản cùng một chủ đề (dựa vào
+   `insight_tung_van_ban` và `diem_tac_dong_nganh`), đủ 4 khối: quy định hiện
+   hành → điểm thay đổi → tác động tới doanh nghiệp → rủi ro & khuyến nghị hành
+   động. Mỗi luận điểm dẫn Điều/Khoản cụ thể lấy từ `noi_dung_chinh`.
+
+   Ràng buộc phủ sóng: mọi văn bản trong `danh_sach_van_ban` phải xuất hiện với
+   NỘI DUNG THỰC CHẤT ở ít nhất một chương hoặc ở khối "Văn bản trọng tâm" —
+   không được có văn bản chỉ nằm trong phụ lục danh mục mà không nói nó quy định
+   gì. Văn bản thiếu nội dung chi tiết thì nhắc ngắn theo thông tin sẵn có, không
+   giải thích vì sao thiếu.
 
 ### KHỐI "VĂN BẢN TRỌNG TÂM"
    Với 2–3 văn bản quan trọng nhất, mỗi văn bản:
    - Số hiệu, cơ quan ban hành, ngày ban hành, ngày có hiệu lực, tình trạng, đối tượng áp dụng
-   - Luận điểm pháp lý (đánh số)
+   - Luận điểm pháp lý (đánh số) — chắt từ `noi_dung_chinh` và `diem_dang_chu_y`
    - Bảng: | Điều/khoản | Quy định nói gì | Bạn phải làm gì | Trước ngày nào |
+     — mỗi dòng là một mục trong `noi_dung_chinh`/`nghia_vu_moi`/`moc_thoi_gian`
 
 ### CHƯƠNG CUỐI — TỔNG HỢP & LỘ TRÌNH TUÂN THỦ
    Bảng: | Trước ngày | Phải làm gì | Theo văn bản nào | Ai trong công ty lo | Mức khẩn |
@@ -101,7 +115,6 @@ doanh nghiệp đọc qua email, không phải luật sư đọc hồ sơ — m�
 ### PHỤ LỤC
    1. Danh mục văn bản đã tham chiếu
    2. Tuyên bố miễn trách nhiệm
-   3. Hạn chế dữ liệu
 ```
 
 ---
@@ -152,9 +165,10 @@ Khối JSON có các khoá:
 
 | Khoá | Nội dung |
 |---|---|
-| `thong_tin_tra_cuu` | số văn bản, số đoạn, số quan hệ tìm được |
-| `han_che_du_lieu` | văn bản không rõ hiệu lực, đoạn bị loại, phạm vi thời gian thực tế |
+| `thong_tin_tra_cuu` | số văn bản, số văn bản đã đọc sâu, số đoạn, số quan hệ |
+| `han_che_du_lieu` | văn bản không rõ hiệu lực, đoạn bị loại, văn bản chưa đọc sâu được, phạm vi thời gian thực tế |
 | `danh_sach_van_ban` | `doc_num`, `title`, `doc_type`, `issue_date`, `eff_from`, `eff_to`, `eff_status`, `agency_name` |
+| `insight_tung_van_ban` | mỗi văn bản đã đọc hết toàn văn: `mot_cau`, `pham_vi_dieu_chinh`, `noi_dung_chinh[{dieu_khoan, quy_dinh, y_nghia}]`, `nghia_vu_moi`, `moc_thoi_gian`, `che_tai`, `diem_dang_chu_y` |
 | `chi_tiet_dieu_khoan_chunks` | `doc_num`, `heading`, `content_excerpt`, và `canh_bao_hieu_luc` nếu có |
 | `do_thi_quan_he_van_ban_edges` | `source_doc_num`, `target_doc_num`, `relation_type`, `chieu` |
 

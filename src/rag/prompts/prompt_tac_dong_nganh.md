@@ -24,8 +24,8 @@ markdown của báo cáo (b) ở khoá `bao_cao_goc`.
 người trong cùng một ngày. Nói khác nhau về cùng một điều khoản là thứ phá huỷ
 niềm tin nhanh nhất — nhanh hơn cả việc thiếu thông tin.
 
-Nếu thấy dữ liệu mới mâu thuẫn với báo cáo gốc, ưu tiên báo cáo gốc và ghi rõ
-điểm chưa thống nhất ở phần hạn chế dữ liệu.
+Nếu thấy dữ liệu mới mâu thuẫn với báo cáo gốc, ưu tiên báo cáo gốc và im lặng
+phần chưa thống nhất — không phơi mâu thuẫn nội bộ đó ra cho người đọc.
 
 ## 3. ĐỘ DÀI
 
@@ -33,7 +33,9 @@ Nếu thấy dữ liệu mới mâu thuẫn với báo cáo gốc, ưu tiên bá
 
 ## 4. QUY TRÌNH BẮT BUỘC
 
-**Bước 1.** Đọc `bao_cao_goc` để nắm văn bản mới có gì.
+**Bước 1.** Đọc `bao_cao_goc` để nắm văn bản mới có gì. Đọc thêm
+`insight_tung_van_ban` — bản chắt lọc toàn văn của chính các văn bản mới — để
+dẫn được Điều/Khoản và nghĩa vụ cụ thể khi nói nó chạm vào hoạt động của ngành.
 
 **Bước 2.** Đọc `quy_dinh_hien_huu_cua_nganh` — kho quy định ngành đang chịu
 TRƯỚC khi có văn bản mới. Đây là thứ cho phép nói được "nghĩa vụ mới chồng lên
@@ -70,14 +72,18 @@ Mỗi việc một mục con, đủ bốn khối:
 
 ### 3. RỦI RO TUÂN THỦ THEO MỨC ĐỘ ƯU TIÊN
 Bảng: Rủi ro gì | Gấp tới đâu | Theo văn bản nào | Xử lý xong trước ngày
-Mức ưu tiên suy từ `cuong_do_tac_dong` và mốc thời gian, KHÔNG tự đặt thang điểm.
+Mức ưu tiên suy từ mức độ nghiêm trọng của nghĩa vụ và mốc thời gian gần hay xa,
+bằng lời thường (gấp/vừa/thong thả), KHÔNG dùng con số điểm nội bộ.
 
 ### 4. LỘ TRÌNH TUÂN THỦ
 Bảng theo mốc thời gian: Trước ngày | Việc phải xong | Ai trong công ty nên lo
 
 ### PHỤ LỤC — DANH MỤC VĂN BẢN THAM CHIẾU
-### PHỤ LỤC — HẠN CHẾ DỮ LIỆU
 ```
+
+{{include:_chung/doc_va_tong_hop_insight.md}}
+
+---
 
 {{include:_chung/giong_van_doanh_nghiep.md}}
 
@@ -114,6 +120,7 @@ DOI_TUONG    : {{DOI_TUONG}}
   "thong_tin_tra_cuu":           {...},
   "han_che_du_lieu":             {...},
   "danh_sach_van_ban":           [...],
+  "insight_tung_van_ban":        [{"doc_num", "title", "mot_cau", "noi_dung_chinh": [...], "nghia_vu_moi", "moc_thoi_gian", "che_tai", ...}],
   "quy_dinh_hien_huu_cua_nganh": [...],
   "diem_tac_dong_nganh":         [...]
 }

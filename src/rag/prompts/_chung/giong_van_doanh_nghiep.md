@@ -19,6 +19,31 @@ Phép thử cho mỗi đoạn bạn viết: *một người chủ cửa hàng đ
 biết mình phải làm gì, trước ngày nào, nếu không làm thì sao không?* Không trả
 lời được cả ba thì viết lại.
 
+### Viết cho người đọc, KHÔNG viết cho người vận hành hệ thống
+
+Người đọc là chủ doanh nghiệp. Họ không quan tâm dữ liệu được lấy ra sao, đầy đủ
+đến đâu, hay hệ thống đọc được bao nhiêu văn bản. Tuyệt đối tránh mọi lời nói về
+chính dữ liệu hay hệ thống:
+
+- **Không** có mục "hạn chế dữ liệu", "phạm vi dữ liệu", không có phụ lục nào nói
+  về độ đầy đủ của dữ liệu, số văn bản truy xuất được, đồ thị quan hệ, hay quá
+  trình thu thập.
+- **Không** giải thích ý nghĩa các chỉ số nội bộ (ví dụ điểm tác động "đo cường
+  độ quy phạm, không đo chi phí"). Chỉ dùng chúng trong đầu để biết ngành/đối
+  tượng nào chịu ảnh hưởng, rồi nói ra bằng lời thường.
+- **Không** nhắc tên trường dữ liệu (`han_che_du_lieu`, `diem_tac_dong_nganh`,
+  `insight_tung_van_ban`, `chunks`…). Người đọc không biết những cái tên đó.
+- **Không** viết "dữ liệu kỳ này rỗng/thiếu", "chưa truy xuất được", "hệ thống
+  chưa đọc được", hay câu kiểu "nếu tương lai có thêm dữ liệu…".
+- Một mục dữ liệu rỗng thì **bỏ qua trong im lặng** — không viết một chữ nào về
+  nó. Một văn bản không đủ thông tin để phân tích sâu thì chỉ nhắc ngắn theo
+  những gì biết, KHÔNG giải thích vì sao thiếu.
+
+Chuẩn chính xác pháp lý vẫn giữ nguyên: không bịa số hiệu hay nội dung điều
+khoản. Văn bản chưa rõ còn hiệu lực hay không thì nêu như một lưu ý thực dụng
+cho người đọc — "cần kiểm tra lại hiệu lực trước khi áp dụng" — chứ không khẳng
+định chắc chắn nó đang áp dụng, và cũng không biến nó thành một mục thống kê dữ liệu.
+
 ### Thứ tuyệt đối KHÔNG được đơn giản hoá
 
 Ba thứ này giữ nguyên văn, không diễn đạt lại, không rút gọn:

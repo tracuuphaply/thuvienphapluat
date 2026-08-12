@@ -154,10 +154,15 @@ class TestDoiChieuVanBanCu:
         assert len(payload["van_ban_bi_tac_dong"][0]["dieu_khoan_cu"]) == CU_MAX_DOAN
 
     def test_prompt_noi_ro_truong_moi(self):
-        """Dữ liệu có mà prompt không nhắc thì mô hình không dùng tới."""
+        """Dữ liệu có mà prompt không nhắc thì mô hình không dùng tới.
+
+        `van_ban_cu_chua_co_toan_van` là telemetry của hệ thống — nay CỐ Ý không
+        đưa vào prompt vì báo cáo viết cho chủ doanh nghiệp, không phải cho người
+        vận hành (xem giong_van_doanh_nghiep.md). Chỉ giữ trường dữ liệu thật sự
+        dùng để viết nội dung.
+        """
         p = load_prompt("b")
         assert "dieu_khoan_cu" in p
-        assert "van_ban_cu_chua_co_toan_van" in p
 
 
 class TestBaoThieuVanBanDanChieu:
@@ -207,12 +212,19 @@ class TestBaoThieuVanBanDanChieu:
             master_session))
         assert out["van_ban_dan_chieu_chua_co_trong_kho"]["vuot_tran_do_sau"] == 242
 
-    def test_checklist_nhac_mo_hinh_dung_khoi_nay(self):
-        """Dữ liệu có mà prompt không nhắc thì mô hình không dùng tới."""
+    def test_prompt_khong_phoi_telemetry_bao_dong(self):
+        """Đảo chiều chính sách: khối bao đóng dẫn chiếu là telemetry hệ thống,
+
+        KHÔNG được lộ ra báo cáo gửi chủ doanh nghiệp. Trước đây prompt bắt mô
+        hình công bố "đồ thị quan hệ chưa đầy đủ" kèm ba con số — đúng loại nội
+        dung người dùng yêu cầu bỏ. Payload vẫn giữ khối này cho mục đích nội bộ
+        (xem các test payload ở trên), nhưng prompt không được nhắc để mô hình
+        không đưa nó vào báo cáo.
+        """
         for kind in ("a", "b", "c"):
             p = load_prompt(kind)
-            assert "van_ban_dan_chieu_chua_co_trong_kho" in p, f"prompt {kind}"
-            assert "vuot_tran_do_sau" in p, f"prompt {kind}"
+            assert "van_ban_dan_chieu_chua_co_trong_kho" not in p, f"prompt {kind}"
+            assert "vuot_tran_do_sau" not in p, f"prompt {kind}"
 
 
 class TestBaoCaoNganhVaoWorker:

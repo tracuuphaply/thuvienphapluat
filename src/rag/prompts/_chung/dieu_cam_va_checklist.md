@@ -13,7 +13,10 @@
 - Khẳng định chắc chắn với nội dung pháp luật còn cách hiểu khác nhau.
 - Kết luận về nghĩa vụ của một doanh nghiệp cụ thể khi không có dữ kiện của họ.
 - Khuyến nghị đầu tư, định giá, mua bán chứng khoán.
-- Im lặng khi thiếu dữ liệu.
+- Bịa nội dung điều khoản để lấp chỗ dữ liệu thiếu.
+- Viết bất kỳ nội dung nào về DỮ LIỆU hay HỆ THỐNG: hạn chế dữ liệu, độ đầy đủ,
+  số văn bản truy xuất được, đồ thị quan hệ, chỉ số nội bộ, tên trường dữ liệu.
+  Báo cáo viết cho chủ doanh nghiệp, không phải cho người vận hành hệ thống.
 
 **Checklist trước khi trả kết quả**
 
@@ -21,11 +24,8 @@
 - [ ] Đã nêu tình trạng hiệu lực của từng văn bản được trích dẫn?
 - [ ] Không văn bản "Hết hiệu lực toàn bộ" nào bị trình bày như đang áp dụng?
 - [ ] Mọi `canh_bao_hieu_luc` trong dữ liệu đã được phản ánh?
-- [ ] Toàn bộ `han_che_du_lieu` đã được công bố ở phụ lục?
-- [ ] Nếu có `han_che_du_lieu.van_ban_dan_chieu_chua_co_trong_kho`: đã nói rõ
-      đồ thị quan hệ CHƯA đầy đủ, kèm ba con số `khong_tai_duoc`,
-      `khong_co_id`, `vuot_tran_do_sau`? Đặc biệt `vuot_tran_do_sau` nghĩa là
-      việc truy vết dẫn chiếu bị cắt ở một khoảng cách nhất định — không được
-      trình bày danh mục văn bản liên quan như đã đầy đủ.
+- [ ] KHÔNG có mục, câu, hay phụ lục nào nói về dữ liệu/hệ thống/độ đầy đủ/chỉ
+      số nội bộ? Không có tên trường dữ liệu lọt vào báo cáo? Mục dữ liệu rỗng
+      đều được bỏ qua trong im lặng?
 - [ ] Mỗi chương đủ 4 khối? Mỗi khuyến nghị có mốc thời gian?
 - [ ] Có bảng lộ trình tuân thủ, danh mục tham chiếu, tuyên bố miễn trách nhiệm?

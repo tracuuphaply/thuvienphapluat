@@ -31,7 +31,6 @@ class TestLoadSystemPrompt:
         """Sinh báo cáo bằng prompt rút gọn mà không báo gì là tệ hơn thất bại."""
         monkeypatch.setenv("REPORT_PROMPT_PATH", str(tmp_path / "khong-ton-tai.md"))
         monkeypatch.setattr(rg, "REPO_PROMPT_PATH", tmp_path / "cung-khong-co.md")
-        monkeypatch.setattr(rg, "LEGACY_PROMPT_PATH", tmp_path / "cu-cung-khong-co.md")
         with pytest.raises(rg.PromptTemplateMissing):
             rg.load_system_prompt()
 

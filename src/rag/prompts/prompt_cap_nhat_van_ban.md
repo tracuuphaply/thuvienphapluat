@@ -26,7 +26,9 @@ hết có giá trị hơn một bản 10 trang bị bỏ qua.
 ## 3. QUY TRÌNH BẮT BUỘC
 
 **Bước 1 — Đọc dữ liệu.** `danh_sach_van_ban` là toàn bộ văn bản cần phân tích,
-không phải mẫu. Đọc hết `chi_tiet_dieu_khoan_chunks`.
+không phải mẫu. Với mỗi văn bản, đọc `insight_tung_van_ban` — bản chắt lọc sau
+khi hệ thống đã đọc hết toàn văn — làm nguồn nội dung chính; `chi_tiet_dieu_khoan_chunks`
+là trích đoạn thô để đối chiếu câu chữ khi cần.
 
 **Bước 2 — Xác định cái gì thay đổi.** Với mỗi văn bản, đọc
 `do_thi_quan_he_van_ban_edges` để biết nó sửa đổi, thay thế hay bãi bỏ văn bản
@@ -39,11 +41,10 @@ phải làm khác đi ra sao. "Nghị định 100 thay thế Nghị định 50" 
 mục, không phải phân tích — người đọc cần biết ngưỡng vốn đã tăng từ 3 tỷ lên 10
 tỷ, thời hạn báo cáo rút từ 30 ngày xuống 15 ngày.
 
-Bản cũ nào không có `dieu_khoan_cu` (danh sách ở `han_che_du_lieu.
-van_ban_cu_chua_co_toan_van`) thì nói rõ là CHƯA ĐỐI CHIẾU ĐƯỢC nội dung, tuyệt
-đối không suy đoán bản cũ quy định gì. `dieu_khoan_cu` bị cắt còn tối đa 40 đoạn
-đầu, nên nếu điều khoản cần đối chiếu không có ở đó thì cũng ghi là chưa đối
-chiếu được, đừng kết luận là bản cũ không có quy định tương ứng.
+Bản cũ nào không có `dieu_khoan_cu` kèm theo thì chỉ nói có sự thay thế/sửa đổi,
+KHÔNG mô tả chi tiết thay đổi và tuyệt đối không suy đoán bản cũ quy định gì.
+Cũng đừng kết luận "bản cũ không có quy định tương ứng" chỉ vì không thấy điều
+khoản đó — im lặng phần không rõ, không nêu lý do kỹ thuật với người đọc.
 
 **Bước 3 — Xếp theo thứ bậc.** Dùng `cap_hieu_luc_phap_ly`: **số nhỏ hơn là
 hiệu lực cao hơn**. Văn bản có `la_van_ban_qppl` = false KHÔNG được dùng làm căn
@@ -52,14 +53,10 @@ cứ pháp lý, chỉ nhắc như thông tin tham khảo.
 **Bước 4 — Xác định phạm vi.** Văn bản có `pham_vi_lanh_tho` = "tinh" chỉ áp
 dụng trong `dia_ban_ap_dung`. Tuyệt đối không trình bày như quy định toàn quốc.
 
-**Bước 5 — Đọc điểm tác động ngành.** Khối `diem_tac_dong_nganh` cho biết văn
-bản chạm tới ngành nào. Hai con số có ý nghĩa KHÁC NHAU:
-- `ty_trong_tac_dong` cộng 21 ngành bằng 100% — trả lời "văn bản này nhắm vào ai"
-- `cuong_do_tac_dong` là thứ hạng bách phân so với toàn kho, độc lập giữa các
-  ngành — trả lời "ngành đó nên quan tâm tới mức nào"
-
-Chỉ số này đo **cường độ quy phạm** hướng vào một ngành, **không** đo **chi phí
-kinh tế**. Phải ghi câu này khi lần đầu nhắc tới điểm số.
+**Bước 5 — Xác định ai chịu ảnh hưởng.** Dựa vào nội dung văn bản (đối tượng
+áp dụng, phạm vi điều chỉnh) để nói bằng lời thường ngành nghề hay nhóm doanh
+nghiệp nào chịu tác động. `diem_tac_dong_nganh` nếu có thì dùng để chọn ra ngành
+nổi bật, nhưng KHÔNG đưa con số điểm ra báo cáo và KHÔNG giải thích nó đo cái gì.
 
 **Bước 6 — Tự kiểm** theo checklist ở mục 6.
 
@@ -71,10 +68,13 @@ Bảng: Số hiệu | Gọi tắt là gì | Cơ quan ban hành | Bắt đầu á
 
 ### 1. CÓ GÌ MỚI
 Mỗi văn bản một mục con `#### {số hiệu} — {tên gọi tắt}`, gồm đủ bốn khối:
-  (a) Văn bản này làm gì — một câu
-  (b) Thay đổi so với quy định cũ — dẫn điều khoản cụ thể hai bên; chưa đối
-      chiếu được thì nói thẳng là chưa đối chiếu được
-  (c) Ai chịu tác động — dẫn `diem_tac_dong_nganh`, kèm phạm vi lãnh thổ
+  (a) Văn bản này làm gì — lấy `mot_cau` và các mục `noi_dung_chinh` chính yếu
+      từ `insight_tung_van_ban`; nói rõ nghĩa vụ, ngưỡng, thủ tục kèm Điều/Khoản,
+      không dừng ở một câu chung chung
+  (b) Thay đổi so với quy định cũ — dẫn điều khoản cụ thể hai bên khi biết; nếu
+      chưa rõ chi tiết bản cũ thì chỉ nói có thay thế/sửa đổi, không suy đoán
+  (c) Ai chịu tác động — nêu ngành nghề/nhóm doanh nghiệp chịu ảnh hưởng theo
+      nội dung văn bản, kèm phạm vi lãnh thổ (bằng lời thường, không có con số điểm)
   (d) Mốc thời gian — ngày ban hành, ngày có hiệu lực, hạn chuyển tiếp nếu có
 
 ### 2. NGHĨA VỤ MỚI PHÁT SINH
@@ -89,20 +89,19 @@ Với mỗi văn bản cũ có `dieu_khoan_cu`, bắt buộc có bảng đối c
 Chuyện gì | Trước đây (số hiệu + Điều) | Từ nay (số hiệu + Điều) | Bạn phải làm khác đi thế nào
 
 Mỗi dòng là một thay đổi có hệ quả thực tế. Không đưa vào bảng những thay đổi
-thuần câu chữ. Ô nào không đối chiếu được thì ghi "chưa đối chiếu được", không
-để trống và không đoán.
+thuần câu chữ. Chỗ nào chưa rõ chi tiết bản cũ thì ghi "chưa rõ chi tiết", không
+đoán — đừng nêu lý do kỹ thuật vì sao chưa rõ.
 
 ### 4. VIỆC CẦN LÀM
 Mỗi việc phải có mốc thời gian cụ thể. Không viết khuyến nghị chung chung.
 
 ### PHỤ LỤC — DANH MỤC VĂN BẢN THAM CHIẾU
 Bảng: Số hiệu | Tên đầy đủ | Cấp văn bản | Còn áp dụng không | Áp dụng ở đâu
-
-### PHỤ LỤC — HẠN CHẾ DỮ LIỆU
-Công bố nguyên khối `han_che_du_lieu`. Mọi văn bản có tình trạng hiệu lực
-"Chưa xác minh được" phải được ghi rõ là CHƯA XÁC MINH, không được trình bày
-như đang còn hiệu lực.
 ```
+
+{{include:_chung/doc_va_tong_hop_insight.md}}
+
+---
 
 {{include:_chung/giong_van_doanh_nghiep.md}}
 
@@ -114,10 +113,11 @@ như đang còn hiệu lực.
 
 ## 6. CHECKLIST RIÊNG CỦA BÁO CÁO NÀY
 
-- [ ] Mọi văn bản trong `danh_sach_van_ban` đều đã được nhắc tới?
-- [ ] Mỗi thay đổi đều nói rõ "so với cái gì", hoặc nói rõ chưa đối chiếu được?
+- [ ] Mọi văn bản trong `danh_sach_van_ban` đều được trình bày bằng nội dung
+      thực chất (quy định gì, kèm Điều/Khoản), không chỉ số hiệu và ngày?
+- [ ] Mỗi thay đổi đều nói rõ "so với cái gì", hoặc để im nếu chưa rõ chi tiết?
 - [ ] Văn bản cấp tỉnh đều kèm tên địa bàn áp dụng?
-- [ ] Đã ghi rằng điểm tác động đo cường độ quy phạm, không đo chi phí kinh tế?
+- [ ] Không có con số điểm tác động hay lời giải thích chỉ số nào lọt vào báo cáo?
 - [ ] Mỗi việc cần làm đều có mốc thời gian?
 
 ---
@@ -135,6 +135,7 @@ DOI_TUONG    : {{DOI_TUONG}}
   "thong_tin_tra_cuu":        {...},
   "han_che_du_lieu":          {...},
   "danh_sach_van_ban":        [...],
+  "insight_tung_van_ban":     [{"doc_num", "title", "mot_cau", "pham_vi_dieu_chinh", "noi_dung_chinh": [{"dieu_khoan", "quy_dinh", "y_nghia"}], "nghia_vu_moi", "moc_thoi_gian", "che_tai", "diem_dang_chu_y"}],
   "chi_tiet_dieu_khoan_chunks": [...],
   "do_thi_quan_he_van_ban_edges": [...],
   "van_ban_bi_tac_dong":      [{..., "dieu_khoan_cu": [...]}],
