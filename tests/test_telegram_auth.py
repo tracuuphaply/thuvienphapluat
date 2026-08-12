@@ -136,22 +136,45 @@ class TestAllowlist:
 
 class TestMoiHandlerDeuDuocBaoVe:
     def test_khong_handler_nao_bi_bo_sot(self):
+        """Mọi hàm được đăng ký làm handler phải có @restricted.
+
+        Danh sách handler SUY RA TỪ MÃ, không chép tay. Bản trước liệt kê tám
+        tên cố định, nên nó vừa gãy mỗi lần đổi tên handler, vừa bỏ sót handler
+        MỚI — sáu lệnh báo cáo thêm vào sau đó không được kiểm cái nào. Một test
+        an ninh chỉ kiểm những thứ có trong danh sách của chính nó thì không
+        chặn được thứ nguy hiểm nhất: cái vừa được thêm vào.
+        """
         tree = ast.parse(SERVER.read_text(encoding="utf-8"))
-        handlers = {
-            "start_command", "industries_command", "search_command",
-            "text_message_handler", "report_command", "impact_command",
-            "sync_command", "callback_query_handler",
-        }
-        found = {}
+
+        # Tên hàm truyền vào bất kỳ *Handler(...) nào — đó chính là định nghĩa
+        # "được đăng ký làm handler".
+        dang_ky: set[str] = set()
         for node in ast.walk(tree):
-            if isinstance(node, ast.AsyncFunctionDef) and node.name in handlers:
-                found[node.name] = [
+            if not isinstance(node, ast.Call):
+                continue
+            ten_lop = getattr(node.func, "id", "") or getattr(node.func, "attr", "")
+            if not ten_lop.endswith("Handler"):
+                continue
+            for arg in node.args:
+                if isinstance(arg, ast.Name):
+                    dang_ky.add(arg.id)
+
+        assert dang_ky, "không tìm thấy handler nào — bài kiểm đã hỏng"
+
+        khong_bao_ve = []
+        thay = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.AsyncFunctionDef) and node.name in dang_ky:
+                thay.add(node.name)
+                decs = [
                     d.func.id if isinstance(d, ast.Call) else getattr(d, "id", "")
                     for d in node.decorator_list
                 ]
-        assert set(found) == handlers, f"thiếu handler: {handlers - set(found)}"
-        for name, decs in found.items():
-            assert "restricted" in decs, f"{name} chưa được bảo vệ bằng @restricted"
+                if "restricted" not in decs:
+                    khong_bao_ve.append(node.name)
+
+        assert not khong_bao_ve, f"handler chưa có @restricted: {khong_bao_ve}"
+        assert dang_ky == thay, f"đăng ký nhưng không định nghĩa: {dang_ky - thay}"
 
 
 class TestKhongRoRiLoiNoiBo:

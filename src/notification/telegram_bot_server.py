@@ -35,11 +35,11 @@ from src.config import (
     TELEGRAM_ADMIN_CHAT_ID,
     DATA_DIR,
 )
-from src.obsidian.config_obsidian import INDUSTRY_MAP
+from src.notification import report_commands
+from src.storage.database import get_session
 from src.rag.db_rag import RAGDatabase
 from src.rag.hybrid_search import hybrid_search
 from src.rag.graph_traversal import cascade_retrieve, validate_results
-from src.rag.report_generator import generate_compliance_report
 from src.rag.rag_indexer import index_from_phase1
 from src.obsidian.vault_syncer import sync as sync_obsidian_vault
 
@@ -120,12 +120,18 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "━━━━━━━━━━━━━━━━━━━━━\n"
         "Chào mừng bạn! Tôi là trợ lý AI tìm kiếm và tạo báo cáo tuân thủ pháp luật doanh nghiệp.\n\n"
         "📌 *Các Lệnh Khả Dụng:*\n"
-        "🔍 `/search <từ khóa>` — Tìm kiếm văn bản bằng Hybrid RAG (Vector + BM25)\n"
-        "📊 `/report` — Tạo báo cáo tuân thủ AI theo ngành nghề\n"
-        "🔗 `/impact <số hiệu>` — Phân tích tác động đồ thị luật (GraphRAG)\n"
-        "🔄 `/sync` — Chạy đồng bộ cào luật 2026 + Obsidian Vault + RAG DB\n"
-        "🏢 `/industries` — Xem danh sách 10 ngành nghề kinh doanh\n"
-        "❓ `/help` — Hiển thị hướng dẫn này\n\n"
+        "*Báo cáo*\n"
+        "📊 `/baocao` — Điều khiển báo cáo (đặt, xem, huỷ)\n"
+        "🏢 `/nganh` — 21 mã ngành VSIC\n"
+        "📋 `/hangdoi` — Báo cáo đang chờ và đã xong\n"
+        "📄 `/xem <id>` — Chi tiết một báo cáo, tải PDF\n"
+        "🗑️ `/huy <id>` — Huỷ báo cáo đang chờ\n"
+        "⚙️ `/chay` — Chạy hàng đợi ngay\n\n"
+        "*Tra cứu*\n"
+        "🔍 `/search <từ khóa>` — Tìm văn bản (vector + BM25)\n"
+        "🔗 `/impact <số hiệu>` — Quan hệ dẫn chiếu của một văn bản\n"
+        "🔄 `/sync` — Đồng bộ vault và RAG\n"
+        "❓ `/help` — Hướng dẫn này\n\n"
         "💡 *Mẹo:* Bạn cũng có thể **gõ trực tiếp câu hỏi** vào ô chat (không cần gõ `/search`), bot sẽ tự tìm kiếm cho bạn!"
     )
     
@@ -141,22 +147,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
-
-@restricted()
-async def industries_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """List available industries with inline buttons."""
-    msg = "🏢 *DANH SÁCH 10 NGÀNH NGHỀ KINH DOANH*\n\nBấm vào ngành bên dưới để tạo báo cáo tuân thủ AI ngay lập tức:\n\n"
-    
-    keyboard = []
-    for idx, ind_name in enumerate(INDUSTRY_MAP.keys()):
-        msg += f"{idx+1}. `{ind_name}`\n"
-        keyboard.append([InlineKeyboardButton(f"📊 Báo cáo: {ind_name}", callback_data=f"rpt_{ind_name}")])
-        
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    if update.message:
-        await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
-    elif update.callback_query:
-        await update.callback_query.message.reply_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
 
 @restricted()
 async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -201,15 +191,115 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     await search_command(update, context)
 
 @restricted()
-async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /report command."""
-    industry = " ".join(context.args) if context.args else ""
-    if not industry:
-        # Show industry selection menu
-        await industries_command(update, context)
+async def baocao_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/baocao [a|b] [mã ngành] — xếp báo cáo vào hàng đợi."""
+    args = context.args or []
+    with get_session() as session:
+        if not args:
+            kq = report_commands.huong_dan(session)
+        else:
+            kq = report_commands.xep_bao_cao(
+                session, args[0], args[1] if len(args) > 1 else "")
+            session.commit()
+    await _tra_loi(update, kq)
+
+
+@restricted()
+async def nganh_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/nganh — 21 ngành VSIC."""
+    await _tra_loi(update, report_commands.danh_sach_nganh())
+
+
+@restricted()
+async def hangdoi_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/hangdoi — báo cáo đang chờ, đang chạy, vừa xong."""
+    with get_session() as session:
+        kq = report_commands.danh_sach_hang_doi(session)
+    await _tra_loi(update, kq)
+
+
+@restricted()
+async def xem_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/xem <id> — chi tiết một báo cáo, kèm PDF nếu có."""
+    job_id = _so_nguyen(context.args)
+    if job_id is None:
+        await update.message.reply_text(
+            "⚠️ Thiếu số hiệu báo cáo.\nVí dụ: `/xem 12`", parse_mode="Markdown")
         return
-        
-    await _generate_and_send_report(update.message, industry)
+    with get_session() as session:
+        kq = report_commands.chi_tiet_job(session, job_id)
+    await _tra_loi(update, kq)
+
+
+@restricted()
+async def huy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/huy <id> — huỷ báo cáo đang chờ."""
+    job_id = _so_nguyen(context.args)
+    if job_id is None:
+        await update.message.reply_text(
+            "⚠️ Thiếu số hiệu báo cáo.\nVí dụ: `/huy 12`", parse_mode="Markdown")
+        return
+    with get_session() as session:
+        kq = report_commands.huy_job(session, job_id)
+    await _tra_loi(update, kq)
+
+
+@restricted(admin=True)
+async def chay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/chay — rút hàng đợi ngay, không đợi lịch.
+
+    Chạy trong executor: một job gọi mô hình mất tới 300 giây, làm trong vòng
+    lặp sự kiện thì bot đứng im, không nhận được cả lệnh /hangdoi.
+    """
+    await update.message.reply_text("⚙️ Đang chạy hàng đợi báo cáo…")
+
+    def _chay():
+        from src.config import impact_scorer_version
+        from src.rag.reports import worker
+        with get_session() as session:
+            return worker.drain(session, rag_db, impact_scorer_version())
+
+    loop = asyncio.get_running_loop()
+    try:
+        stats = await loop.run_in_executor(None, _chay)
+        d = stats.as_dict() if hasattr(stats, "as_dict") else dict(stats)
+        await update.message.reply_text(
+            "✅ *Chạy xong hàng đợi*\n\n"
+            f"Lấy ra: {d.get('picked', 0)} · Xong: {d.get('done', 0)} · "
+            f"Lỗi: {d.get('failed', 0)} · Bị chặn: {d.get('blocked', 0)}\n\n"
+            "Gõ `/hangdoi` để xem kết quả.",
+            parse_mode="Markdown")
+    except Exception:
+        # Chi tiết vào log, KHÔNG vào chat: exception của SQLAlchemy và httpx
+        # mang theo đường dẫn tuyệt đối, tên bảng và đôi khi cả URL kèm khoá.
+        logger.exception("Lỗi chạy hàng đợi báo cáo")
+        await update.message.reply_text(
+            "❌ Hàng đợi chạy lỗi. Chi tiết đã ghi vào log của máy chủ.")
+
+
+def _so_nguyen(args) -> int | None:
+    try:
+        return int((args or [""])[0])
+    except (ValueError, IndexError):
+        return None
+
+
+async def _tra_loi(update: Update, kq) -> None:
+    """Gửi kết quả một lệnh: chuỗi, rồi file đính kèm nếu có."""
+    msg = update.message or (update.callback_query and update.callback_query.message)
+    if msg is None:
+        return
+    try:
+        await msg.reply_text(kq.van_ban, parse_mode="Markdown")
+    except Exception:
+        # Markdown hỏng không được nuốt mất nội dung — gửi lại dạng thô.
+        await msg.reply_text(kq.van_ban)
+
+    if kq.file_dinh_kem:
+        p = Path(kq.file_dinh_kem)
+        with open(p, "rb") as f:
+            await msg.reply_document(document=f, filename=p.name)
+
 
 @restricted()
 async def impact_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -261,7 +351,7 @@ async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_T
     
     data = query.data
     if data == "menu_report" or data == "menu_industries":
-        await industries_command(update, context)
+        await nganh_command(update, context)
     elif data == "menu_sync":
         await query.message.reply_text("🔄 Bắt đầu đồng bộ dữ liệu...")
         def _run_sync():
@@ -274,47 +364,12 @@ async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_T
         context.args = ["quy định", "xử", "phạt"]
         await search_command(update, context)
     elif data.startswith("rpt_"):
-        industry_name = data.replace("rpt_", "")
-        await _generate_and_send_report(query.message, industry_name)
-
-async def _generate_and_send_report(message_obj, industry_name: str) -> None:
-    """Helper to generate AI compliance report, convert to PDF, and send both text summary and PDF file to Telegram chat."""
-    await message_obj.reply_text(f"📊 Đang tạo báo cáo tuân thủ AI & file PDF cho ngành *{industry_name}* (vui lòng đợi 10-15s)...", parse_mode="Markdown")
-    
-    from src.utils.pdf_exporter import convert_md_to_pdf
-
-    def _make_report_and_pdf():
-        report_md = generate_compliance_report(rag_db, industry=industry_name, days=250)
-        pdf_path = convert_md_to_pdf(report_md, report_title=f"BÁO CÁO PHÁP LÝ CHUYÊN ĐỀ — NGÀNH {industry_name.upper()}")
-        return report_md, pdf_path
-        
-    loop = asyncio.get_running_loop()
-    try:
-        report_md, pdf_path = await loop.run_in_executor(None, _make_report_and_pdf)
-        
-        # 1. Send text preview / chunks
-        from src.notification.telegram_bot import _split_message
-        chunks = _split_message(report_md, max_len=3800)
-        for chunk in chunks:
-            try:
-                await message_obj.reply_text(chunk, parse_mode="Markdown")
-            except Exception:
-                await message_obj.reply_text(chunk)
-
-        # 2. Send attached PDF file
-        if pdf_path and pdf_path.exists():
-            clean_ind_filename = re.sub(r"[^\w\-_]", "_", industry_name)
-            pdf_filename = f"Bao_Cao_Phap_Ly_{clean_ind_filename}_{datetime.date.today().strftime('%Y%m%d')}.pdf"
-            with open(pdf_path, "rb") as f:
-                await message_obj.reply_document(
-                    document=f,
-                    filename=pdf_filename,
-                    caption=f"📄 *File PDF Báo cáo Pháp lý Chuyên đề Ngành {industry_name}*"
-                )
-    except Exception as e:
-        logger.error(f"Error generating report or PDF: {e}")
-        await message_obj.reply_text("❌ Lỗi khi tạo báo cáo. Vui lòng thử lại sau.")
-
+        # Nút mang MÃ ngành VSIC (một chữ cái), không phải tên ngành của bộ 10
+        # ngành cũ. Và nó XẾP HÀNG chứ không sinh tại chỗ — xem report_commands.
+        with get_session() as session:
+            kq = report_commands.xep_bao_cao(session, "a", data.replace("rpt_", ""))
+            session.commit()
+        await _tra_loi(update, kq)
 
 def main() -> None:
     """Start the interactive Telegram Bot server."""
@@ -331,9 +386,15 @@ def main() -> None:
     
     # Handlers
     app.add_handler(CommandHandler(["start", "help"], start_command))
-    app.add_handler(CommandHandler("industries", industries_command))
     app.add_handler(CommandHandler("search", search_command))
-    app.add_handler(CommandHandler("report", report_command))
+    # /report và /industries giữ làm bí danh: người dùng đã quen gõ chúng, và
+    # lệnh cũ im lặng biến mất thì trông như bot hỏng.
+    app.add_handler(CommandHandler(["baocao", "report"], baocao_command))
+    app.add_handler(CommandHandler(["nganh", "industries"], nganh_command))
+    app.add_handler(CommandHandler("hangdoi", hangdoi_command))
+    app.add_handler(CommandHandler("xem", xem_command))
+    app.add_handler(CommandHandler("huy", huy_command))
+    app.add_handler(CommandHandler("chay", chay_command))
     app.add_handler(CommandHandler("impact", impact_command))
     app.add_handler(CommandHandler(["sync", "run"], sync_command))
     

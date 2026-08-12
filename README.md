@@ -69,6 +69,28 @@ Chạy tự động: `scripts/install_scheduler.sh` cài hai launchd agent — `
 | `src/publish/` | Sinh trang tra cứu công khai và link từ PDF về trang đó |
 | `src/notification/` | Digest Telegram |
 
+## Điều khiển qua Telegram
+
+Cào dữ liệu chạy ngầm, **không nhắn tin** — kết quả xem trực tiếp trên Google
+Drive. Telegram chỉ dùng để điều khiển báo cáo và nhận file.
+
+| Lệnh | Việc |
+|---|---|
+| `/baocao` | Hướng dẫn + số báo cáo đang chờ |
+| `/baocao a <mã ngành>` | Đặt báo cáo tổng hợp ngành |
+| `/baocao b` | Đặt báo cáo cập nhật văn bản mới |
+| `/nganh` | 21 mã ngành VSIC |
+| `/hangdoi` | Báo cáo đang chờ / đang chạy / vừa xong |
+| `/xem <id>` | Chi tiết một báo cáo, kèm file PDF |
+| `/huy <id>` | Huỷ báo cáo còn đang chờ |
+| `/chay` | Chạy hàng đợi ngay, không đợi lịch |
+
+Mọi lệnh đều **xếp hàng chứ không sinh báo cáo tại chỗ**, để cổng kiểm trích dẫn
+ở tầng worker không thể đi vòng. Báo cáo loại (c) không đặt tay được — hệ thống
+tự tạo sau khi (b) chạy xong.
+
+Chạy bot: `python -m src.notification.telegram_bot_server`
+
 ## Ba loại báo cáo
 
 | Loại | Kích hoạt | Nội dung |

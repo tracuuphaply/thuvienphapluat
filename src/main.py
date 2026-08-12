@@ -41,8 +41,6 @@ from src.config import (
 )
 
 from src.notification.telegram_bot import (
-    build_daily_digest,
-    send_daily_digest,
     send_error_alert,
 )
 from src.pipeline.deduplicator import merge_triggers, normalize_doc_num
@@ -378,10 +376,6 @@ def run_pipeline(
                 )
                 session.commit()
 
-                # Still send "no new docs" notification
-                if not dry_run:
-                    send_daily_digest([])
-
                 return metrics
 
             # ── Step 4: Enrich each new document ──
@@ -640,33 +634,26 @@ def run_pipeline(
                 session.commit()
 
 
-            # ── Step 7: Send Telegram notification ──
-            logger.info("=" * 60)
-            logger.info("STEP 7: Sending Telegram notification")
-            logger.info("=" * 60)
-
-            if dry_run:
-                message = build_daily_digest(saved_docs)
-                print("\n" + "=" * 60)
-                print("DRY RUN — Telegram message preview:")
-                print("=" * 60)
-                print(message)
-                print("=" * 60 + "\n")
-                metrics["total_notified"] = len(saved_docs)
-            else:
-                success = send_daily_digest(saved_docs)
-                if success:
-                    # Mark documents as notified
-                    now = datetime.now(timezone.utc)
-                    for doc_data in saved_docs:
-                        existing = resolve_existing_document(session, doc_data)
-                        if existing:
-                            existing.notified_at = now
-                    session.commit()
-                    metrics["total_notified"] = len(saved_docs)
-                    logger.info("Telegram digest sent: %d documents", len(saved_docs))
-                else:
-                    logger.error("Failed to send Telegram digest.")
+            # ── Step 7: (đã bỏ) bản tin Telegram về việc cào ──
+            #
+            # Cào dữ liệu chạy ngầm. Trước đây mỗi lần cào gửi một digest liệt
+            # kê văn bản mới, nhưng đó là thông báo về CÔNG VIỆC NỘI BỘ của hệ
+            # thống, không phải thứ cần người đọc quyết định gì. Kết quả cào
+            # xem trực tiếp trên Google Drive; Telegram nay chỉ dùng để điều
+            # khiển và nhận báo cáo (xem src/notification/report_commands.py).
+            #
+            # Vẫn đánh dấu notified_at: cột này là mốc "văn bản đã được đưa qua
+            # vòng xử lý", và get_unnotified_documents() dựa vào nó. Để NULL
+            # mãi thì mỗi lần chạy lại coi toàn bộ kho là chưa xử lý.
+            now = datetime.now(timezone.utc)
+            for doc_data in saved_docs:
+                existing = resolve_existing_document(session, doc_data)
+                if existing:
+                    existing.notified_at = now
+            session.commit()
+            metrics["total_notified"] = len(saved_docs)
+            logger.info("Đã cào %d văn bản (không gửi bản tin — xem trên Drive)",
+                        len(saved_docs))
 
             # ── Step 8: Xếp hàng báo cáo phân tích văn bản mới ──
             #
