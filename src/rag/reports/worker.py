@@ -94,7 +94,7 @@ def _build_pdf(job: dict, md_path: Path,
                        job["id"], type(e).__name__, e)
         figures = []
 
-    meta = ReportMeta(
+    chung = dict(
         figures=figures,
         industry=_nhan_bia(job, result),
         industry_code=job.get("vsic_code") or "",
@@ -103,18 +103,36 @@ def _build_pdf(job: dict, md_path: Path,
         scope=brand.get("scope", ""),
         company=brand.get("company", ""),
         contact=brand.get("footer", ""),
-        partner_title=brand.get("partner_title", ""),
-        partner_pitch=brand.get("partner_pitch", ""),
-        partner_cta=brand.get("partner_cta", ""),
-        partner_contact=brand.get("partner_contact", ""),
     )
-    try:
-        return str(build_report_pdf(
-            result.markdown, md_path.with_suffix(".pdf"), meta))
-    except Exception as e:
-        logger.warning("Job %d: không dựng được PDF — %s: %s",
-                       job["id"], type(e).__name__, e)
-        return None
+
+    # HAI BẢN, KHÁC NHAU ĐÚNG MỘT THỨ: chân trang có hay không có lời ngỏ hợp
+    # tác. Báo cáo gửi doanh nghiệp thì lời mời hợp tác với công ty luật là nói
+    # với nhầm người; báo cáo dùng làm hồ sơ chào mời công ty luật thì cần nó.
+    #
+    # Dựng cả hai ngay tại đây thay vì thêm một cờ chọn: lúc gửi mới biết gửi
+    # cho ai, mà lúc đó job đã chạy xong và không còn ngữ cảnh để dựng lại.
+    ban = [("khach", {})]
+    if (brand.get("partner_pitch") or "").strip():
+        ban.append(("doitac", dict(
+            partner_title=brand.get("partner_title", ""),
+            partner_pitch=brand.get("partner_pitch", ""),
+            partner_cta=brand.get("partner_cta", ""),
+            partner_contact=brand.get("partner_contact", ""),
+        )))
+
+    duong_dan: dict[str, str] = {}
+    for ten, rieng in ban:
+        out = md_path.with_name(f"{md_path.stem}_{ten}.pdf")
+        try:
+            build_report_pdf(result.markdown, out, ReportMeta(**chung, **rieng))
+            duong_dan[ten] = str(out)
+        except Exception as e:
+            logger.warning("Job %d: không dựng được PDF bản %s — %s: %s",
+                           job["id"], ten, type(e).__name__, e)
+
+    # Trả bản gửi khách làm đường dẫn chính: đó là bản dùng nhiều hơn, và nếu
+    # chỉ dựng được một bản thì phải là bản không có lời chào mời.
+    return duong_dan.get("khach") or duong_dan.get("doitac")
 
 
 def _write_outputs(job_id: int, kind: str, result: generators.ReportResult) -> dict:

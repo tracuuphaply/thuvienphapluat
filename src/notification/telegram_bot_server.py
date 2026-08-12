@@ -295,8 +295,10 @@ async def _tra_loi(update: Update, kq) -> None:
         # Markdown hỏng không được nuốt mất nội dung — gửi lại dạng thô.
         await msg.reply_text(kq.van_ban)
 
-    if kq.file_dinh_kem:
-        p = Path(kq.file_dinh_kem)
+    for duong_dan in [kq.file_dinh_kem, *getattr(kq, "file_bo_sung", [])]:
+        if not duong_dan:
+            continue
+        p = Path(duong_dan)
         with open(p, "rb") as f:
             await msg.reply_document(document=f, filename=p.name)
 

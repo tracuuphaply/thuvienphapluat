@@ -275,12 +275,18 @@ class _Canvas(rl_canvas.Canvas):
         self.drawPath(dai, stroke=0, fill=1)
 
         # ── Khối nhấn bên phải ──
+        #
+        # Cạnh trái vát SONG SONG với cạnh phải của dải, cách một khoảng đều.
+        # Bản đầu để cạnh này thẳng đứng trong khi cạnh kia vát, nên giữa hai
+        # khối hở ra một nêm trắng hình tam giác — nhìn như lỗi dựng chứ không
+        # ra chủ ý. Song song thì khe hở đều, đọc được là một nhịp thiết kế.
+        khe = 4
         self.setFillColor(colors.HexColor(BRAND))
         cta = self.beginPath()
-        cta.moveTo(x_cta + vat, y)
+        cta.moveTo(x_cta + khe, y)
         cta.lineTo(phai, y)
         cta.lineTo(phai, y + h)
-        cta.lineTo(x_cta + vat, y + h)
+        cta.lineTo(x_cta + vat + khe, y + h)
         cta.close()
         self.drawPath(cta, stroke=0, fill=1)
 
@@ -299,12 +305,13 @@ class _Canvas(rl_canvas.Canvas):
             y_chu -= 8
 
         # ── Khối nhấn: chữ CTA và số trang ──
-        giua = x_cta + vat + (phai - x_cta - vat) / 2
+        giua = x_cta + vat / 2 + khe + (phai - x_cta - vat - khe) / 2
         self.setFillColor(colors.white)
-        self.setFont(FONT_B, 7)
-        self.drawCentredString(giua, y + h - 13, (self._meta.partner_cta or "HỢP TÁC")[:12])
-        self.setFont(FONT, 6.5)
-        self.drawCentredString(giua, y + 9, f"Trang {self._pageNumber}")
+        # CHỈ chữ CTA, không in số trang ở đây: đầu trang đã có số trang rồi
+        # (dòng drawRightString phía trên), in lại là hai số cho một trang.
+        self.setFont(FONT_B, 8)
+        self.drawCentredString(giua, y + h / 2 - 3,
+                               (self._meta.partner_cta or "HỢP TÁC")[:14])
 
         # ── Dòng liên hệ dưới dải ──
         lien_he = (self._meta.partner_contact or self._meta.contact or "").strip()

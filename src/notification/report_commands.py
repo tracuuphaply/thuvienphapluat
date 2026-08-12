@@ -27,7 +27,8 @@ from __future__ import annotations
 
 import datetime
 import logging
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from sqlalchemy import text
@@ -65,6 +66,9 @@ class KetQua:
     """Kết quả một lệnh: chuỗi để gửi, kèm đường dẫn file nếu có."""
     van_ban: str
     file_dinh_kem: str | None = None
+    # Báo cáo có hai bản PDF khác nhau đúng ở chân trang; gửi cả hai để người
+    # dùng chọn đúng bản cho đúng người nhận.
+    file_bo_sung: list[str] = field(default_factory=list)
 
 
 # ──────────────────────────────────────────────
@@ -238,14 +242,46 @@ def chi_tiet_job(session, job_id: int) -> KetQua:
     elif r["status"] == jobs.FAILED and r["error"]:
         dong += ["", f"❌ *Lỗi:* `{str(r['error'])[:300]}`"]
 
-    pdf = r["output_pdf_path"]
-    if pdf and Path(pdf).exists():
-        dong += ["", "📎 Đang gửi file PDF…"]
-        return KetQua("\n".join(dong), file_dinh_kem=pdf)
-    if r["status"] == jobs.DONE and not pdf:
+    khach, doi_tac = _hai_ban_pdf(r["output_pdf_path"])
+    if khach or doi_tac:
+        dong += [""]
+        if khach and doi_tac:
+            dong += ["📎 Gửi *hai bản*:",
+                     "• `_khach` — chân trang gọn, gửi doanh nghiệp",
+                     "• `_doitac` — có lời ngỏ hợp tác, gửi công ty luật"]
+        else:
+            dong += ["📎 Đang gửi file PDF…"]
+        co_ban = [p for p in (khach, doi_tac) if p]
+        return KetQua("\n".join(dong), file_dinh_kem=co_ban[0],
+                      file_bo_sung=co_ban[1:])
+
+    if r["status"] == jobs.DONE:
         dong += ["", "⚠️ Báo cáo xong nhưng không có file PDF (thường do thiếu font)."]
 
     return KetQua("\n".join(dong))
+
+
+def _hai_ban_pdf(duong_dan: str | None) -> tuple[str | None, str | None]:
+    """(bản gửi khách, bản gửi đối tác) — chỉ trả về file thật sự còn trên đĩa.
+
+    Worker ghi hai file cạnh nhau, tên chỉ khác hậu tố, nhưng DB chỉ giữ một
+    đường dẫn. Suy ra bản kia từ tên thay vì thêm cột: hai bản luôn sinh cùng
+    lúc và cùng chỗ, nên một cột nữa chỉ là hai nguồn sự thật cho một việc.
+    """
+    if not duong_dan:
+        return None, None
+    p = Path(duong_dan)
+    goc = re.sub(r"_(khach|doitac)$", "", p.stem)
+
+    def _co(hau_to: str) -> str | None:
+        f = p.with_name(f"{goc}_{hau_to}.pdf")
+        return str(f) if f.exists() else None
+
+    khach, doi_tac = _co("khach"), _co("doitac")
+    # Báo cáo cũ sinh trước khi tách hai bản chỉ có một file không hậu tố.
+    if not khach and not doi_tac and p.exists():
+        return str(p), None
+    return khach, doi_tac
 
 
 def huy_job(session, job_id: int) -> KetQua:

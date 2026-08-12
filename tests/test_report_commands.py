@@ -278,3 +278,52 @@ class TestBoLenhTelegram:
         src = _ma_thuc(pathlib.Path(
             "src/notification/telegram_bot_server.py").read_text(encoding="utf-8"))
         assert "INDUSTRY_MAP" not in src
+
+
+class TestHaiBanPDF:
+    """Bản gửi khách và bản gửi đối tác, khác nhau đúng ở chân trang."""
+
+    def _job_xong(self, session, tmp_path, ten_file: list[str]) -> int:
+        for t in ten_file:
+            (tmp_path / t).write_bytes(b"%PDF-1.4")
+        return _job(session, status=jobs.DONE, dedupe_key=f"p{len(ten_file)}",
+                    output_pdf_path=str(tmp_path / ten_file[0]))
+
+    def test_co_ca_hai_ban_thi_gui_ca_hai(self, master_session, tmp_path):
+        i = self._job_xong(master_session, tmp_path,
+                           ["job1_khach.pdf", "job1_doitac.pdf"])
+        kq = rc.chi_tiet_job(master_session, i)
+        gui = [kq.file_dinh_kem, *kq.file_bo_sung]
+        assert len(gui) == 2
+        assert any("_khach" in g for g in gui)
+        assert any("_doitac" in g for g in gui)
+        assert "gửi doanh nghiệp" in kq.van_ban
+        assert "gửi công ty luật" in kq.van_ban
+
+    def test_ban_gui_khach_dung_dau(self, master_session, tmp_path):
+        """Nếu người dùng chỉ mở file đầu tiên thì đó phải là bản không quảng bá."""
+        i = self._job_xong(master_session, tmp_path,
+                           ["job2_khach.pdf", "job2_doitac.pdf"])
+        assert "_khach" in rc.chi_tiet_job(master_session, i).file_dinh_kem
+
+    def test_chi_co_ban_khach_thi_khong_noi_gi_ve_ban_kia(self, master_session, tmp_path):
+        i = self._job_xong(master_session, tmp_path, ["job3_khach.pdf"])
+        kq = rc.chi_tiet_job(master_session, i)
+        assert kq.file_bo_sung == []
+        assert "gửi công ty luật" not in kq.van_ban
+
+    def test_bao_cao_cu_mot_file_khong_hau_to_van_gui_duoc(self, master_session, tmp_path):
+        """Báo cáo sinh trước khi tách hai bản chỉ có một file không hậu tố.
+
+        Không xử lý thì mọi báo cáo cũ đột nhiên không tải về được nữa.
+        """
+        i = self._job_xong(master_session, tmp_path, ["job4.pdf"])
+        kq = rc.chi_tiet_job(master_session, i)
+        assert kq.file_dinh_kem.endswith("job4.pdf")
+        assert kq.file_bo_sung == []
+
+    def test_file_mat_tren_dia_thi_khong_dinh_kem(self, master_session, tmp_path):
+        i = _job(master_session, status=jobs.DONE, dedupe_key="p9",
+                 output_pdf_path=str(tmp_path / "khong_ton_tai_khach.pdf"))
+        kq = rc.chi_tiet_job(master_session, i)
+        assert kq.file_dinh_kem is None and kq.file_bo_sung == []

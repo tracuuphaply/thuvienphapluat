@@ -81,23 +81,32 @@ def main() -> None:
              if brand_path.exists() else {})
     hom_nay = datetime.date.today()
 
-    meta = ReportMeta(
+    chung = dict(
         figures=figs,
         industry=brand.get("demo_industry", "Bản demo — dựng lại từ báo cáo đã có"),
-        period=f"Bản demo biểu đồ · {hom_nay:%m/%Y}",
+        period=f"Bản demo · {hom_nay:%m/%Y}",
         cutoff=f"{hom_nay:%d/%m/%Y}",
         scope=brand.get("scope", ""),
         company=brand.get("company", ""),
         contact=brand.get("footer", ""),
-        partner_title=brand.get("partner_title", ""),
-        partner_pitch=brand.get("partner_pitch", ""),
-        partner_cta=brand.get("partner_cta", ""),
-        partner_contact=brand.get("partner_contact", ""),
     )
 
-    out = args.out or args.md_path.with_name(args.md_path.stem + "_DEMO.pdf")
-    build_report_pdf(md, out, meta)
-    print(f"\nĐã ghi: {out}")
+    # Hai bản, khác nhau đúng ở chân trang — giống hệt worker làm.
+    ban = [("khach", {})]
+    if (brand.get("partner_pitch") or "").strip():
+        ban.append(("doitac", dict(
+            partner_title=brand.get("partner_title", ""),
+            partner_pitch=brand.get("partner_pitch", ""),
+            partner_cta=brand.get("partner_cta", ""),
+            partner_contact=brand.get("partner_contact", ""),
+        )))
+
+    goc = args.out or args.md_path.with_name(args.md_path.stem + "_DEMO.pdf")
+    print()
+    for ten, rieng in ban:
+        out = goc.with_name(f"{goc.stem}_{ten}.pdf")
+        build_report_pdf(md, out, ReportMeta(**chung, **rieng))
+        print(f"Đã ghi: {out}")
 
 
 if __name__ == "__main__":
