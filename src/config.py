@@ -161,11 +161,15 @@ def llm_api_key() -> str:
 
 
 def openai_api_base() -> str:
-    return os.getenv("OPENAI_API_BASE", "https://v98store.com/v1")
+    # Mặc định trỏ thẳng nhà cung cấp đang dùng. v98store đã đóng cửa (trả
+    # service_migrated), dời sang cheapkeyai.shop — vẫn OpenAI-compatible.
+    return os.getenv("OPENAI_API_BASE", "https://cheapkeyai.shop/v1")
 
 
 def report_model() -> str:
-    return os.getenv("REPORT_MODEL", "gpt-4o")
+    # gpt-4o không còn trên nhà cung cấp mới; claude-sonnet-5 là mặc định chạy
+    # được. Đổi qua REPORT_MODEL nếu muốn model khác.
+    return os.getenv("REPORT_MODEL", "claude-sonnet-5")
 
 
 def report_max_tokens() -> int:
@@ -173,8 +177,53 @@ def report_max_tokens() -> int:
     return int(os.getenv("REPORT_MAX_TOKENS", "16000"))
 
 
+def report_request_timeout() -> float:
+    """Giây chờ MỘT lượt gọi mô hình.
+
+    Báo cáo (a) nạp payload lớn (hàng chục insight) và model mạnh sinh 4–6 trang,
+    trên proxy chậm có thể vượt 300s. Đặt rộng để không cắt oan một lượt đang
+    chạy tốt; lỗi mạng thật thì tầng thử-lại lo.
+    """
+    return float(os.getenv("REPORT_REQUEST_TIMEOUT", "600"))
+
+
+def summary_model() -> str:
+    """Model cho bước ĐỌC (tóm tắt insight từng văn bản).
+
+    Để trống = dùng chính REPORT_MODEL. Tách biến riêng vì bước tóm tắt gọi mô
+    hình một lần cho MỖI văn bản, nên người vận hành có thể muốn dùng model rẻ
+    hơn ở đây và giữ model mạnh cho bước tổng hợp báo cáo.
+    """
+    return os.getenv("SUMMARY_MODEL", "") or report_model()
+
+
+def summary_max_tokens() -> int:
+    """Bản tóm tắt một văn bản ngắn hơn báo cáo nhiều; 3000 token là dư."""
+    return int(os.getenv("SUMMARY_MAX_TOKENS", "3000"))
+
+
 def report_prompt_path() -> str:
     return os.getenv("REPORT_PROMPT_PATH", "")
+
+
+def business_field_codes_override() -> str:
+    """Danh sách mã lĩnh vực TVPL 'liên quan doanh nghiệp', dạng "1,2,6,10".
+
+    Trống = dùng bộ mặc định trong src/legal/business_relevance.py. Đặt biến này
+    để đổi định nghĩa "liên quan doanh nghiệp" mà không sửa code.
+    """
+    return os.getenv("BUSINESS_FIELD_CODES", "")
+
+
+def report_central_only() -> bool:
+    """Chỉ đưa văn bản CẤP TRUNG ƯƠNG vào báo cáo (bỏ văn bản cấp tỉnh).
+
+    Mục tiêu báo cáo là cập nhật luật toàn quốc cho chủ doanh nghiệp; quyết định
+    cấp tỉnh chỉ áp dụng ở một địa bàn nên mặc định loại. Đặt false để giữ lại
+    văn bản cấp tỉnh thuộc lĩnh vực doanh nghiệp.
+    """
+    return os.getenv("REPORT_CENTRAL_ONLY", "true").strip().lower() not in (
+        "0", "false", "no", "off")
 
 
 def embedding_model_override() -> str:

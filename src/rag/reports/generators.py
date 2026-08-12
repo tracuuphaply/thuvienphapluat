@@ -27,6 +27,7 @@ from src.rag.db_rag import RAGDatabase
 from src.rag.graph_traversal import validate_results
 from src.rag.hybrid_search import industry_search
 from src.rag.reports import context as ctx
+from src.rag.reports import summarizer
 from src.rag.reports.llm import LLMUnavailable, call_report_llm
 from src.rag.reports.prompts import load_prompt
 from src.storage.models import Document
@@ -60,6 +61,10 @@ class ReportResult:
     sidecar: dict[str, Any] = field(default_factory=dict)
     truncated: bool = False
     model: str = ""
+    # Số hiệu có căn cứ trong nguồn (toàn văn + prompt) nhưng có thể chưa có bản
+    # ghi trong kho — cổng kiểm trích dẫn nhận nhóm này để không chặn nhầm văn
+    # bản cũ bị bãi bỏ/dẫn chiếu. Xem citation_check.check_citations.
+    allowed_doc_nums: set[str] = field(default_factory=set)
 
 
 def _header(lines: dict[str, str]) -> str:
@@ -86,11 +91,44 @@ def _danh_sach_so_hieu(payload: dict[str, Any]) -> str:
         return ""
     return (
         "\n=== DANH SÁCH SỐ HIỆU ĐƯỢC PHÉP TRÍCH DẪN ({} văn bản) ===\n"
-        "Mọi số hiệu trong báo cáo PHẢI nằm trong danh sách này, sao chép "
-        "NGUYÊN VĂN. Không ghép, không rút gọn, không thêm tiền tố.\n"
-        "Cần một văn bản không có ở đây thì ghi vào phần hạn chế dữ liệu, "
-        "KHÔNG được viết số hiệu của nó ra.\n\n{}\n"
+        "Số hiệu trong báo cáo phải là số THẬT, sao chép NGUYÊN VĂN. Không "
+        "ghép, không rút gọn, không thêm tiền tố. Được phép trích nếu số hiệu "
+        "nằm trong danh sách dưới đây, HOẶC xuất hiện ngay trong nội dung văn "
+        "bản nguồn được cung cấp (ví dụ văn bản cũ bị một quyết định trong danh "
+        "sách bãi bỏ/sửa đổi). TUYỆT ĐỐI không bịa số hiệu không thấy ở đâu.\n\n{}\n"
     ).format(len(nums), "\n".join(f"  {n}" for n in nums))
+
+
+def _source_citations(system_prompt: str, payload: dict[str, Any],
+                      source_doc_nums: set[str]) -> set[str]:
+    """Số hiệu có bảo chứng từ NGUỒN cho một báo cáo — dựng cho cổng trích dẫn.
+
+    Ba nguồn, tất cả đều KHÔNG phải đầu ra của mô hình sinh báo cáo, nên không
+    thể bị nó bịa lọt qua:
+      - `source_doc_nums`: số hiệu trong TOÀN VĂN các văn bản đã đọc (từ bước ĐỌC)
+      - toàn văn thô còn nằm trong payload: điều khoản bản cũ, quy định hiện hữu,
+        và markdown báo cáo gốc (b) mà (c) phải nhất quán theo
+      - mẫu prompt hệ thống: số hiệu như 27/2018/QĐ-TTg (mã ngành VSIC) do chính
+        chỉ dẫn viết ra, mô hình chép lại là đúng
+
+    KHÔNG lấy từ `insight_tung_van_ban`: đó là bản do mô hình tóm tắt sinh ra;
+    số hiệu ở đó đã được đối chiếu gián tiếp qua `source_doc_nums` lấy thẳng từ
+    toàn văn.
+    """
+    from src.rag.citation_check import extract_doc_nums
+
+    allowed = set(source_doc_nums)
+    allowed.update(extract_doc_nums(system_prompt))
+
+    for key in ("chi_tiet_dieu_khoan_chunks", "quy_dinh_hien_huu_cua_nganh"):
+        for c in payload.get(key) or []:
+            allowed.update(extract_doc_nums(c.get("content_excerpt") or ""))
+    for old in payload.get("van_ban_bi_tac_dong") or []:
+        for c in old.get("dieu_khoan_cu") or []:
+            allowed.update(extract_doc_nums(c.get("content_excerpt") or ""))
+    if isinstance(payload.get("bao_cao_goc"), str):
+        allowed.update(extract_doc_nums(payload["bao_cao_goc"]))
+    return allowed
 
 
 def _user_message(header: dict[str, str], payload: dict[str, Any],
@@ -108,17 +146,27 @@ def _user_message(header: dict[str, str], payload: dict[str, Any],
 # Nhắc lại ở message người dùng những điều dễ bị bỏ qua nhất. Prompt hệ thống đã
 # nói, nhưng đây là các quy tắc mà vi phạm gây sai dữ kiện pháp lý.
 COMMON_NOTES = [
+    "Khối `insight_tung_van_ban` là bản tóm tắt sau khi ĐỌC HẾT toàn văn từng "
+    "văn bản — dùng nó làm nguồn chính để viết nội dung. Mỗi văn bản trong "
+    "`danh_sach_van_ban` phải được trình bày bằng NỘI DUNG THỰC CHẤT (quy định "
+    "gì, nghĩa vụ nào, mốc nào, kèm Điều/Khoản), KHÔNG chỉ liệt kê metadata. "
+    "Văn bản thiếu nội dung chi tiết thì nhắc ngắn theo thông tin sẵn có, không "
+    "suy đoán, và không giải thích với người đọc vì sao thiếu.",
     "Không tự bịa số hiệu văn bản nằm ngoài dữ liệu được cung cấp.",
-    "Khối `han_che_du_lieu` là dữ kiện BẮT BUỘC phải công bố ở phụ lục. Văn bản "
-    "có tình trạng hiệu lực 'Chưa xác minh được' phải ghi rõ là CHƯA XÁC MINH, "
-    "không được trình bày như đang còn hiệu lực.",
+    "BÁO CÁO VIẾT CHO CHỦ DOANH NGHIỆP, KHÔNG PHẢI CHO NGƯỜI VẬN HÀNH HỆ THỐNG. "
+    "Tuyệt đối không có mục hay câu nào nói về dữ liệu/hệ thống: không 'hạn chế "
+    "dữ liệu', không nhắc độ đầy đủ dữ liệu, không tên trường dữ liệu, không câu "
+    "kiểu 'dữ liệu kỳ này rỗng'. Mục dữ liệu rỗng thì bỏ qua trong im lặng. Văn "
+    "bản chưa rõ còn hiệu lực thì nêu như lưu ý 'cần kiểm tra lại hiệu lực trước "
+    "khi áp dụng', không biến thành mục thống kê dữ liệu.",
     "Khi hai văn bản mâu thuẫn, dùng `cap_hieu_luc_phap_ly`: SỐ NHỎ HƠN LÀ HIỆU "
     "LỰC CAO HƠN. Văn bản có `la_van_ban_qppl` = false KHÔNG được dùng làm căn "
     "cứ pháp lý.",
     "Văn bản có `pham_vi_lanh_tho` = 'tinh' chỉ áp dụng trong `dia_ban_ap_dung`, "
     "không được trình bày như quy định toàn quốc.",
-    "Điểm trong `diem_tac_dong_nganh` đo CƯỜNG ĐỘ QUY PHẠM hướng vào một ngành, "
-    "KHÔNG đo chi phí kinh tế. Phải ghi rõ điều này khi lần đầu nhắc tới điểm số.",
+    "`diem_tac_dong_nganh` chỉ dùng NGẦM để biết ngành nào chịu ảnh hưởng; nói "
+    "ra bằng lời thường. KHÔNG đưa con số điểm vào báo cáo, KHÔNG giải thích nó "
+    "đo cái gì.",
 ]
 
 
@@ -159,6 +207,11 @@ def build_industry_context(session, rag: RAGDatabase, vsic_code: str,
     facts = [ctx.document_facts(d, thieu) for d in docs]
     edges = [e for d in docs for e in ctx.graph_edges(session, d)]
 
+    # Bước ĐỌC: mỗi văn bản được đọc HẾT toàn văn rồi chắt thành insight. Đây là
+    # thứ chuyển báo cáo (a) từ "liệt kê kết quả truy xuất" sang "hiểu từng văn
+    # bản" — truy xuất chỉ đưa vài đoạn khớp ngữ nghĩa, không phải cả văn bản.
+    insights = summarizer.build_insights(rag, docs)
+
     chunks = [{
         "doc_num": c.get("doc_num"),
         "heading": c.get("heading"),
@@ -170,6 +223,7 @@ def build_industry_context(session, rag: RAGDatabase, vsic_code: str,
     payload = {
         "thong_tin_tra_cuu": {
             "so_van_ban": len(facts),
+            "so_van_ban_da_doc_sau": len(insights.items),
             "so_doan": len(chunks),
             "so_quan_he": len(edges),
         },
@@ -180,15 +234,19 @@ def build_industry_context(session, rag: RAGDatabase, vsic_code: str,
                 "văn bản của ngành trong kho."
             ),
             bao_dong=ctx.van_ban_dan_chieu_khong_lay_duoc(session),
+            khong_co_toan_van_de_doc_sau=insights.khong_co_toan_van,
+            loi_khi_tom_tat=insights.loi_tom_tat,
         ),
         "danh_sach_van_ban": facts,
+        "insight_tung_van_ban": insights.items,
         "chi_tiet_dieu_khoan_chunks": chunks,
         "do_thi_quan_he_van_ban_edges": edges,
         "diem_tac_dong_nganh": ctx.industry_impact(
             session, [d.doc_key for d in docs], scorer_version),
     }
     return ctx.ReportContext(payload=payload,
-                             doc_nums=[d["doc_num"] for d in facts])
+                             doc_nums=[d["doc_num"] for d in facts],
+                             source_doc_nums=insights.source_doc_nums)
 
 
 def generate_industry_report(session, rag: RAGDatabase, vsic_code: str,
@@ -212,14 +270,18 @@ def generate_industry_report(session, rag: RAGDatabase, vsic_code: str,
         "DOI_TUONG": DEFAULT_AUDIENCE,
         "DO_DAI": DO_DAI_MAC_DINH,
     }
+    system_prompt = load_prompt("a")
     result = call_report_llm(
-        load_prompt("a"),
+        system_prompt,
         _user_message(header, report_ctx.payload, COMMON_NOTES),
         model=model,
     )
-    return ReportResult(kind="a", markdown=result.text,
-                        payload=report_ctx.payload,
-                        truncated=result.truncated, model=result.model)
+    return ReportResult(
+        kind="a", markdown=result.text, payload=report_ctx.payload,
+        truncated=result.truncated, model=result.model,
+        allowed_doc_nums=_source_citations(
+            system_prompt, report_ctx.payload, report_ctx.source_doc_nums),
+    )
 
 
 # ──────────────────────────────────────────────
@@ -289,9 +351,14 @@ def build_update_context(session, rag: RAGDatabase, doc_keys: list[str],
         d["doc_num"] for d in impacted if not d["dieu_khoan_cu"]
     )
 
+    # Bước ĐỌC trên các văn bản MỚI — chủ thể của báo cáo. Chúng được đọc hết
+    # toàn văn để nói được "văn bản này quy định gì", không chỉ "nó thay thế ai".
+    insights = summarizer.build_insights(rag, docs)
+
     payload = {
         "thong_tin_tra_cuu": {
             "so_van_ban_phan_tich": len(facts),
+            "so_van_ban_da_doc_sau": len(insights.items),
             "tong_so_doan": len(chunks),
             "tong_so_quan_he": len(edges),
         },
@@ -302,8 +369,11 @@ def build_update_context(session, rag: RAGDatabase, doc_keys: list[str],
                 "không phải mẫu truy xuất."
             ),
             bao_dong=ctx.van_ban_dan_chieu_khong_lay_duoc(session),
+            khong_co_toan_van_de_doc_sau=insights.khong_co_toan_van,
+            loi_khi_tom_tat=insights.loi_tom_tat,
         ),
         "danh_sach_van_ban": facts,
+        "insight_tung_van_ban": insights.items,
         "chi_tiet_dieu_khoan_chunks": chunks,
         "do_thi_quan_he_van_ban_edges": edges,
         "van_ban_bi_tac_dong": impacted,
@@ -313,7 +383,11 @@ def build_update_context(session, rag: RAGDatabase, doc_keys: list[str],
         # Không nuốt im lặng: thiếu toàn văn bản cũ thì phần "thay đổi so với
         # cái gì" của báo cáo không có căn cứ, và người đọc phải biết điều đó.
         payload["han_che_du_lieu"]["van_ban_cu_chua_co_toan_van"] = khong_co_toan_van
-    return ctx.ReportContext(payload=payload, doc_nums=[d["doc_num"] for d in facts])
+
+    # Số hiệu trong điều khoản bản CŨ (van_ban_bi_tac_dong) do _source_citations
+    # bóc thẳng từ payload lúc sinh báo cáo, nên ở đây chỉ cần source từ bước ĐỌC.
+    return ctx.ReportContext(payload=payload, doc_nums=[d["doc_num"] for d in facts],
+                             source_doc_nums=insights.source_doc_nums)
 
 
 def generate_update_report(session, rag: RAGDatabase, doc_keys: list[str],
@@ -329,8 +403,9 @@ def generate_update_report(session, rag: RAGDatabase, doc_keys: list[str],
         "MOC_CAT": today.strftime("%d/%m/%Y"),
         "DOI_TUONG": DEFAULT_AUDIENCE,
     }
+    system_prompt = load_prompt("b")
     result = call_report_llm(
-        load_prompt("b"),
+        system_prompt,
         _user_message(header, report_ctx.payload, COMMON_NOTES),
         model=model,
     )
@@ -339,6 +414,8 @@ def generate_update_report(session, rag: RAGDatabase, doc_keys: list[str],
         kind="b", markdown=result.text, payload=report_ctx.payload,
         sidecar=_update_sidecar(report_ctx),
         truncated=result.truncated, model=result.model,
+        allowed_doc_nums=_source_citations(
+            system_prompt, report_ctx.payload, report_ctx.source_doc_nums),
     )
 
 
@@ -390,16 +467,15 @@ def generate_business_report(session, rag: RAGDatabase, vsic_code: str,
         for r in existing
     ])
 
-    doc_keys = [
-        d.doc_key for d in session.query(Document).filter(
-            Document.doc_num.in_(parent_sidecar.get("doc_nums") or [""])
-        ).all()
-    ]
+    new_docs = session.query(Document).filter(
+        Document.doc_num.in_(parent_sidecar.get("doc_nums") or [""])
+    ).all()
     thieu: list[str] = []
-    facts = [
-        ctx.document_facts(d, thieu)
-        for d in session.query(Document).filter(Document.doc_key.in_(doc_keys)).all()
-    ]
+    facts = [ctx.document_facts(d, thieu) for d in new_docs]
+
+    # Bước ĐỌC trên chính các văn bản mới mà báo cáo (b) đã nêu — để (c) nói
+    # được nghĩa vụ mới chạm vào đâu, dựa trên nội dung thật chứ không chỉ tên.
+    insights = summarizer.build_insights(rag, new_docs)
 
     payload = {
         "bao_cao_goc": parent_markdown,
@@ -407,6 +483,7 @@ def generate_business_report(session, rag: RAGDatabase, vsic_code: str,
             "nganh": industry,
             "ma_nganh": vsic_code,
             "so_van_ban_moi": len(facts),
+            "so_van_ban_da_doc_sau": len(insights.items),
             "so_dieu_khoan_hien_huu": len(kept),
         },
         "han_che_du_lieu": ctx.limitations(
@@ -416,8 +493,11 @@ def generate_business_report(session, rag: RAGDatabase, vsic_code: str,
                 "văn bản hết hiệu lực toàn bộ."
             ),
             bao_dong=ctx.van_ban_dan_chieu_khong_lay_duoc(session),
+            khong_co_toan_van_de_doc_sau=insights.khong_co_toan_van,
+            loi_khi_tom_tat=insights.loi_tom_tat,
         ),
         "danh_sach_van_ban": facts,
+        "insight_tung_van_ban": insights.items,
         "quy_dinh_hien_huu_cua_nganh": [{
             "doc_num": c["doc_num"], "heading": c["heading"],
             "content_excerpt": (c["content"] or "")[:1200],
@@ -442,11 +522,16 @@ def generate_business_report(session, rag: RAGDatabase, vsic_code: str,
         "TUYỆT ĐỐI không đưa ra kết luận mâu thuẫn với `bao_cao_goc`. Hai tài "
         "liệu này tới tay cùng một người trong cùng một ngày.",
     ]
-    result = call_report_llm(load_prompt("c"), _user_message(header, payload, notes),
+    system_prompt = load_prompt("c")
+    result = call_report_llm(system_prompt, _user_message(header, payload, notes),
                              model=model)
 
-    return ReportResult(kind="c", markdown=result.text, payload=payload,
-                        truncated=result.truncated, model=result.model)
+    return ReportResult(
+        kind="c", markdown=result.text, payload=payload,
+        truncated=result.truncated, model=result.model,
+        allowed_doc_nums=_source_citations(
+            system_prompt, payload, insights.source_doc_nums),
+    )
 
 
 def _short_name(vsic_code: str) -> str:

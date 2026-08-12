@@ -7,10 +7,15 @@ của giai đoạn này:
     thong_tin_tra_cuu             tóm tắt số lượng
     han_che_du_lieu               chỗ nào thiếu — BẮT BUỘC công bố trong báo cáo
     danh_sach_van_ban             metadata từng văn bản
+    insight_tung_van_ban          bản tóm tắt insight sau khi ĐỌC HẾT toàn văn
     chi_tiet_dieu_khoan_chunks    trích đoạn điều khoản
     do_thi_quan_he_van_ban_edges  quan hệ hai chiều
     diem_tac_dong_nganh           điểm % tác động 21 ngành VSIC
     van_ban_bi_tac_dong           văn bản cũ bị sửa/thay thế, để so được thay đổi
+
+`insight_tung_van_ban` là đầu ra bước ĐỌC (src/rag/reports/summarizer.py): mỗi
+văn bản đã được đọc hết toàn văn và chắt thành các luận điểm neo vào Điều/Khoản.
+Đây là nguồn để bước TỔNG HỢP dựng nội dung, thay cho việc chỉ liệt kê metadata.
 """
 from __future__ import annotations
 
@@ -34,6 +39,9 @@ logger = logging.getLogger(__name__)
 class ReportContext:
     payload: dict[str, Any] = field(default_factory=dict)
     doc_nums: list[str] = field(default_factory=list)
+    # Số hiệu xuất hiện trong toàn văn nguồn (từ bước ĐỌC) — cổng kiểm trích dẫn
+    # dùng để không chặn nhầm văn bản cũ bị bãi bỏ/dẫn chiếu.
+    source_doc_nums: set[str] = field(default_factory=set)
 
     def is_empty(self) -> bool:
         return not self.payload.get("danh_sach_van_ban")
@@ -175,11 +183,18 @@ def limitations(
     loai_do_het_hieu_luc: int = 0,
     ghi_chu_thoi_gian: str = "",
     bao_dong: dict[str, Any] | None = None,
+    khong_co_toan_van_de_doc_sau: list[str] | None = None,
+    loi_khi_tom_tat: list[str] | None = None,
 ) -> dict[str, Any]:
     """Khối hạn chế dữ liệu — mô hình BẮT BUỘC công bố ở phụ lục.
 
     Đây là thứ giữ cho báo cáo trung thực khi dữ liệu thiếu, thay vì im lặng lấp
     bằng kiến thức nền.
+
+    Hai danh sách cuối thuộc bước ĐỌC (tóm tắt insight từng văn bản):
+      - `khong_co_toan_van_de_doc_sau`: văn bản chỉ có metadata, kho chưa có toàn
+        văn nên không đọc sâu được — báo cáo phải nói rõ chứ không giả vờ đã đọc.
+      - `loi_khi_tom_tat`: có toàn văn nhưng bước tóm tắt hỏng. Cũng phải công bố.
     """
     out = {
         "so_van_ban_khong_ro_trang_thai_hieu_luc": len(thieu_trang_thai),
@@ -191,4 +206,8 @@ def limitations(
     }
     if bao_dong and any(bao_dong.values()):
         out["van_ban_dan_chieu_chua_co_trong_kho"] = bao_dong
+    if khong_co_toan_van_de_doc_sau:
+        out["van_ban_chua_co_toan_van_de_doc_sau"] = khong_co_toan_van_de_doc_sau
+    if loi_khi_tom_tat:
+        out["van_ban_chua_tom_tat_duoc_noi_dung"] = loi_khi_tom_tat
     return out

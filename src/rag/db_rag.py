@@ -201,6 +201,29 @@ class RAGDatabase:
             self.db.execute(
                 f"CREATE INDEX IF NOT EXISTS idx_graph_{col} ON legal_graph({col})"
             )
+
+        # Bản tóm tắt insight từng văn bản — kết quả của bước "đọc hết toàn văn
+        # rồi tóm tắt" (xem src/rag/reports/summarizer.py). Lưu ở đây vì nó là
+        # hàm của NỘI DUNG văn bản, mà nội dung nằm trong rag.db chứ không phải
+        # legal_docs.db.
+        #
+        # Vì sao phải cache: cùng một đạo luật (vd Luật Xây dựng) xuất hiện trong
+        # hàng chục báo cáo ngành và lặp lại mỗi quý. Tóm tắt lại mỗi lần là gọi
+        # mô hình thừa hàng trăm lượt cho cùng một nội dung không đổi. Khoá theo
+        # doc_key; chỉ tóm tắt lại khi content_hash đổi (nội dung thay) hoặc
+        # prompt_version đổi (ta cải tiến cách tóm tắt).
+        self.db.execute("""
+            CREATE TABLE IF NOT EXISTS document_insights (
+                doc_key        TEXT PRIMARY KEY,
+                doc_num        TEXT,
+                content_hash   TEXT NOT NULL,
+                prompt_version TEXT NOT NULL,
+                model          TEXT,
+                insight_json   TEXT NOT NULL,
+                source_chars   INTEGER,
+                updated_at     TEXT DEFAULT (datetime('now'))
+            )
+        """)
         self.db.commit()
 
     def upsert_chunk(self, chunk_data: dict, commit: bool = True) -> int:
@@ -521,6 +544,59 @@ class RAGDatabase:
         cursor = self.db.execute("SELECT * FROM legal_chunks WHERE id = ?", (chunk_id,))
         row = cursor.fetchone()
         return dict(row) if row else None
+
+    def full_document(self, doc_key: str) -> List[Dict]:
+        """TOÀN VĂN một văn bản: mọi đoạn theo đúng thứ tự Điều/Khoản.
+
+        Tra bằng COALESCE(doc_key, doc_num) giống mọi truy vấn phục vụ báo cáo:
+        tra thuần số hiệu sẽ trộn toàn văn của hai văn bản trùng số hiệu ở hai
+        tỉnh. KHÔNG cắt content — đây là đầu vào cho bước tóm tắt, mà tóm tắt
+        trên bản đã cắt thì bỏ sót đúng phần chi tiết báo cáo cần.
+        """
+        cursor = self.db.execute(
+            "SELECT heading, content, char_count FROM legal_chunks "
+            "WHERE COALESCE(doc_key, doc_num) = ? ORDER BY chunk_index",
+            (doc_key,),
+        )
+        return [dict(r) for r in cursor.fetchall()]
+
+    def get_document_insight(self, doc_key: str) -> Optional[Dict]:
+        """Bản tóm tắt insight đã cache, hoặc None. Bên gọi tự đối chiếu
+
+        content_hash và prompt_version để quyết định dùng lại hay tóm tắt mới.
+        """
+        cursor = self.db.execute(
+            "SELECT * FROM document_insights WHERE doc_key = ?", (doc_key,)
+        )
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+    def save_document_insight(
+        self, doc_key: str, doc_num: str, content_hash: str,
+        prompt_version: str, model: str, insight_json: str,
+        source_chars: int, commit: bool = True,
+    ) -> None:
+        """Ghi đè bản tóm tắt insight của một văn bản (khoá theo doc_key)."""
+        self.db.execute(
+            """
+            INSERT INTO document_insights
+                (doc_key, doc_num, content_hash, prompt_version, model,
+                 insight_json, source_chars, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            ON CONFLICT(doc_key) DO UPDATE SET
+                doc_num        = excluded.doc_num,
+                content_hash   = excluded.content_hash,
+                prompt_version = excluded.prompt_version,
+                model          = excluded.model,
+                insight_json   = excluded.insight_json,
+                source_chars   = excluded.source_chars,
+                updated_at     = datetime('now')
+            """,
+            (doc_key, doc_num, content_hash, prompt_version, model,
+             insight_json, source_chars),
+        )
+        if commit:
+            self.db.commit()
         
     def get_max_usage_count(self) -> int:
         cursor = self.db.execute("SELECT MAX(usage_count) as m FROM legal_chunks")

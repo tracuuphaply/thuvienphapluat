@@ -18,6 +18,9 @@ KIND_TO_FILE: dict[str, str] = {
     "c": "prompt_tac_dong_nganh.md",    # doanh nghiệp trong ngành
 }
 
+# Mẫu cho bước ĐỌC — tóm tắt insight từng văn bản, dùng trước cả ba loại báo cáo.
+SUMMARY_FILE = "prompt_tom_tat_van_ban.md"
+
 # Mục 9 trở đi là tài liệu cho người vận hành (hợp đồng dữ liệu, tham số API),
 # không phải chỉ dẫn cho mô hình. Mỗi mẫu tự khai chỗ cắt bằng tiêu đề này.
 _CUT_MARKERS = ("## 9. HỢP ĐỒNG DỮ LIỆU", "## 7. HỢP ĐỒNG DỮ LIỆU")
@@ -60,8 +63,6 @@ def load_prompt(kind: str = "a") -> str:
         candidates.append(Path(override))
     if kind in KIND_TO_FILE:
         candidates.append(PROMPT_DIR / KIND_TO_FILE[kind])
-    if kind == "a":
-        candidates.append(PROMPT_DIR / "prompt_report.md")
 
     for path in candidates:
         try:
@@ -78,3 +79,16 @@ def load_prompt(kind: str = "a") -> str:
     raise PromptTemplateMissing(
         f"Không đọc được mẫu prompt loại {kind!r} tại: {[str(p) for p in candidates]}"
     )
+
+
+def load_summary_prompt() -> str:
+    """Mẫu hệ thống cho bước tóm tắt insight một văn bản.
+
+    Tách khỏi load_prompt vì đây không phải một "loại báo cáo": nó là bước ĐỌC
+    chạy trước, và không có khối HỢP ĐỒNG DỮ LIỆU để cắt.
+    """
+    path = PROMPT_DIR / SUMMARY_FILE
+    try:
+        return _expand_includes(path.read_text(encoding="utf-8"))
+    except OSError as e:
+        raise PromptTemplateMissing(f"Không đọc được mẫu tóm tắt {path}: {e}")

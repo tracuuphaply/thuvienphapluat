@@ -102,6 +102,18 @@ Chạy bot: `python -m src.notification.telegram_bot_server`
 Báo cáo viết cho **chủ doanh nghiệp, không phải luật sư** — quy tắc giọng văn dùng
 chung ở `src/rag/prompts/_chung/giong_van_doanh_nghiep.md`.
 
+**Đọc trước, tổng hợp sau.** Cả ba loại đều chạy qua hai bước. Bước ĐỌC
+(`src/rag/reports/summarizer.py`) đọc HẾT toàn văn từng văn bản trong báo cáo rồi
+chắt thành insight neo vào Điều/Khoản (nghĩa vụ, ngưỡng, mốc, chế tài); bước TỔNG
+HỢP dựng báo cáo từ các insight đó thay vì chỉ liệt kê metadata. Bản tóm tắt được
+cache theo `doc_key` trong `rag.db` (chỉ dựng lại khi nội dung đổi), nên cùng một
+đạo luật không bị tóm tắt lại ở mỗi báo cáo ngành. Làm ấm cache trước khi sinh
+báo cáo hàng loạt:
+
+```bash
+python -m scripts.backfill_document_insights
+```
+
 Hai chốt chặn không được gỡ:
 
 - **Kiểm trích dẫn là cổng cứng.** Số hiệu không có trong kho thì báo cáo bị chặn
