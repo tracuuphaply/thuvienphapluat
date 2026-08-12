@@ -5,23 +5,23 @@
   "website": "congty.vn",
   "header": "",
   "footer": "",
-  "_ghi_chu_chan_trang": "Khối thư ngỏ hợp tác in ở CUỐI báo cáo (trang chót), không lặp mỗi trang. Để partner_pitch rỗng thì khối này tắt hẳn và chỉ còn bản gửi khách. Mỗi cột nên giữ 3–4 dòng, mỗi dòng dưới 60 ký tự.",
+  "_ghi_chu_chan_trang": "Khối thư ngỏ in ở CUỐI báo cáo (trang chót), không lặp mỗi trang. Để partner_pitch rỗng thì khối tắt hẳn và chỉ còn bản gửi khách. Hai cột ĐỐI XỨNG TỪNG DÒNG: dòng n bên phải là giá trị của giải pháp ở dòng n bên trái, nên phải cùng số mục. Mỗi mục giữ dưới khoảng 34 ký tự để gọn trong một dòng; dài hơn sẽ xuống hai dòng và lệch thế đối chiếu.",
   "partner_title": "THƯ NGỎ HỢP TÁC TRUYỀN THÔNG",
-  "partner_pitch": "Chúng tôi tìm công ty luật đồng hành cùng bản tin pháp lý này.",
+  "partner_pitch": "Chúng tôi tìm quý doanh nghiệp đồng hành cùng congty.vn.",
   "partner_cta": "HỢP TÁC CÙNG CHÚNG TÔI",
   "partner_contact": "Liên hệ hợp tác: lienhe@congty.vn",
-  "partner_col1_title": "Chúng tôi cung cấp",
+  "partner_col1_title": "Giải pháp chúng tôi mang đến",
   "partner_col1": [
-    "Hệ thống tự động rà soát văn bản pháp luật mới",
-    "Báo cáo pháp lý theo ngành, gửi định kỳ",
-    "Danh sách doanh nghiệp đang cần tư vấn pháp lý",
-    "Kênh email marketing đã có sẵn người đọc"
+    "Dữ liệu hơn 80.000 doanh nghiệp",
+    "Kết nối cơ hội kinh doanh",
+    "Quảng bá thương hiệu bằng email",
+    "Báo cáo pháp lý theo ngành"
   ],
-  "partner_col2_title": "Công ty luật nhận được",
+  "partner_col2_title": "Giá trị doanh nghiệp nhận được",
   "partner_col2": [
-    "Thương hiệu xuất hiện trên mọi bản báo cáo",
-    "Tiếp cận doanh nghiệp đúng lúc họ cần",
-    "Thông tin liên hệ khách hàng tiềm năng",
-    "Đổi lại: tài trợ chi phí gửi email"
+    "Tìm đúng khách hàng tiềm năng",
+    "Thêm đối tác và hợp đồng mới",
+    "Thương hiệu đến người quyết định",
+    "Xuất hiện trên tài liệu khách đọc"
   ]
 }

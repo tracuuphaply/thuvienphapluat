@@ -341,7 +341,10 @@ class KhoiThuNgo(Flowable):
         self.meta = meta
         self.width = rong
         self.vat = 16
-        self.w_anh = rong * 0.30
+        # 0,25 chứ không 0,30: cột chữ cần đủ rộng để mỗi mục gọn trong MỘT
+        # dòng. Hai cột đối xứng từng dòng chỉ đọc ra là "tương ứng" khi các
+        # dòng thẳng hàng nhau; mục nào xuống hai dòng là phá thế đối xứng đó.
+        self.w_anh = rong * 0.25
         self.x_anh = rong - self.w_anh
         self.rong_cot = (self.x_anh - self.LE * 2 - 10) / 2
 
