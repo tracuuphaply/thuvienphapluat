@@ -452,6 +452,21 @@ class KhoiThuNgo(Flowable):
             c.drawString(self.LE, y_dai - 13, self.phu_de[0])
             y_moc -= self.CAO_PHU_DE
 
+        # ── Đường kẻ dọc chia hai cột ──
+        #
+        # Vẽ TRƯỚC hai cột và chỉ khi cả hai đều có nội dung: một đường kẻ cạnh
+        # một cột trống trông như phần bên kia bị mất chứ không như một vạch
+        # chia. Chiều cao lấy theo cột dài hơn để nó không thò ra dưới chữ.
+        if all(self.cot):
+            cao_cot_thuc = max(
+                sum(len(d) * self.CAO_DONG + self.CACH_MUC for _, d in c)
+                for c in self.cot)
+            x_ke = self.LE + self.rong_cot + 5
+            y_tren = y_moc - self.HO_TREN_COT + 9
+            c.setStrokeColor(colors.HexColor(RULE))
+            c.setLineWidth(0.7)
+            c.line(x_ke, y_tren, x_ke, y_tren - self.CAO_TIEU_DE_COT - cao_cot_thuc)
+
         # ── Hai cột giá trị ──
         tieu_de_cot = (m.partner_col1_title, m.partner_col2_title)
         co_cham = (m.partner_col1_cham, m.partner_col2_cham)
