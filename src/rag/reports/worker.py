@@ -216,8 +216,11 @@ def run_job(session, rag: RAGDatabase, job: dict, scorer_version: str,
         session.commit()
         return jobs.FAILED
 
-    # ── Cổng cứng: mọi số hiệu trong báo cáo phải có thật trong kho ──
-    citation = check_citations(result.markdown)
+    # ── Cổng cứng: mọi số hiệu trong báo cáo phải CÓ THẬT ──
+    # "Có thật" = trong kho, HOẶC có căn cứ trong nguồn mô hình đã đọc (toàn văn
+    # văn bản nguồn + prompt). Nhóm sau là văn bản cũ bị bãi bỏ/dẫn chiếu mà kho
+    # chưa có bản ghi — số thật, mô hình chép lại chứ không bịa.
+    citation = check_citations(result.markdown, extra_allowed=result.allowed_doc_nums)
     paths = _write_outputs(job_id, kind, result)
 
     if not citation.ok:

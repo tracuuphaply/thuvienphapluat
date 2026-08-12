@@ -4,6 +4,15 @@
 Prompt cấm bịa số hiệu, nhưng cấm không phải là bảo đảm. Báo cáo gửi ra ngoài
 cho doanh nghiệp mà trích dẫn một văn bản không tồn tại thì hỏng cả uy tín, nên
 mỗi bản phải qua bước đối chiếu máy móc này trước khi xuất PDF.
+
+Cổng này CHẶN đúng thứ cần chặn — số hiệu mô hình BỊA. Nhưng "không có trong
+kho" không đồng nghĩa với "bịa": một quyết định mới thường bãi bỏ/sửa đổi văn
+bản cũ và phải gọi tên chúng, mà kho chỉ chứa văn bản từ cuối 2025 nên không có
+bản cũ. Số hiệu đó có thật, nằm ngay trong TOÀN VĂN của văn bản đang phân tích —
+mô hình chép lại chứ không bịa. Tham số `extra_allowed` nhận đúng nhóm này: các
+số hiệu ĐÃ XUẤT HIỆN trong nguồn mà mô hình được đọc (toàn văn văn bản nguồn +
+mẫu prompt). Bên gọi phải dựng nhóm này TỪ NGUỒN, không bao giờ từ chính đầu ra
+của mô hình — nếu không cổng tự vô hiệu hoá.
 """
 from __future__ import annotations
 
@@ -72,16 +81,33 @@ def _known_doc_nums(db_path: Path | None = None) -> set[str]:
         conn.close()
 
 
-def check_citations(report_text: str, db_path: Path | None = None) -> CitationReport:
-    """Đối chiếu số hiệu trong báo cáo với bảng documents."""
-    known = _known_doc_nums(db_path)
-    # So khớp không phân biệt hoa thường và dấu phân cách để không báo động giả
-    # với "89-2025-QH15" so với "89/2025/QH15".
-    normalized = {k.lower().replace("-", "/"): k for k in known}
+def _norm_key(num: str) -> str:
+    """Khoá so khớp: bỏ hoa thường và gộp dấu phân cách, để "89-2025-QH15" và
+
+    "89/2025/QH15" coi là một, tránh báo động giả.
+    """
+    return num.lower().replace("-", "/")
+
+
+def check_citations(
+    report_text: str,
+    db_path: Path | None = None,
+    extra_allowed: set[str] | None = None,
+) -> CitationReport:
+    """Đối chiếu số hiệu trong báo cáo với kho, cộng thêm nhóm được nguồn bảo chứng.
+
+    `extra_allowed`: số hiệu có căn cứ trong NGUỒN mô hình đã đọc (toàn văn văn
+    bản nguồn, mẫu prompt) nhưng chưa có bản ghi đầy đủ trong kho — điển hình là
+    văn bản cũ bị bãi bỏ/sửa đổi. Chúng KHÔNG phải số bịa nên không được chặn.
+    Bên gọi có trách nhiệm dựng nhóm này từ nguồn, không từ đầu ra mô hình.
+    """
+    normalized = {_norm_key(k): k for k in _known_doc_nums(db_path)}
+    for k in (extra_allowed or ()):
+        normalized.setdefault(_norm_key(k), k)
 
     result = CitationReport()
     for num in extract_doc_nums(report_text):
-        if num.lower().replace("-", "/") in normalized:
+        if _norm_key(num) in normalized:
             result.found.append(num)
         else:
             result.missing.append(num)
