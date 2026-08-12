@@ -4,5 +4,12 @@
   "phone": "0900 000 000",
   "website": "congty.vn",
   "header": "",
-  "footer": ""
+  "footer": "",
+
+  "_ghi_chu_chan_trang": "Bốn khoá dưới đây dựng khối lời ngỏ hợp tác ở chân mỗi trang PDF. Để partner_pitch rỗng thì khối này tắt và chân trang lùi về dạng gọn (tên công ty + số trang). Lời ngỏ dài quá hai dòng sẽ bị cắt và báo bằng dấu ba chấm — giữ dưới khoảng 170 ký tự.",
+
+  "partner_title": "ĐỒNG HÀNH CÙNG BẢN TIN PHÁP LÝ NÀY",
+  "partner_pitch": "Quý công ty luật tài trợ chi phí gửi email; đổi lại, thương hiệu và dịch vụ của quý công ty đến đúng những doanh nghiệp vừa nhận cảnh báo pháp lý và đang cần tư vấn.",
+  "partner_cta": "HỢP TÁC",
+  "partner_contact": "Liên hệ hợp tác: lienhe@congty.vn"
 }
