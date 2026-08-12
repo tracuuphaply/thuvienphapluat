@@ -36,11 +36,17 @@ TOI_THIEU_VAN_BAN = 4
 def _nhan_hieu_luc(vb: dict) -> str:
     """Nhãn tình trạng hiệu lực, ưu tiên cờ đã chuẩn hoá.
 
-    `eff_state_dien_giai` là bản đã chuẩn hoá và đã dịch sang tiếng người;
-    `eff_status` là chuỗi tự do của Bộ Tư pháp, cùng một tình trạng có nhiều
-    cách viết nên vẽ ra sẽ thành nhiều cột cho cùng một thứ.
+    `tinh_trang_hieu_luc_chuan_hoa` là bản đã chuẩn hoá; `eff_status` là chuỗi
+    tự do của Bộ Tư pháp, cùng một tình trạng có nhiều cách viết nên vẽ ra sẽ
+    thành nhiều cột cho cùng một thứ.
+
+    Tên khoá phải khớp context.document_facts(). Bản đầu tôi đoán là
+    "eff_state_dien_giai" — không tồn tại, nên nó âm thầm rơi xuống nhánh dự
+    phòng và nhóm theo đúng chuỗi tự do mà đoạn trên nói là không được dùng.
+    Biểu đồ vẫn vẽ ra, chỉ là vẽ sai. Đây là lần thứ hai trong cùng file này
+    tôi mắc lỗi đoán tên khoá; xem thêm _theo_nganh().
     """
-    return (vb.get("eff_state_dien_giai") or vb.get("eff_status")
+    return (vb.get("tinh_trang_hieu_luc_chuan_hoa") or vb.get("eff_status")
             or "Chưa xác định")
 
 

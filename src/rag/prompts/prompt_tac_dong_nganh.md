@@ -53,33 +53,42 @@ cấp tỉnh của địa bàn này.
 
 ## 5. CẤU TRÚC BẮT BUỘC
 
+Áp khung tạp chí cho báo cáo chuyên sâu một ngành:
+
 ```
-### TÓM TẮT ĐIỀU HÀNH
-Ba câu: (1) văn bản mới làm gì với ngành này, (2) nghĩa vụ nặng nhất phát sinh,
-(3) mốc thời gian gần nhất cần hành động.
+**Tóm tắt.** 120–180 chữ: văn bản mới làm gì với ngành này, việc nặng nhất, hạn gần nhất.
+**Từ khoá:** 4–6 cụm.
+**Phạm vi và thời điểm.** Ngành, số văn bản, ngày chốt dữ liệu.
 
-### 1. VĂN BẢN MỚI CHẠM VÀO ĐÂU
-Bảng: Việc bạn đang làm | Trước đây quy định thế nào | Từ nay quy định thế nào | Thay đổi kiểu gì
+### I. VĂN BẢN MỚI CHẠM VÀO ĐÂU
+BẢNG 1: | Việc bạn đang làm | Trước đây quy định thế nào | Từ nay quy định thế nào | Thay đổi kiểu gì |
 
-### 2. TỪNG VIỆC BẠN PHẢI LÀM
-Mỗi việc một mục con, đủ bốn khối:
+### II. TỪNG VIỆC BẠN PHẢI LÀM
+Mỗi việc một mục con `#### n. …`, đủ bốn khối:
   (a) Phải làm gì — dẫn số hiệu + Điều cụ thể
   (b) So với việc đang làm — thay hẳn / làm thêm / trùng một phần
   (c) Ai trong ngành phải làm — công ty quy mô nào, làm nghề gì
   (d) Trước ngày nào, và không làm thì sao — CHỈ khi dữ liệu có nêu mức phạt
 
-### 3. RỦI RO TUÂN THỦ THEO MỨC ĐỘ ƯU TIÊN
-Bảng: Rủi ro gì | Gấp tới đâu | Theo văn bản nào | Xử lý xong trước ngày
-Mức ưu tiên suy từ `cuong_do_tac_dong` và mốc thời gian, KHÔNG tự đặt thang điểm.
+### III. RỦI RO XẾP THEO MỨC KHẨN
+BẢNG: | Rủi ro gì | Gấp tới đâu | Theo văn bản nào | Xử lý xong trước ngày |
+Mức khẩn suy từ `cuong_do_tac_dong` và mốc thời gian, KHÔNG tự đặt thang điểm.
 
-### 4. LỘ TRÌNH TUÂN THỦ
-Bảng theo mốc thời gian: Trước ngày | Việc phải xong | Ai trong công ty nên lo
+### IV. LỘ TRÌNH TUÂN THỦ
+BẢNG theo mốc thời gian: | Trước ngày | Việc phải xong | Ai trong công ty nên lo |
 
-### PHỤ LỤC — DANH MỤC VĂN BẢN THAM CHIẾU
-### PHỤ LỤC — HẠN CHẾ DỮ LIỆU
+### TÀI LIỆU VÀ CĂN CỨ PHÁP LÝ
+### TUYÊN BỐ MIỄN TRÁCH NHIỆM
+### HẠN CHẾ DỮ LIỆU
 ```
 
+---
+
 {{include:_chung/giong_van_doanh_nghiep.md}}
+
+---
+
+{{include:_chung/cau_truc_tap_chi.md}}
 
 ---
 

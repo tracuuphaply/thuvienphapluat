@@ -164,6 +164,10 @@ def _styles() -> dict[str, ParagraphStyle]:
             "fig_title", fontName=FONT_B, fontSize=12, leading=15,
             textColor=colors.HexColor(ORANGE), spaceAfter=6,
         ),
+        "caption": ParagraphStyle(
+            "caption", fontName=FONT_B, fontSize=8, leading=11,
+            textColor=colors.white, alignment=1,
+        ),
         "source": ParagraphStyle(
             "source", fontName=FONT_I, fontSize=7.5, leading=10,
             textColor=colors.HexColor(INK_SOFT), alignment=2, spaceBefore=3,
@@ -226,10 +230,75 @@ class _Canvas(rl_canvas.Canvas):
         self.setLineWidth(0.5)
         self.line(_MARGIN, _PAGE_H - 48, _PAGE_W - _MARGIN, _PAGE_H - 48)
 
-        foot = self._meta.contact or self._meta.company or ""
-        if foot:
-            self.drawString(_MARGIN, 30, foot[:110])
+        self._chan_trang()
         self.restoreState()
+
+    def _chan_trang(self) -> None:
+        """Chân trang dựng bằng vector theo bố cục của banner mẫu.
+
+        Mẫu người dùng đưa là một banner tuyển dụng: khối logo bên trái, dải
+        ngang đậm chạy giữa, khối nhấn bo góc bên phải, các góc vát chéo. Ở đây
+        lấy đúng bố cục đó nhưng VẼ LẠI BẰNG VECTOR thay vì nhúng ảnh, vì hai lý
+        do: ảnh raster kéo ngang một trang A4 sẽ rỗ khi in, và màu cam của banner
+        chọi với xanh #003CA7 đang dùng cho bìa, đầu bảng và biểu đồ.
+
+        Chân trang nằm dưới đáy khung nội dung (bottomMargin = 54) nên không
+        đụng chữ.
+        """
+        y = 20            # đáy dải
+        h = 15            # chiều cao dải
+        vat = 9           # độ vát của góc chéo, lấy theo tỷ lệ banner mẫu
+
+        trai = _MARGIN
+        phai = _PAGE_W - _MARGIN
+        # Khối nhấn bên phải giữ chỗ cho số trang; phần còn lại là dải chính.
+        w_nhan = 58
+        x_nhan = phai - w_nhan
+
+        # ── Dải chính, vát góc trên-phải để dẫn mắt sang khối nhấn ──
+        self.setFillColor(colors.HexColor(BRAND_DEEP))
+        dai = self.beginPath()
+        dai.moveTo(trai, y)
+        dai.lineTo(x_nhan - vat, y)
+        dai.lineTo(x_nhan - vat + vat, y + h)
+        dai.lineTo(trai, y + h)
+        dai.close()
+        self.drawPath(dai, stroke=0, fill=1)
+
+        # ── Khối nhấn bên phải, vát góc dưới-trái để khớp với dải ──
+        self.setFillColor(colors.HexColor(BRAND))
+        nhan = self.beginPath()
+        nhan.moveTo(x_nhan, y)
+        nhan.lineTo(phai, y)
+        nhan.lineTo(phai, y + h)
+        nhan.lineTo(x_nhan - vat + vat, y + h)
+        nhan.close()
+        self.drawPath(nhan, stroke=0, fill=1)
+
+        # ── Vạch mảnh phía trên, tách chân trang khỏi thân bài ──
+        self.setStrokeColor(colors.HexColor(BRAND))
+        self.setLineWidth(1.6)
+        self.line(trai, y + h + 5, trai + 46, y + h + 5)
+
+        # ── Chữ trên dải: tên đơn vị và kỳ báo cáo ──
+        nhan_trai = (self._meta.company or "").strip()
+        ky = (self._meta.period or "").strip()
+        text = " · ".join(x for x in (nhan_trai, ky) if x)
+        self.setFillColor(colors.white)
+        self.setFont(FONT_B, 7)
+        self.drawString(trai + 8, y + 5, text[:78])
+
+        # ── Số trang trong khối nhấn ──
+        self.setFont(FONT_B, 8)
+        self.drawCentredString(x_nhan + w_nhan / 2 + 2, y + 4.5,
+                               f"Trang {self._pageNumber}")
+
+        # ── Dòng liên hệ dưới dải, cỡ nhỏ ──
+        lien_he = (self._meta.contact or "").strip()
+        if lien_he:
+            self.setFont(FONT, 6.5)
+            self.setFillColor(colors.HexColor(INK_SOFT))
+            self.drawString(trai, y - 9, lien_he[:120])
 
 
 def _draw_cover(canv: rl_canvas.Canvas, doc) -> None:
@@ -308,6 +377,31 @@ def _inline(text: str) -> str:
     text = re.sub(r"(?<!\*)\*([^*]+?)\*(?!\*)", r"<i>\1</i>", text)
     text = re.sub(r"`(.+?)`", r"<font face='Courier'>\1</font>", text)
     return text
+
+
+# Tiêu đề bảng và dòng nguồn, theo lối trình bày của tạp chí khoa học: một dải
+# nền đậm chạy hết bề ngang mang tên bảng viết hoa, và ngay dưới bảng là dòng
+# "Nguồn: …" cỡ nhỏ nghiêng, canh phải.
+#
+# Vì sao dòng nguồn quan trọng đến mức có riêng cách trình bày: một con số không
+# nói rõ lấy từ đâu thì không kiểm chứng được. Đó là ranh giới giữa báo cáo và
+# ý kiến, và là lý do tạp chí bắt buộc ghi nguồn dưới mọi bảng.
+_RE_CAPTION = re.compile(r"^(BẢNG|HÌNH)\s+(\d+)\s*[:.]\s*(.+)$", re.IGNORECASE)
+_RE_NGUON = re.compile(r"^(Nguồn|Đơn vị)\s*:\s*(.+)$", re.IGNORECASE)
+
+
+def _caption_bar(text: str, st: dict) -> Table:
+    """Dải tiêu đề bảng — nền đậm, chữ trắng, chạy hết bề ngang."""
+    t = Table([[Paragraph(_inline(text.upper()), st["caption"])]],
+              colWidths=[_CONTENT_W])
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(BRAND)),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    return t
 
 
 def _figure_block(fig: Figure, st: dict) -> KeepTogether:
@@ -402,12 +496,26 @@ def _parse(md: str, meta: ReportMeta, st: dict) -> list:
     in_disclaimer = False
     figures_placed = False
 
+    pending_caption = ""
+
     def flush_table():
-        nonlocal pending_table
+        """Dựng bảng, kèm dải tiêu đề "BẢNG n: …" nếu có.
+
+        Tiêu đề và bảng đi trong một KeepTogether: tạp chí đặt tiêu đề ngay trên
+        bảng, nên để chúng rơi sang hai trang là mất hẳn nghĩa của tiêu đề.
+        """
+        nonlocal pending_table, pending_caption
         if len(pending_table) >= 2:
+            khoi = [Spacer(1, 6)]
+            if pending_caption:
+                khoi.append(_caption_bar(pending_caption, st))
+            khoi.append(_table(pending_table, st))
+            story.append(KeepTogether(khoi))
             story.append(Spacer(1, 4))
-            story.append(_table(pending_table, st))
-            story.append(Spacer(1, 10))
+            # Chỉ xoá tiêu đề khi ĐÃ dựng bảng. Giữa dòng "BẢNG n: …" và bảng
+            # luôn có một dòng trống, mà dòng trống cũng đi qua flush_table() —
+            # xoá vô điều kiện ở đây thì tiêu đề bị mất sạch trước khi bảng tới.
+            pending_caption = ""
         pending_table = []
 
     # Cụm cho biết khối trích dẫn thực chất là lời miễn trách nhiệm, không phải
@@ -439,6 +547,23 @@ def _parse(md: str, meta: ReportMeta, st: dict) -> list:
         line = raw.rstrip()
         stripped = line.strip()
 
+        # "BẢNG n: …" là tiêu đề của bảng ngay bên dưới, không phải một đoạn văn.
+        m = _RE_CAPTION.match(stripped)
+        if m:
+            flush_table()
+            if m.group(1).upper() == "BẢNG":
+                pending_caption = f"{m.group(1).upper()} {m.group(2)}: {m.group(3)}"
+            # HÌNH thì bỏ qua: biểu đồ do hệ thống chèn và tự đánh số, giữ lại
+            # dòng chữ của mô hình sẽ thành hai số hiệu cho cùng một hình.
+            continue
+
+        # "Nguồn: …" đi liền sau bảng nên phải xả bảng trước rồi mới in.
+        m = _RE_NGUON.match(stripped)
+        if m:
+            flush_table()
+            story.append(Paragraph(_inline(stripped), st["source"]))
+            continue
+
         if stripped.startswith("|"):
             cells = [c.strip() for c in stripped.strip("|").split("|")]
             if all(re.fullmatch(r":?-{2,}:?", c or "-") for c in cells):
@@ -463,6 +588,9 @@ def _parse(md: str, meta: ReportMeta, st: dict) -> list:
             continue
 
         if stripped.startswith("#"):
+            # Tiêu đề bảng chưa dùng tới thì bỏ tại đây, đừng để nó trôi xuống
+            # gắn nhầm vào bảng của mục sau.
+            pending_caption = ""
             flush_disclaimer()
             level = len(stripped) - len(stripped.lstrip("#"))
             text = stripped.lstrip("# ").strip()

@@ -637,3 +637,49 @@ class TestDanhSachSoHieuHopLe:
         # Phải nằm SAU khối JSON và TRƯỚC phần lưu ý — chỗ mô hình đọc cuối.
         assert msg.index("DANH SÁCH SỐ HIỆU") > msg.index("DỮ LIỆU THỰC TẾ")
         assert msg.index("DANH SÁCH SỐ HIỆU") < msg.index("LƯU Ý QUAN TRỌNG")
+
+
+class TestBoCucTapChi:
+    """Dải tiêu đề bảng và dòng nguồn kiểu tạp chí khoa học."""
+
+    def _dung(self, md, tmp_path):
+        from src.utils.report_pdf import ReportMeta, build_report_pdf
+        out = tmp_path / "t.pdf"
+        build_report_pdf(md, out, ReportMeta(
+            industry="Thử", period="Kỳ thử", cutoff="12/08/2026"))
+        from pypdf import PdfReader
+        return "\n".join(p.extract_text() or "" for p in PdfReader(str(out)).pages)
+
+    def test_dong_trong_giua_tieu_de_va_bang_khong_lam_mat_tieu_de(self, tmp_path):
+        """Dòng trống cũng đi qua flush_table().
+
+        Bản đầu xoá tiêu đề đang chờ vô điều kiện ở đó, nên MỌI tiêu đề bảng
+        đều biến mất — bảng vẫn ra, chỉ mất tên, và không có gì báo lỗi.
+        """
+        md = ("BẢNG 1: TÌNH TRẠNG HIỆU LỰC\n\n"
+              "| Số hiệu | Tình trạng |\n|---|---|\n| 01/2026/NĐ-CP | Còn hiệu lực |\n\n"
+              "Nguồn: Cơ sở dữ liệu văn bản\n")
+        txt = self._dung(md, tmp_path)
+        assert "BẢNG 1:" in txt
+        assert "TÌNH TRẠNG HIỆU LỰC" in txt
+        assert "Nguồn:" in txt
+
+    def test_tieu_de_khong_co_bang_thi_khong_troi_sang_bang_sau(self, tmp_path):
+        md = ("BẢNG 1: TIÊU ĐỀ MỒ CÔI\n\n"
+              "### I. MỘT MỤC\n\n"
+              "| A | B |\n|---|---|\n| 1 | 2 |\n")
+        txt = self._dung(md, tmp_path)
+        assert "TIÊU ĐỀ MỒ CÔI" not in txt
+
+    def test_khong_giu_so_hinh_do_mo_hinh_tu_danh(self, tmp_path):
+        """Biểu đồ do hệ thống chèn và tự đánh số.
+
+        Giữ lại dòng "HÌNH n:" của mô hình sẽ thành hai số hiệu cho cùng một hình.
+        """
+        md = "HÌNH 1: BIỂU ĐỒ MÔ HÌNH TỰ ĐẶT\n\nMột đoạn văn.\n"
+        assert "BIỂU ĐỒ MÔ HÌNH TỰ ĐẶT" not in self._dung(md, tmp_path)
+
+    def test_chan_trang_co_so_trang(self, tmp_path):
+        md = "### I. MỤC\n\n" + ("Một đoạn văn dài. " * 200)
+        txt = self._dung(md, tmp_path)
+        assert "Trang 2" in txt

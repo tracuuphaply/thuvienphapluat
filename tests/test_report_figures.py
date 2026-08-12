@@ -16,7 +16,7 @@ from src.rag.reports import figures
 
 def _vb(**kw) -> dict:
     nen = {"doc_num": "01/2026/NĐ-CP", "doc_type": "Nghị định",
-           "eff_state_dien_giai": "Còn hiệu lực", "eff_from": "2026-01-01"}
+           "tinh_trang_hieu_luc_chuan_hoa": "Còn hiệu lực", "eff_from": "2026-01-01"}
     nen.update(kw)
     return nen
 
@@ -28,7 +28,7 @@ class TestChonBieuDo:
             _vb(doc_type="Nghị định", eff_from=str(mai)),
             _vb(doc_type="Thông tư", eff_from=str(mai.replace(day=1) + timedelta(days=40))),
             _vb(doc_type="Luật", eff_from=str(mai.replace(day=1) + timedelta(days=80))),
-            _vb(doc_type="Quyết định", eff_state_dien_giai="Hết hiệu lực toàn bộ",
+            _vb(doc_type="Quyết định", tinh_trang_hieu_luc_chuan_hoa="Hết hiệu lực toàn bộ",
                 eff_from=str(mai.replace(day=1) + timedelta(days=120))),
         ]
         figs = figures.build_figures("a", {"danh_sach_van_ban": ds})
@@ -88,6 +88,21 @@ class TestBieuDoNganhCuaBaoCaoB:
         for kind in ("a", "c"):
             titles = [f.title for f in figures.build_figures(kind, self._payload())]
             assert not any("Ngành nào chịu ảnh hưởng" in t for t in titles), kind
+
+    def test_moi_khoa_figures_doc_deu_co_trong_document_facts(self):
+        """Chốt hợp đồng khoá giữa figures.py và context.document_facts().
+
+        Hai lần trong cùng một file tôi đoán tên khoá và đoán sai —
+        "impact_pct_doc" (tên cột SQL, không phải tên khoá trả ra) và
+        "tinh_trang_hieu_luc_chuan_hoa" (không tồn tại). Cả hai đều hỏng IM LẶNG: biểu đồ
+        hoặc biến mất, hoặc vẫn vẽ nhưng nhóm theo trường sai. Test này so
+        thẳng vào mã nguồn hàm kia.
+        """
+        src = inspect.getsource(report_context.document_facts)
+        for khoa in ("doc_type", "eff_from", "tinh_trang_hieu_luc_chuan_hoa"):
+            assert f'"{khoa}"' in src, (
+                f"figures.py đọc khoá {khoa!r} mà document_facts() không trả ra"
+            )
 
     def test_ten_truong_khop_voi_industry_impact(self):
         """Chốt hợp đồng giữa figures.py và context.industry_impact().
