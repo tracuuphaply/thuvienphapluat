@@ -9,25 +9,42 @@ phiên bản trôi khác nhau.
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 
 import httpx
 
-from src.config import llm_api_key, openai_api_base, report_max_tokens, report_model
+from src.config import (
+    llm_api_key,
+    openai_api_base,
+    report_max_tokens,
+    report_model,
+    report_request_timeout,
+)
 
 logger = logging.getLogger(__name__)
-
-# Báo cáo dài, mô hình cần thời gian. Đây là lý do KHÔNG gọi LLM bên trong
-# run_pipeline: 300 giây nằm trong khối try bao trọn pipeline nghĩa là một lỗi
-# LLM sẽ đánh dấu cả lần cào là FAILED.
-REQUEST_TIMEOUT = 300.0
 
 # Thấp để bám dữ liệu; báo cáo pháp lý không cần sáng tạo.
 TEMPERATURE = 0.3
 
+# Thử lại lỗi TẠM THỜI. Proxy LLM (reseller) hay chớp tắt: DNS không phân giải
+# được, đứt kết nối, 5xx, 429. Không thử lại thì một cái nấc mạng đánh hỏng cả
+# báo cáo — và với bot Telegram tạo báo cáo thật, đó là hỏng nhìn thấy được.
+# KHÔNG thử lại lỗi nội dung (thiếu khoá, 400, 401): thử lại chỉ tốn thời gian.
+RETRY_ATTEMPTS = 3
+RETRY_BACKOFF = (4.0, 12.0)  # giây chờ trước lần thử 2 và 3
+
 
 class LLMUnavailable(RuntimeError):
     """Không gọi được mô hình — chưa có khoá, hoặc API lỗi."""
+
+
+def _is_transient(exc: Exception) -> bool:
+    """Lỗi có khả năng tự khỏi khi thử lại: mạng chập chờn hoặc máy chủ quá tải."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code in (429, 500, 502, 503, 504)
+    # TransportError phủ ConnectError (gồm DNS), ReadError, TimeoutException…
+    return isinstance(exc, httpx.TransportError)
 
 
 def strip_code_fence(text: str) -> str:
@@ -81,26 +98,37 @@ def call_report_llm(
     url = f"{openai_api_base().rstrip('/')}/chat/completions"
 
     logger.info("Gọi mô hình %s (tối đa %d token)...", model_name, limit)
-    try:
-        resp = httpx.post(
-            url,
-            headers={"Authorization": f"Bearer {api_key}",
-                     "Content-Type": "application/json"},
-            json={
-                "model": model_name,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                "temperature": TEMPERATURE,
-                "max_tokens": limit,
-            },
-            timeout=REQUEST_TIMEOUT,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-    except Exception as e:
-        raise LLMUnavailable(f"Gọi mô hình thất bại: {e}") from e
+    body = {
+        "model": model_name,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "temperature": TEMPERATURE,
+        "max_tokens": limit,
+    }
+    headers = {"Authorization": f"Bearer {api_key}",
+               "Content-Type": "application/json"}
+
+    data = None
+    for attempt in range(1, RETRY_ATTEMPTS + 1):
+        try:
+            resp = httpx.post(url, headers=headers, json=body,
+                              timeout=report_request_timeout())
+            resp.raise_for_status()
+            data = resp.json()
+            break
+        except Exception as e:
+            transient = _is_transient(e)
+            if transient and attempt < RETRY_ATTEMPTS:
+                wait = RETRY_BACKOFF[attempt - 1]
+                logger.warning(
+                    "Gọi mô hình lỗi tạm thời (lần %d/%d): %s — thử lại sau %.0fs",
+                    attempt, RETRY_ATTEMPTS, e, wait,
+                )
+                time.sleep(wait)
+                continue
+            raise LLMUnavailable(f"Gọi mô hình thất bại: {e}") from e
 
     choices = data.get("choices") or []
     if not choices:
