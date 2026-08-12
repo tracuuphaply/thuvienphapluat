@@ -37,7 +37,6 @@ logger = logging.getLogger(__name__)
 # trường thay vì hardcode đường dẫn máy cá nhân (bản cũ trỏ tới ~/Downloads nên
 # trên bất kỳ máy nào khác cũng rơi về fallback).
 REPO_PROMPT_PATH = PROJECT_ROOT / "src" / "rag" / "prompts" / "prompt_bao_cao_v98.md"
-LEGACY_PROMPT_PATH = PROJECT_ROOT / "src" / "rag" / "prompts" / "prompt_report.md"
 
 
 class PromptTemplateMissing(RuntimeError):
@@ -80,7 +79,6 @@ def load_system_prompt() -> str:
     override = report_prompt_path()
     candidates = [Path(override)] if override else []
     candidates.append(REPO_PROMPT_PATH)
-    candidates.append(LEGACY_PROMPT_PATH)
 
     for path in candidates:
         try:
