@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -81,12 +82,30 @@ def _known_doc_nums(db_path: Path | None = None) -> set[str]:
         conn.close()
 
 
-def _norm_key(num: str) -> str:
-    """Khoá so khớp: bỏ hoa thường và gộp dấu phân cách, để "89-2025-QH15" và
+def _fold_dau(s: str) -> str:
+    """Gỡ dấu tiếng Việt khỏi số hiệu để so khớp.
 
-    "89/2025/QH15" coi là một, tránh báo động giả.
+    Mô hình sinh báo cáo hay đánh rơi dấu Đ: viết "168/2025/ND-CP" thay vì
+    "168/2025/NĐ-CP". Đó là lỗi CHÉP, không phải bịa — số hiệu có thật trong kho,
+    chỉ khác đúng cái dấu. Không gỡ dấu thì cổng chặn oan cả báo cáo.
+
+    Đ/đ là ký tự riêng (U+0110/U+0111), NFD không tách được nên phải thay tay;
+    các dấu tổ hợp khác (á→a…) thì NFD lo. Gỡ dấu KHÔNG gây khớp nhầm: số hiệu
+    VBQPPL chỉ gồm chữ số + loại văn bản ASCII, chữ có dấu duy nhất là Đ, mà
+    không có loại nào dùng "ND" để lẫn với "NĐ".
     """
-    return num.lower().replace("-", "/")
+    s = s.replace("Đ", "D").replace("đ", "d")
+    return "".join(c for c in unicodedata.normalize("NFD", s)
+                   if unicodedata.category(c) != "Mn")
+
+
+def _norm_key(num: str) -> str:
+    """Khoá so khớp: bỏ dấu tiếng Việt, hoa thường, và gộp dấu phân cách — để
+
+    "89-2025-QH15", "89/2025/QH15" và "168/2025/ND-CP" ~ "168/2025/NĐ-CP" coi là
+    một, tránh báo động giả.
+    """
+    return _fold_dau(num).lower().replace("-", "/")
 
 
 def check_citations(

@@ -70,3 +70,18 @@ class TestCitationGate:
             "Bãi bỏ 18-2016-QĐ-UBND.",
             db_path=docs_db, extra_allowed={"18/2016/QĐ-UBND"})
         assert r.ok, r.missing
+
+    def test_bo_dau_D_khop_ND_voi_NghiDinh(self, tmp_path):
+        """Mô hình rớt dấu Đ: "168/2025/ND-CP" phải khớp "168/2025/NĐ-CP" trong kho."""
+        import sqlite3
+        path = tmp_path / "d.db"
+        conn = sqlite3.connect(str(path))
+        conn.execute("CREATE TABLE documents (doc_num TEXT)")
+        conn.execute("INSERT INTO documents VALUES ('168/2025/NĐ-CP')")
+        conn.commit(); conn.close()
+
+        r = check_citations("Theo Nghị định 168/2025/ND-CP.", db_path=path)
+        assert r.ok, r.missing
+        # chiều ngược cũng đúng: kho có bản không dấu, báo cáo viết có dấu
+        assert check_citations("QĐ 40/2026/QD-UBND.",
+                               db_path=path, extra_allowed={"40/2026/QĐ-UBND"}).ok
