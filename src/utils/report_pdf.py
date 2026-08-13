@@ -584,12 +584,46 @@ def _draw_cover(canv: rl_canvas.Canvas, doc) -> None:
 
 
 # ── Markdown → flowables ─────────────────────────────────────────────────────
+# ── Ngắt dòng theo lối soạn thảo tiếng Việt ──
+#
+# Nguyên tắc (theo cách các phần mềm soạn thảo tiếng Việt xử lý):
+#   1. Tiếng Việt ngắt dòng ở KHOẢNG TRẮNG giữa các âm tiết, KHÔNG bao giờ tách
+#      chữ cái trong một âm tiết. reportlab mặc định làm đúng điều này, chỉ char-
+#      break khi một token rộng hơn cả ô — với số hiệu dài trong ô bảng hẹp.
+#   2. GIỮ LIỀN (không cho ngắt) các cụm mà tách ra thì đọc như bị cắt:
+#      - từ định danh thứ tự + số: "Điều 6", "khoản 3", "Chương II", "ngày 24"…
+#      - chữ số + đơn vị: "10 tỷ", "24 tháng", "70%", "30 ngày"…
+#      Dùng khoảng trắng không ngắt (U+00A0). Các cụm này đều NGẮN nên không gây
+#      tràn ô.
+#   Không chèn điểm-ngắt-ẩn (U+200B) vào số hiệu: font báo cáo dựng U+200B ra
+#   một khoảng trắng THẤY ĐƯỢC ("108/ 2026/ TT- BTC"). Số hiệu vốn vừa các cột
+#   hiện có nên để nguyên là an toàn nhất.
+_NBSP = " "
+
+_GIU_LIEN_TRUOC = re.compile(
+    r"\b([Đđ]iều|[Kk]hoản|[Đđ]iểm|[Cc]hương|[Mm]ục|[Pp]hần|[Tt]rang|số|"
+    r"ngày|tháng|năm|quý|Luật|Nghị định|Thông tư|Quyết định)[ ]+(?=\d)"
+)
+_GIU_LIEN_DON_VI = re.compile(
+    r"(\d)[ ]+(tỷ|tỉ|triệu|nghìn|đồng|VNĐ|%|ngày|tháng|năm|tuần|giờ|phút|"
+    r"giây|người|lần|bản|bộ)\b"
+)
+
+
+def _ngat_dong_tieng_viet(text: str) -> str:
+    text = _GIU_LIEN_TRUOC.sub(lambda m: m.group(1) + _NBSP, text)
+    text = _GIU_LIEN_DON_VI.sub(lambda m: m.group(1) + _NBSP + m.group(2), text)
+    return text
+
+
 def _inline(text: str) -> str:
     text = (text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
     text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
     text = re.sub(r"(?<!\*)\*([^*]+?)\*(?!\*)", r"<i>\1</i>", text)
     text = re.sub(r"`(.+?)`", r"<font face='Courier'>\1</font>", text)
-    return text
+    # Áp quy tắc ngắt dòng SAU cùng, trên chuỗi đã có thẻ markup: các mẫu ở đây
+    # (từ khoá + số, số + đơn vị, số hiệu) không đụng cú pháp thẻ <b>/<i>/<font>.
+    return _ngat_dong_tieng_viet(text)
 
 
 def _figure_block(fig: Figure, st: dict) -> KeepTogether:
