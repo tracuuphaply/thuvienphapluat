@@ -96,14 +96,18 @@ def merge_triggers(
 
     Returns a list of merged dicts ready for upsert_document().
     """
-    # Index MOJ items by normalized doc_num
-    moj_index: dict[str, dict] = {}
+    # Gom MOJ theo số hiệu thành DANH SÁCH. Nhiều tỉnh có thể cùng số hiệu
+    # ("40/2026/QĐ-UBND" — 31 văn bản thật trùng số này); gom vào một khoá rồi
+    # GHI ĐÈ thì chỉ giữ cái cuối, mất phần còn lại — đúng cái mất dữ liệu mà
+    # thiết kế doc_key sinh ra để chặn, nay tái diễn ở tầng gộp trigger.
+    moj_index: dict[str, list[dict]] = {}
     for item in moj_items:
         key = normalize_doc_num(item.get("doc_num", ""))
         if key:
-            moj_index[key] = item
+            moj_index.setdefault(key, []).append(item)
 
-    merged: dict[str, dict] = {}
+    merged: list[dict] = []
+    da_gop_moj: set[int] = set()  # id() các MOJ item đã gộp vào một TVPL entry
 
     # Process TVPL items first
     for tvpl_item in tvpl_items:
@@ -130,9 +134,13 @@ def merge_triggers(
             "field_name": BUSINESS_FIELDS.get(field_code) if field_code else None,
         }
 
-        # If MOJ also has this document, merge
-        if key in moj_index:
-            moj_data = moj_index.pop(key)
+        # Chỉ gộp MOJ vào TVPL khi KHÔNG nhập nhằng: đúng MỘT văn bản MOJ cùng số
+        # hiệu. Nhiều bản (trùng số hiệu khác tỉnh) thì không biết TVPL ứng với
+        # tỉnh nào — để chúng thành ứng viên MOJ riêng bên dưới, không gộp bừa.
+        ung_vien = moj_index.get(key) or []
+        moj_data = ung_vien[0] if len(ung_vien) == 1 else None
+        if moj_data is not None:
+            da_gop_moj.add(id(moj_data))
             entry.update({
                 "doc_num": moj_data.get("doc_num") or entry["doc_num"],
                 "title": moj_data.get("title") or entry["title"],
@@ -153,7 +161,7 @@ def merge_triggers(
                 "moj_id": moj_data.get("moj_id"),
             })
 
-        merged[key] = entry
+        merged.append(entry)
 
     # Add remaining MOJ-only items.
     # Danh sách MOJ được quét không lọc lĩnh vực (API danh sách không trả lĩnh
@@ -161,9 +169,14 @@ def merge_triggers(
     # bản cả nước. Lĩnh vực thật được xác nhận lại sau khi lấy chi tiết.
     from src.sources.moj_api import title_looks_business
 
-    for key, moj_data in moj_index.items():
-        if key not in merged and title_looks_business(moj_data):
-            moj_data["_needs_field_check"] = True
-            merged[key] = moj_data
+    # Mọi MOJ item CHƯA gộp (gồm tất cả các tỉnh trùng số hiệu) — theo id() từng
+    # bản, không theo số hiệu, nên không bỏ sót tỉnh nào.
+    for items in moj_index.values():
+        for moj_data in items:
+            if id(moj_data) in da_gop_moj:
+                continue
+            if title_looks_business(moj_data):
+                moj_data["_needs_field_check"] = True
+                merged.append(moj_data)
 
-    return list(merged.values())
+    return merged

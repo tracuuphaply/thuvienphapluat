@@ -168,16 +168,19 @@ def hybrid_search(
                 if doc["issue_date"] < start_date or doc["issue_date"] > end_date:
                     continue
             
+        # Recency tính theo NGÀY BAN HÀNH của văn bản (tuổi thật của luật), KHÔNG
+        # theo updated_at. updated_at là mốc REINDEX: sau mỗi lần nạp lại toàn kho
+        # nó ≈ now cho mọi chunk, nên recency thành hằng số và số hạng recency
+        # (trọng số 0.3) mất hẳn tác dụng — một luật 2015 nhìn "mới" ngang một nghị
+        # định 2026, đúng ngược với nhu cầu của báo cáo cập nhật. issue_date dạng
+        # 'YYYY-MM-DD'; so bằng date để tránh lệch múi giờ UTC/local.
         days_old = 0
-        if doc.get("updated_at"):
+        issue = doc.get("issue_date")
+        if issue:
             try:
-                # SQLite datetime format is usually 'YYYY-MM-DD HH:MM:SS'
-                date_str = doc["updated_at"].replace(" ", "T")
-                if not date_str.endswith("Z"):
-                     # Simple parsing
-                     updated_date = datetime.datetime.fromisoformat(date_str)
-                     days_old = (datetime.datetime.now() - updated_date).days
-            except:
+                ban_hanh = datetime.date.fromisoformat(str(issue)[:10])
+                days_old = max(0, (datetime.date.today() - ban_hanh).days)
+            except (ValueError, TypeError):
                 pass
                 
         final_score = compute_final_score(m["rrf"], days_old, doc.get("usage_count", 0), max_usage)

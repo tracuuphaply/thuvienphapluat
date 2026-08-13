@@ -126,6 +126,14 @@ def seed_frontier(session: Session, max_new: int = 0) -> int:
           AND r.target_moj_id <> ''
           AND r.target_moj_id NOT IN (SELECT moj_id FROM documents WHERE moj_id IS NOT NULL)
           AND r.target_moj_id NOT IN (SELECT moj_id FROM crawl_frontier)
+          -- "Cắt hub" thật sự: KHÔNG seed đích mà nguồn dẫn tới nó là một hub đã
+          -- đánh HUB_NOT_EXPANDED. Trước đây expand chỉ đổi nhãn trạng thái, còn
+          -- seed_frontier vẫn nạp mọi dẫn chiếu của hub → kéo cả hệ thống pháp
+          -- luật về, đúng cái ngưỡng hub sinh ra để chặn. Đích còn được nguồn
+          -- KHÔNG-hub dẫn tới thì vẫn seed (qua hàng của nguồn đó).
+          AND src.moj_id NOT IN (
+              SELECT moj_id FROM crawl_frontier WHERE state = 'HUB_NOT_EXPANDED'
+          )
         GROUP BY r.target_moj_id, r.target_doc_num
         ORDER BY COUNT(*) DESC
     """)).mappings().all()

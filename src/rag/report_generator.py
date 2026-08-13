@@ -19,6 +19,7 @@ from src.config import (
     report_max_tokens,
     report_model,
     report_prompt_path,
+    report_request_timeout,
 )
 from src.legal import effectivity
 from src.legal.hierarchy import LEVEL_NON_NORMATIVE
@@ -85,6 +86,14 @@ def load_system_prompt() -> str:
             content = path.read_text(encoding="utf-8")
         except OSError:
             continue
+        # Nở {{include:_chung/...}} như đường mới, nếu không mô hình nhận nguyên
+        # chuỗi "{{include:...}}" và mất sạch quy tắc trích dẫn + điều cấm (chúng
+        # nằm ở file dùng chung). Đây đúng lỗi mà comment ở đầu hàm cảnh báo.
+        try:
+            from src.rag.reports.prompts import _expand_includes
+            content = _expand_includes(content)
+        except Exception as e:
+            logger.warning("Không nở được {{include}} trong %s: %s", path, e)
         # Extract system prompt section (starting from ## 1. VAI TRÒ)
         # Cắt từ "## 1. VAI TRÒ" tới trước mục 9 (hợp đồng dữ liệu) — phần sau
         # là tài liệu cho người vận hành, không phải chỉ dẫn cho mô hình.
@@ -157,6 +166,14 @@ def generate_compliance_report(
         return _empty_retrieval_report(industry, period_str, cut_off_date_str, scope)
 
     retrieved_doc_nums = list({c["doc_num"] for c in kept if c.get("doc_num")})
+    # Ưu tiên tra theo doc_key (định danh THẬT): tra thuần số hiệu kéo về cả văn
+    # bản trùng số hiệu của tỉnh khác, gán nhầm quan hệ và metadata cho văn bản
+    # đang xét. Chunk chưa có doc_key thì lùi về số hiệu (đường bao đóng cũ, và
+    # fixture test tạo chunk không kèm doc_key).
+    retrieved_keys = {c["doc_key"] for c in kept if c.get("doc_key")}
+    nums_khong_key = {
+        c["doc_num"] for c in kept if c.get("doc_num") and not c.get("doc_key")
+    }
 
     docs_metadata = []
     graph_edges = []
@@ -165,8 +182,12 @@ def generate_compliance_report(
 
     # Search SQLite master DB for full metadata
     try:
+        from sqlalchemy import or_
         with get_session() as session:
-            db_docs = session.query(Document).filter(Document.doc_num.in_(retrieved_doc_nums)).all()
+            db_docs = session.query(Document).filter(or_(
+                Document.doc_key.in_(retrieved_keys or {""}),
+                Document.doc_num.in_(nums_khong_key or {""}),
+            )).all()
             for doc in db_docs:
                 # Không mặc định "Còn hiệu lực" khi nguồn không nói gì: với báo
                 # cáo tuân thủ, đó là bịa dữ kiện pháp lý.
@@ -352,7 +373,8 @@ LƯU Ý QUAN TRỌNG:
         }
 
         logger.info(f"Calling LLM Chat Completions ({model_name})...")
-        resp = httpx.post(url, headers=headers, json=payload, timeout=300.0)
+        resp = httpx.post(url, headers=headers, json=payload,
+                          timeout=report_request_timeout())
         resp.raise_for_status()
         data = resp.json()
 

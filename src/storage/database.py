@@ -260,7 +260,20 @@ def upsert_document(session: Session, data: dict) -> tuple[Document, bool]:
 
         # Cơ quan ban hành có thể vừa lộ diện ở lần cào này — định danh phải
         # được tính lại, nếu không bản ghi vẫn mang khoá tạm thời thiếu cơ quan.
-        existing.doc_key = make_doc_key(existing.doc_num, existing.agency_name)
+        # NHƯNG nếu khoá mới đã thuộc một bản ghi KHÁC (UNIQUE doc_key), đổi sang
+        # sẽ ném IntegrityError lúc commit và mất trắng lần enrich này. Trường hợp
+        # đó giữ khoá cũ — để một lỗi khoá làm hỏng cả lần cào là tệ hơn nhiều.
+        new_key = make_doc_key(existing.doc_num, existing.agency_name)
+        if new_key != existing.doc_key:
+            clash = session.query(Document).filter(
+                Document.doc_key == new_key, Document.id != existing.id
+            ).first()
+            if clash is None:
+                existing.doc_key = new_key
+            else:
+                logger.warning(
+                    "Giữ doc_key cũ %s: khoá mới %s đã thuộc bản #%s",
+                    existing.doc_key, new_key, clash.id)
 
         new_status = existing.eff_status
         if old_status != new_status:
