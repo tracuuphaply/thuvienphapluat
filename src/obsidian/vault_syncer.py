@@ -41,6 +41,12 @@ def sync(vault_dir: Path = VAULT_DIR) -> None:
         link_resolver = build_link_resolver(session)
         expected: set[str] = set()
         for db_doc in session.query(Document).order_by(Document.id).all():
+            # Đánh dấu "văn bản này CÓ tồn tại" TRƯỚC khi kết xuất. Nếu để sau và
+            # export ném lỗi tạm thời, tên note không vào `expected` và
+            # _remove_orphans sẽ XOÁ một note vẫn còn hợp lệ — mất dữ liệu, chỉ
+            # tự lành ở lần chạy sau thành công trọn vẹn.
+            out_path = docs_dir / f"{note_filename(db_doc)}.md"
+            expected.add(out_path.name)
             try:
                 doc_data = document_to_export_dict(db_doc)
                 content = load_clean_text(doc_data, clean_dir)
@@ -57,8 +63,6 @@ def sync(vault_dir: Path = VAULT_DIR) -> None:
                     doc_data, content, references, link_resolver
                 )
                 new_hash = get_content_hash(md_content)
-                out_path = docs_dir / f"{note_filename(db_doc)}.md"
-                expected.add(out_path.name)
 
                 if db_doc.obsidian_hash == new_hash and out_path.exists():
                     stats["skipped"] += 1

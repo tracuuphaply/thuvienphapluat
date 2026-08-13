@@ -150,34 +150,46 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 @restricted()
 async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /search command or text search."""
+    """Handle /search command or text search.
+
+    Không dùng parse_mode="Markdown": nội dung do người dùng gõ và số hiệu văn
+    bản chứa ký tự đặc biệt của Markdown (*, _, `, [) làm Telegram trả 400 và câu
+    trả lời rơi mất. Lấy `msg` từ cả message lẫn callback: nút "Tìm kiếm Mẫu" gọi
+    hàm này với update.message = None. Chạy truy xuất trong executor để không
+    treo vòng lặp sự kiện (mọi tin nhắn thường đều đổ vào đây).
+    """
+    msg = update.message or (update.callback_query and update.callback_query.message)
+    if msg is None:
+        return
     query = " ".join(context.args) if context.args else ""
     if not query:
-        await update.message.reply_text("⚠️ Vui lòng nhập từ khóa tìm kiếm.\nVí dụ: `/search kế toán trưởng`", parse_mode="Markdown")
+        await msg.reply_text("⚠️ Vui lòng nhập từ khóa tìm kiếm. Ví dụ: /search kế toán trưởng")
         return
-        
-    await update.message.reply_text(f"🔍 Đang tìm kiếm thông tin cho: *{query}*...", parse_mode="Markdown")
-    
+
+    await msg.reply_text(f"🔍 Đang tìm kiếm: {query}…")
     try:
         # Không truyền embedder thì /search chỉ chạy BM25, mất hẳn tìm kiếm ngữ nghĩa.
         from src.rag.report_generator import _default_embedder
-        results = hybrid_search(rag_db, query=query, limit=5, embedder=_default_embedder())
+        loop = asyncio.get_running_loop()
+        results = await loop.run_in_executor(
+            None,
+            lambda: hybrid_search(rag_db, query=query, limit=5,
+                                  embedder=_default_embedder()),
+        )
         if not results:
-            await update.message.reply_text("❌ Không tìm thấy văn bản pháp luật phù hợp.")
+            await msg.reply_text("❌ Không tìm thấy văn bản pháp luật phù hợp.")
             return
-            
-        msg = f"🔎 *KẾT QUẢ TÌM KIẾM cho '{query}':*\n━━━━━━━━━━━━━━━━━━━━━\n\n"
+
+        lines = [f"🔎 KẾT QUẢ TÌM KIẾM cho “{query}”:", "━" * 18, ""]
         for r in results:
-            score_fmt = f"{r.final_score:.2f}"
-            msg += f"📜 *{r.doc_num}* (Điểm: `{score_fmt}`)\n"
-            msg += f"📌 *{r.heading}*\n"
-            content_snippet = r.content[:250].replace('\n', ' ')
-            msg += f"_{content_snippet}_\n\n"
-            
-        await update.message.reply_text(msg, parse_mode="Markdown")
+            lines.append(f"📜 {r.doc_num} (điểm {r.final_score:.2f})")
+            lines.append(f"📌 {r.heading}")
+            lines.append(r.content[:250].replace("\n", " "))
+            lines.append("")
+        await msg.reply_text("\n".join(lines))
     except Exception as e:
         logger.error(f"Search error: {e}")
-        await update.message.reply_text("❌ Có lỗi khi tìm kiếm. Vui lòng thử lại sau.")
+        await msg.reply_text("❌ Có lỗi khi tìm kiếm. Vui lòng thử lại sau.")
 
 @restricted()
 async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -308,22 +320,25 @@ async def impact_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     """Handle /impact <doc_num> command."""
     doc_num = " ".join(context.args) if context.args else ""
     if not doc_num:
-        await update.message.reply_text("⚠️ Vui lòng nhập số hiệu văn bản.\nVí dụ: `/impact 101/2026/TT-BTC`", parse_mode="Markdown")
+        await update.message.reply_text("⚠️ Vui lòng nhập số hiệu văn bản. Ví dụ: /impact 101/2026/TT-BTC")
         return
-        
-    await update.message.reply_text(f"🔗 Đang phân tích tác động đồ thị luật GraphRAG cho: *{doc_num}*...", parse_mode="Markdown")
-    
+
+    await update.message.reply_text(f"🔗 Đang phân tích quan hệ dẫn chiếu cho: {doc_num}…")
     try:
-        edges = cascade_retrieve(rag_db, doc_num, max_depth=2)
+        # Chạy trong executor: cascade_retrieve truy vấn đồ thị, không được treo
+        # vòng lặp sự kiện. Không dùng Markdown: số hiệu chứa ký tự đặc biệt.
+        loop = asyncio.get_running_loop()
+        edges = await loop.run_in_executor(
+            None, lambda: cascade_retrieve(rag_db, doc_num, max_depth=2))
         if not edges:
-            await update.message.reply_text(f"ℹ️ Không thấy quan hệ tác động trực tiếp nào cho văn bản `{doc_num}` trong đồ thị.", parse_mode="Markdown")
+            await update.message.reply_text(
+                f"ℹ️ Không thấy quan hệ dẫn chiếu nào cho văn bản {doc_num} trong đồ thị.")
             return
-            
-        msg = f"🕸️ *TÁC ĐỘNG ĐỒ THỊ LUẬT (GraphRAG) cho {doc_num}:*\n━━━━━━━━━━━━━━━━━━━━━\n\n"
+
+        lines = [f"🕸️ QUAN HỆ DẪN CHIẾU của {doc_num}:", "━" * 18, ""]
         for e in edges:
-            msg += f"• *{e.source}* `[{e.relation}]` → *{e.target}*\n"
-            
-        await update.message.reply_text(msg, parse_mode="Markdown")
+            lines.append(f"• {e.source} [{e.relation}] → {e.target}")
+        await update.message.reply_text("\n".join(lines))
     except Exception as e:
         logger.error(f"Impact analysis error: {e}")
         await update.message.reply_text("❌ Lỗi khi phân tích tác động. Vui lòng thử lại sau.")
@@ -350,8 +365,8 @@ async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_T
     """Handle inline button callback queries."""
     query = update.callback_query
     await query.answer()
-    
-    data = query.data
+
+    data = query.data or ""
     if data == "menu_report" or data == "menu_industries":
         await nganh_command(update, context)
     elif data == "menu_sync":

@@ -149,15 +149,22 @@ def hybrid_search(
                 continue
             if filters.get("industries"):
                 import json
+                # doc["industries"] có thể là NULL → .get(...,"[]") vẫn trả None
+                # (khoá tồn tại), json.loads(None) ném TypeError. Trước đây bị
+                # `except: pass` nuốt, nên chunk chưa phân ngành LỌT qua bộ lọc.
+                raw = doc.get("industries") or "[]"
                 try:
-                    inds = json.loads(doc.get("industries", "[]"))
-                    if filters["industries"] not in inds:
-                        continue
-                except:
-                    pass
+                    inds = json.loads(raw)
+                except (TypeError, ValueError):
+                    inds = []
+                if filters["industries"] not in inds:
+                    continue
             if filters.get("date_range") and doc.get("issue_date"):
                 # Basic string compare for simplicity 'YYYY-MM-DD'
-                start_date, end_date = filters["date_range"]
+                dr = filters["date_range"]
+                if not (isinstance(dr, (list, tuple)) and len(dr) == 2):
+                    continue
+                start_date, end_date = dr
                 if doc["issue_date"] < start_date or doc["issue_date"] > end_date:
                     continue
             

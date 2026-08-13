@@ -122,15 +122,15 @@ def html_to_clean_text(html: str) -> str:
     }
     for entity, char in entity_map.items():
         text = text.replace(entity, char)
-    # Numeric entities
-    text = re.sub(
-        r"&#(\d+);", lambda m: chr(int(m.group(1))), text
-    )
-    text = re.sub(
-        r"&#x([0-9a-fA-F]+);",
-        lambda m: chr(int(m.group(1), 16)),
-        text,
-    )
+    # Numeric entities. chr() ném ValueError nếu điểm mã vượt 0x10FFFF; một
+    # "&#9999999999;" rác trong HTML sẽ làm hỏng cả văn bản (đánh dấu FAILED,
+    # mất toàn bộ toàn văn). Ngoài dải hợp lệ thì bỏ thực thể đó.
+    def _ky_tu_so(code: int) -> str:
+        return chr(code) if 0 < code <= 0x10FFFF else ""
+
+    text = re.sub(r"&#(\d+);", lambda m: _ky_tu_so(int(m.group(1))), text)
+    text = re.sub(r"&#x([0-9a-fA-F]+);",
+                  lambda m: _ky_tu_so(int(m.group(1), 16)), text)
 
     # 7. Normalize whitespace
     # Collapse multiple spaces (but not newlines) into single space
@@ -204,8 +204,13 @@ def chunk_legal_text(
     if len(chunks) >= 2:
         return _enforce_size_limits(chunks, max_chunk_size, min_chunk_size)
 
-    # No recognizable structure — return as single chunk
-    return [_make_chunk(doc_num, 0, "Toàn văn", clean_text, "full")]
+    # No recognizable structure — vẫn phải áp trần kích thước, nếu không một văn
+    # bản không có cấu trúc Điều/Chương thành đúng MỘT chunk khổng lồ, về sau bị
+    # cắt cụt lúc nhúng vector. (Nhánh này trước đây bỏ qua _enforce_size_limits.)
+    return _enforce_size_limits(
+        [_make_chunk(doc_num, 0, "Toàn văn", clean_text, "full")],
+        max_chunk_size, min_chunk_size,
+    )
 
 
 def _split_by_pattern(
@@ -312,6 +317,21 @@ def _split_large_chunk(
     current_text = ""
 
     for para in paragraphs:
+        # Đoạn đơn lẻ đã vượt trần: đẩy phần đang gom ra rồi CẮT CỨNG đoạn này
+        # theo max_size. Không có nhánh này thì một đoạn dài liền mạch (không có
+        # \n\n) thành đúng một sub-chunk quá cỡ — thứ hàm này sinh ra để chặn,
+        # và về sau bị cắt cụt lúc nhúng vector.
+        if len(para) > max_size:
+            if current_text.strip():
+                sub_chunks.append(_make_chunk(
+                    chunk["doc_num"], 0, chunk["heading"],
+                    current_text.strip(), chunk["chunk_type"]))
+                current_text = ""
+            for i in range(0, len(para), max_size):
+                sub_chunks.append(_make_chunk(
+                    chunk["doc_num"], 0, chunk["heading"],
+                    para[i:i + max_size].strip(), chunk["chunk_type"]))
+            continue
         if len(current_text) + len(para) + 2 > max_size and current_text:
             sub_chunks.append(
                 _make_chunk(

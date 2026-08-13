@@ -177,7 +177,16 @@ class EmbeddingAPI:
                     data = response.json()
                     
                     if "embeddings" in data:
-                        for embed in data["embeddings"]:
+                        embs = data["embeddings"]
+                        # Cùng cạm bẫy như nhánh OpenAI: trả thiếu phần tử mà cứ
+                        # append tuần tự thì vector bị gán lệch sang chunk khác —
+                        # sai thầm lặng, về sau không phát hiện được. Bỏ cả lô.
+                        if len(embs) != len(batch):
+                            logger.error(
+                                "Gemini trả %d embedding cho %d văn bản — bỏ cả "
+                                "lô để tránh gán lệch", len(embs), len(batch))
+                            break
+                        for embed in embs:
                             results.append(embed["values"])
                         success = True
                         break

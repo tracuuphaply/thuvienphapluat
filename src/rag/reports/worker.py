@@ -220,8 +220,21 @@ def run_job(session, rag: RAGDatabase, job: dict, scorer_version: str,
     # "Có thật" = trong kho, HOẶC có căn cứ trong nguồn mô hình đã đọc (toàn văn
     # văn bản nguồn + prompt). Nhóm sau là văn bản cũ bị bãi bỏ/dẫn chiếu mà kho
     # chưa có bản ghi — số thật, mô hình chép lại chứ không bịa.
-    citation = check_citations(result.markdown, extra_allowed=result.allowed_doc_nums)
-    paths = _write_outputs(job_id, kind, result)
+    #
+    # Trong try: check_citations mở một kết nối sqlite riêng, _write_outputs
+    # mkdir/ghi file — đĩa đầy hay DB kẹt sẽ ném ở đây. Nằm ngoài try thì lỗi
+    # thoát khỏi run_job, drain vỡ giữa chừng, và job đã đánh RUNNING kẹt
+    # RUNNING vĩnh viễn (next_job chỉ lấy QUEUED).
+    try:
+        citation = check_citations(
+            result.markdown, extra_allowed=result.allowed_doc_nums)
+        paths = _write_outputs(job_id, kind, result)
+    except Exception as e:
+        logger.error("Job %d lỗi sau khi sinh (cổng trích dẫn / ghi file): %s",
+                     job_id, e)
+        jobs.mark(session, job_id, jobs.FAILED, error=str(e)[:500])
+        session.commit()
+        return jobs.FAILED
 
     if not citation.ok:
         logger.warning(

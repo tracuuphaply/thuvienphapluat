@@ -771,9 +771,15 @@ def _parse(md: str, meta: ReportMeta, st: dict) -> list:
         if not stripped or set(stripped) <= {"-", "*", "_"} and len(stripped) >= 3:
             continue
 
-        # Mục miễn trách nhiệm có thể là tiêu đề (#### …) hoặc mục đánh số
+        # Mục miễn trách nhiệm có thể là tiêu đề (#### …) hoặc mục đánh số ngắn
         # (2. **Tuyên bố miễn trách nhiệm:**) tuỳ cách LLM viết — bắt cả hai.
-        if not in_disclaimer and "miễn trách nhiệm" in stripped.lower():
+        # NHƯNG chỉ khi dòng là NHÃN/TIÊU ĐỀ, không phải một câu thân bài bàn về
+        # "điều khoản miễn trách nhiệm" (nội dung bảo hiểm/tài chính rất hay có):
+        # bắt theo chuỗi con thuần thì nuốt cả đoạn đó và mọi đoạn sau tới tiêu
+        # đề kế tiếp, làm vỡ cấu trúc. Nhãn thì ngắn; câu thân bài thì dài.
+        chu_thuan = re.sub(r"[*_#>\d.\-•:\s]", "", stripped)
+        if (not in_disclaimer and "miễn trách nhiệm" in stripped.lower()
+                and (stripped.startswith("#") or len(chu_thuan) <= 40)):
             flush_disclaimer()
             in_disclaimer = True
             continue

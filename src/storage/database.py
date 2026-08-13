@@ -194,15 +194,21 @@ def resolve_existing_document(session: Session, data: dict) -> Document | None:
 
 
 def get_document_by_moj_id(session: Session, moj_id: str) -> Document | None:
-    """Find a document by its MOJ internal ID."""
-    stmt = select(Document).where(Document.moj_id == moj_id)
-    return session.execute(stmt).scalar_one_or_none()
+    """Find a document by its MOJ internal ID.
+
+    `.first()` chứ không `.scalar_one_or_none()`: moj_id chỉ được đánh chỉ mục,
+    KHÔNG duy nhất (một nút bao đóng và một bản nghiệp vụ có thể mang cùng id qua
+    hai luồng khác nhau). scalar_one_or_none ném MultipleResultsFound khi trùng,
+    làm sập chính bước upsert đang cố gộp chúng.
+    """
+    stmt = select(Document).where(Document.moj_id == moj_id).order_by(Document.id)
+    return session.execute(stmt).scalars().first()
 
 
 def get_document_by_tvpl_id(session: Session, tvpl_id: str) -> Document | None:
-    """Find a document by its TVPL ID (last slug number)."""
-    stmt = select(Document).where(Document.tvpl_id == tvpl_id)
-    return session.execute(stmt).scalar_one_or_none()
+    """Find a document by its TVPL ID (last slug number). Xem get_document_by_moj_id."""
+    stmt = select(Document).where(Document.tvpl_id == tvpl_id).order_by(Document.id)
+    return session.execute(stmt).scalars().first()
 
 
 # Vòng đời hiệu lực của văn bản QPPL thay đổi theo thời gian: văn bản hôm nay

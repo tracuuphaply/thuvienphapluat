@@ -56,9 +56,33 @@ STATUS_COLORS = {
 }
 STATUS_FALLBACK = "#6B7280"
 
-FONT_PATH = "/System/Library/Fonts/Supplemental/Arial.ttf"
-FONT_BOLD_PATH = "/System/Library/Fonts/Supplemental/Arial Bold.ttf"
+# Font cho biểu đồ. PHẢI có nhánh dự phòng đa nền tảng như report_pdf.py: hardcode
+# đường dẫn macOS khiến FontProperties dựng được nhưng savefig ném FileNotFoundError
+# trên Linux/Windows — mọi biểu đồ biến mất ÂM THẦM (worker nuốt lỗi, báo cáo tự
+# động ra không có biểu đồ nào). run_daily.sh nhắm máy chủ Linux.
+_UNG_VIEN_FONT: tuple[tuple[str, str], ...] = (
+    ("/System/Library/Fonts/Supplemental/Arial.ttf",
+     "/System/Library/Fonts/Supplemental/Arial Bold.ttf"),
+    (r"C:\Windows\Fonts\arial.ttf", r"C:\Windows\Fonts\arialbd.ttf"),
+    ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+    ("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+     "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"),
+)
 
+
+def _chon_font() -> tuple[str | None, str | None]:
+    import os
+    for thuong, dam in _UNG_VIEN_FONT:
+        if os.path.exists(thuong):
+            return thuong, dam if os.path.exists(dam) else thuong
+    return None, None
+
+
+FONT_PATH, FONT_BOLD_PATH = _chon_font()
+
+# fname=None → FontProperties dùng font mặc định của matplotlib (DejaVu Sans, có
+# sẵn trong gói matplotlib và phủ đủ chữ Việt) thay vì ném lỗi lúc savefig.
 _font = fm.FontProperties(fname=FONT_PATH)
 _font_bold = fm.FontProperties(fname=FONT_BOLD_PATH)
 

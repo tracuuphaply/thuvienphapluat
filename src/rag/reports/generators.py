@@ -455,8 +455,11 @@ def generate_business_report(session, rag: RAGDatabase, vsic_code: str,
                              scorer_version: str, embedder=None,
                              model: str = "") -> ReportResult:
     """Báo cáo chuyên sâu cho một ngành, dựa trên kết quả báo cáo (b)."""
-    industry = official_name(vsic_code) or vsic_code
+    # official_name() nhận TÊN NGẮN của ngành, không nhận mã: truyền thẳng "F"
+    # thì nó trả lại "F", nên báo cáo (c) in "NGANH: F (mã F)" thay vì "Xây dựng".
+    # Báo cáo (a) đã làm đúng — dùng chung cách ở đây.
     short = _short_name(vsic_code)
+    industry = official_name(short) or short
 
     # Kho quy định ngành đang chịu TRƯỚC văn bản mới — thứ cho phép nói được
     # "nghĩa vụ mới chồng lên nghĩa vụ cũ nào", điều (b) không làm được.
