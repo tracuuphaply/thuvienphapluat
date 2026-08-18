@@ -108,10 +108,15 @@ async def _cao(source: str, field: int | None, gioi_han: int | None,
                 try:
                     detail = _bo_qua_tai_lai(it, lam_lai)
                     if detail is not None:
+                        # KHÔNG reset chuỗi bị chặn ở đây. Bóc từ đĩa không chạm
+                        # mạng nên nó KHÔNG phải bằng chứng là mạng đã thông —
+                        # đo ngày 18/08/2026: mẫu nằm xen kẽ giữa các lượt bị
+                        # chặn làm bộ đếm về 0 hai lần, và bộ cào đốt 9 lượt bị
+                        # chặn thay vì dừng ở 5.
                         tu_dia += 1
                     else:
                         detail = await crawler.lay_chi_tiet(it)
-                    chuoi_bi_chan = 0
+                        chuoi_bi_chan = 0
                 except FormParseError as e:
                     # Mẫu rỗng KHÔNG bị bỏ qua im lặng: ghi lại trạng thái để
                     # người vận hành thấy được, và để lần chạy sau thử lại.

@@ -173,16 +173,42 @@ nội bộ của cơ quan nhà nước thì đã đốt công vô ích.
 
 ### Bị Cloudflare chặn giữa chừng
 
-Chuyện bình thường. Bộ cào tự dừng sau 5 lần chặn liên tiếp (`MAX_BLOCKED_STREAK`)
-thay vì đốt hết danh sách — đo ngày 18/08/2026: sau ~67 trang thì bị chặn cứng, và
-bản không có cầu dao đã ghi ~600 dòng `FAILED` trong 40 phút mà không lấy được gì.
+Bộ cào tự dừng sau 5 lần chặn liên tiếp (`MAX_BLOCKED_STREAK`) thay vì đốt hết
+danh sách — đo ngày 18/08/2026: bản không có cầu dao đã ghi ~600 dòng `FAILED`
+trong 40 phút mà không lấy được gì.
 
 Chạy lại chính lệnh đó để đi tiếp: trang đã tải nằm ở `data/forms/html/` và được
-**bóc lại từ đĩa**, không tải lại TVPL. Nếu vẫn bị chặn ngay từ đầu:
+**bóc lại từ đĩa**, không tải lại TVPL.
 
-- nghỉ 30–60 phút rồi thử lại
-- tăng `TVPL_RATE_LIMIT_SECONDS` (7 là mức an toàn, 3 thì bị chặn)
-- xuất lại cookie ra `data/tvpl_cookies.json` (xem HUONG_DAN_CHUYEN_GIAO §2.5)
+**TĂNG `TVPL_RATE_LIMIT_SECONDS` KHÔNG GIẢI QUYẾT ĐƯỢC.** Đo ngày 18/08/2026,
+xen kẽ trong cùng một phiên ở cùng tốc độ 5 giây:
+
+| Loại trang | Kết quả |
+|---|---|
+| `/hopdong?type=6` (liệt kê) | THÔNG, 204 KB |
+| `/hopdong/249/…` (chi tiết) | CHẶN |
+| `/hopdong?type=7` (liệt kê) | THÔNG, 207 KB |
+| `/hopdong/226/…` (chi tiết) | CHẶN |
+
+TVPL đặt bảo vệ mạnh hơn hẳn cho **trang chi tiết**. Trang bị chặn trả về đúng
+thử thách Cloudflare (`Chờ một chút…`, "Thực hiện xác minh bảo mật", có Ray ID),
+và nó **không tự giải kể cả sau 120 giây** — `_goto()` chỉ chờ 15 giây nhưng chờ
+lâu hơn cũng vô ích, đã đo.
+
+Cách sửa thật, theo thứ tự nên thử:
+
+1. **Giải thử thách bằng tay một lần trong chính Chrome của pipeline.** Chế độ
+   CDP mở Chrome bằng hồ sơ riêng ở `data/chrome_profile/`, và cookie
+   `cf_clearance` lấy được sẽ nằm lại đó cho các lần chạy sau. Mở hồ sơ đó, vào
+   một trang chi tiết bất kỳ, qua thử thách, rồi chạy lại lệnh cào.
+2. **Xuất lại cookie ra `data/tvpl_cookies.json`** từ trình duyệt thật đã qua
+   thử thách (xem HUONG_DAN_CHUYEN_GIAO §2.5). Lưu ý `cf_clearance` gắn với IP +
+   User-Agent nên phải xuất từ chính máy sẽ chạy pipeline.
+3. **Nghỉ vài giờ.** Phiên sáng cùng ngày đã tải trót lọt 67 trang chi tiết trước
+   khi bị chặn, nên trạng thái này không vĩnh viễn.
+
+Agent hằng tuần cứ chạy: mỗi lượt lấy thêm được phần nào thì kho đầy thêm phần
+đó, và phần đã có không bị tải lại.
 
 ### Xem tình trạng kho
 
