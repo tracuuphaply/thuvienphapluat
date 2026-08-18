@@ -198,6 +198,64 @@ def _luu_can_cu(session, form_key: str, detail: FormDetail, kq: KetQuaLuu) -> No
         ))
 
 
+TRANG_THAI_CHO = "PENDING"
+
+
+def ghi_hang_doi(session, items) -> int:
+    """Ghi mọi mục vừa liệt kê vào DB với trạng thái PENDING. Trả về số dòng mới.
+
+    HÀNG ĐỢI PHẢI NẰM TRONG DB, KHÔNG PHẢI TRONG BỘ NHỚ — đúng lý do
+    `crawl_frontier` tồn tại. Bản đầu chỉ ghi dòng khi ĐÃ THỬ tải trang chi tiết,
+    nên đứt giữa chừng là mất danh sách: đo ngày 18/08/2026, kho có 76 dòng cho
+    662 mẫu đã liệt kê, và mỗi lần chạy lại phải lật 22 nhóm × ~40 lượt tải mất
+    5,5 phút chỉ để dựng lại đúng cái danh sách vừa mất.
+
+    Tệ hơn con số: 40 lượt tải đó chạy TRƯỚC việc cần làm, nên khi bộ cào chạm
+    tới trang chi tiết đầu tiên thì Cloudflare đã dựng lại thử thách.
+
+    KHÔNG hạ cấp dòng đã OK: hàm chỉ chèn dòng còn thiếu.
+    """
+    da_co = {
+        k for (k,) in session.query(LegalForm.form_key).filter(
+            LegalForm.form_key.in_([it.form_key for it in items])
+        ).all()
+    }
+    them = 0
+    for it in items:
+        if it.form_key in da_co:
+            continue
+        luu_bieu_mau(session, it, crawl_status=TRANG_THAI_CHO)
+        them += 1
+    if them:
+        logger.info("Ghi %d mục mới vào hàng đợi biểu mẫu", them)
+    return them
+
+
+def hang_doi_con_lai(session, source: str) -> list[FormListItem]:
+    """Các mục còn phải tải trang chi tiết, dựng lại từ DB.
+
+    Cho phép chạy tiếp mà KHÔNG lật lại trang liệt kê — vào thẳng việc cần làm
+    trong lúc `cf_clearance` còn tươi nhất.
+    """
+    rows = (
+        session.query(LegalForm)
+        .filter(LegalForm.source == source)
+        .filter(LegalForm.crawl_status != "OK")
+        .order_by(LegalForm.form_key)
+        .all()
+    )
+    ra: list[FormListItem] = []
+    for f in rows:
+        ra.append(FormListItem(
+            source=f.source, external_id=f.external_id, slug=f.slug or "",
+            title=f.title or "", url=f.url or "",
+            keywords=json.loads(f.keywords or "[]"),
+            updated_on=f.updated_on,
+            field_code=f.field_code, form_type_code=f.form_type_code,
+        ))
+    return ra
+
+
 def so_hieu_can_cu_chua_co(session, gioi_han: int = 500) -> list[str]:
     """Số hiệu văn bản mà biểu mẫu dẫn tới nhưng kho chưa có.
 
@@ -231,6 +289,7 @@ def noi_lai_can_cu(session) -> int:
 
 
 __all__ = [
-    "KetQuaLuu", "tim_doc_key", "luu_bieu_mau",
+    "KetQuaLuu", "TRANG_THAI_CHO", "tim_doc_key", "luu_bieu_mau",
+    "ghi_hang_doi", "hang_doi_con_lai",
     "so_hieu_can_cu_chua_co", "noi_lai_can_cu",
 ]

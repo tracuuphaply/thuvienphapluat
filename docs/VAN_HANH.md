@@ -162,14 +162,32 @@ Làm mới hằng tuần bằng `scripts/run_weekly_forms.sh` (launchd agent
 `vn.legalvault.weeklyforms`, Chủ nhật 5h). Bốn bước, đúng thứ tự:
 
 ```bash
-python -m scripts.crawl_forms --source hopdong    # 662 mẫu hợp đồng
-python -m scripts.crawl_forms --source bieumau    # theo 21 lĩnh vực kinh doanh
+python -m scripts.crawl_forms --source hopdong --chi-hang-doi   # nạp hàng đợi
+python -m scripts.crawl_forms --source hopdong --tiep-tuc       # tải chi tiết
+python -m scripts.crawl_forms --source bieumau --chi-hang-doi
+python -m scripts.crawl_forms --source bieumau --tiep-tuc
 python -m scripts.classify_forms                  # phễu 3 tầng
 python -m scripts.build_forms                     # dựng DOCX + PDF
 ```
 
 Phân loại trước, dựng file sau — dựng cho cả kho rồi mới biết phần lớn là báo cáo
 nội bộ của cơ quan nhà nước thì đã đốt công vô ích.
+
+### Vì sao tách hai pha `--chi-hang-doi` rồi `--tiep-tuc`
+
+Giai đoạn liệt kê tốn ~40 lượt tải và 5,5 phút cho kho hợp đồng, và nó chạy TRƯỚC
+việc cần làm. Đo ngày 18/08/2026, ba lượt liền:
+
+| Cách chạy | Kết quả |
+|---|---|
+| Một lượt (liệt kê rồi tải chi tiết) | 0 mẫu mới, bị chặn 5 lần rồi dừng |
+| Thử tay một trang chi tiết ngay sau đó | THÔNG, 58 KB |
+| `--chi-hang-doi` rồi `--tiep-tuc` | chạy liên tục, **0 lần bị chặn** |
+
+Nghĩa là 40 lượt liệt kê làm Cloudflare dựng lại thử thách trước khi bộ cào kịp
+làm việc gì có ích. Hàng đợi nằm trong bảng `legal_forms` (trạng thái `PENDING`)
+nên chỉ cần liệt kê MỘT lần, sau đó `--tiep-tuc` dùng trọn `cf_clearance` còn tươi
+cho đúng việc tải trang chi tiết.
 
 ### Bị Cloudflare chặn giữa chừng
 
