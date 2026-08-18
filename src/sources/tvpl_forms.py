@@ -4,9 +4,18 @@ Cào hai kho biểu mẫu của Thư viện Pháp luật.
   /bieumau   33.820 biểu mẫu, lọc theo 47 lĩnh vực
   /hopdong      662 mẫu hợp đồng, 22 nhóm (10 gốc + 12 con)
 
-KHÔNG CẦN ĐĂNG NHẬP. Ruột biểu mẫu hiện đầy đủ với khách vãng lai — khác hẳn bản
-`.docx` của văn bản. Nhờ vậy phần này không đụng tới hạn mức tải của tài khoản
-công ty và không phải qua `login()`.
+RUỘT BIỂU MẪU HIỆN VỚI KHÁCH VÃNG LAI, NHƯNG VẪN PHẢI ĐĂNG NHẬP ĐỂ CÀO ĐƯỢC.
+Hai chuyện khác nhau. Nội dung không bị tường phí che, khác hẳn bản `.docx` của
+văn bản — nhưng đường vãng lai bị Cloudflare giới hạn nặng: mỗi lần vượt thử thách
+chỉ "mua" được khoảng 40–70 trang chi tiết rồi bị chặn lại, nên cào 662 mẫu phải
+vượt thử thách bằng tay hơn chục lượt.
+
+Đo ngày 18/08/2026, cùng 5 URL đang bị chặn ở phiên vãng lai: sau `login()` thì
+5/5 THÔNG (246–696 KB mỗi trang). Vì vậy `TVPLFormCrawler` gọi `login()` trước khi
+tải — xem `chuan_bi()`.
+
+Đăng nhập KHÔNG đụng hạn mức tải của tài khoản: hạn mức đó đếm lượt tải file
+`.docx`, còn đây chỉ là xem trang.
 
 VẪN PHẢI QUA CHROME THẬT. Cloudflare trả 403 cho `fetch()` và `curl` kể cả khi
 mang đủ cookie và User-Agent (đo ngày 18/08/2026), chỉ cho điều hướng của trình
@@ -85,7 +94,23 @@ def duong_dan_html(form_key: str) -> Path:
 # Bộ cào
 # ──────────────────────────────────────────────
 class TVPLFormCrawler(TVPLDownloader):
-    """Cào biểu mẫu. Dùng `start()` / `stop()` của lớp cha, bỏ qua `login()`."""
+    """Cào biểu mẫu. Dùng lại `start()` / `stop()` / `login()` của lớp cha."""
+
+    async def chuan_bi(self, dang_nhap: bool = True) -> bool:
+        """Mở trình duyệt rồi đăng nhập. Trả về có đăng nhập được hay không.
+
+        KHÔNG ném lỗi khi đăng nhập thất bại: đường vãng lai vẫn cào được, chỉ là
+        bị Cloudflare chặn sau ~40–70 trang. Cào ít còn hơn không cào gì.
+        """
+        await self.start()
+        if not dang_nhap:
+            return False
+        try:
+            return await self.login()
+        except Exception as e:
+            logger.warning("Đăng nhập TVPL không thành — cào tiếp ở chế độ "
+                           "vãng lai, sẽ bị chặn sớm hơn nhiều. (%s)", e)
+            return False
 
     async def lay_html(self, url: str) -> str:
         """Tải một trang và trả về HTML. Ném TVPLBlockedError khi Cloudflare chặn."""

@@ -15,10 +15,11 @@ khi bộ cào chạm tới trang chi tiết đầu tiên thì Cloudflare đã d�
 dù chính phiên Chrome đó mở được trang chi tiết ngay trước và ngay sau lượt chạy.
 Hàng đợi đã nằm trong bảng `legal_forms` nên không cần liệt kê lại.
 
-KHÔNG CẦN TÀI KHOẢN TVPL: ruột biểu mẫu hiện với khách vãng lai, khác hẳn bản
-`.docx` của văn bản. Nhưng VẪN CẦN CHROME THẬT — Cloudflare trả 403 cho mọi thứ
-không phải điều hướng của trình duyệt, và bảo vệ trang chi tiết mạnh hơn hẳn trang
-liệt kê. Cách vượt: xem docs/VAN_HANH.md § Bị Cloudflare chặn giữa chừng.
+CẦN TÀI KHOẢN TVPL, dù ruột biểu mẫu hiện cả với khách vãng lai. Đường vãng lai
+bị Cloudflare chặn sau ~40–70 trang chi tiết; đo ngày 18/08/2026, cùng 5 URL đang
+bị chặn thì sau `login()` là 5/5 thông. Bộ cào mặc định đăng nhập —
+`--khong-dang-nhap` để tắt. Vẫn cần Chrome thật: Cloudflare trả 403 cho mọi thứ
+không phải điều hướng của trình duyệt.
 
 Dừng-tiếp được ở hai tầng: hàng đợi trong DB, và HTML gốc ở data/forms/html/ được
 bóc lại từ đĩa thay vì tải lại.
@@ -187,7 +188,8 @@ async def _liet_ke(crawler: TVPLFormCrawler, source: str, field: int | None,
 
 async def _cao(source: str, field: int | None, gioi_han: int | None,
                dry_run: bool, lam_lai: bool = False,
-               tiep_tuc: bool = False, chi_hang_doi: bool = False) -> KetQuaLuu:
+               tiep_tuc: bool = False, chi_hang_doi: bool = False,
+               dang_nhap: bool = True) -> KetQuaLuu:
     crawler = TVPLFormCrawler()
     kq = KetQuaLuu()
 
@@ -206,13 +208,15 @@ async def _cao(source: str, field: int | None, gioi_han: int | None,
         if not muc:
             print("Hàng đợi rỗng — chạy KHÔNG có --tiep-tuc để liệt kê lại kho.")
             return kq
-        await crawler.start()
+        if await crawler.chuan_bi(dang_nhap):
+            print("Đã đăng nhập TVPL — trang chi tiết không bị Cloudflare chặn.")
         try:
             return await _tai_chi_tiet(crawler, muc, kq, lam_lai)
         finally:
             await crawler.stop()
 
-    await crawler.start()
+    if await crawler.chuan_bi(dang_nhap):
+        print("Đã đăng nhập TVPL.")
     try:
         muc = await _liet_ke(crawler, source, field, gioi_han)
         print(f"Liệt kê được {len(muc)} biểu mẫu.")
@@ -260,6 +264,8 @@ def main() -> None:
                     help="Chỉ liệt kê, không tải trang chi tiết và không ghi DB")
     ap.add_argument("--lam-lai", action="store_true",
                     help="Cào lại cả mẫu đã có HTML trên đĩa")
+    ap.add_argument("--khong-dang-nhap", action="store_true",
+                    help="Cào ở chế độ vãng lai; bị Cloudflare chặn sau ~40-70 trang")
     ap.add_argument("--chi-hang-doi", action="store_true",
                     help="Chỉ liệt kê và nạp hàng đợi vào DB, không tải chi tiết")
     ap.add_argument("--tiep-tuc", action="store_true",
@@ -275,7 +281,8 @@ def main() -> None:
         init_db()
 
     kq = asyncio.run(_cao(args.source, args.field, args.limit, args.dry_run,
-                          args.lam_lai, args.tiep_tuc, args.chi_hang_doi))
+                          args.lam_lai, args.tiep_tuc, args.chi_hang_doi,
+                          not args.khong_dang_nhap))
     if not args.dry_run:
         print(f"\nXong: {kq.tom_tat()}")
 
