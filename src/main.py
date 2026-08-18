@@ -685,6 +685,16 @@ def run_pipeline(
                 noi_them = noi_lai_can_cu(session)
                 metrics["form_refs_linked"] = noi_them
                 session.commit()
+
+                # Tính lại hiệu lực biểu mẫu NGAY SAU khi nối: hiệu lực biểu mẫu
+                # suy từ hiệu lực văn bản căn cứ, mà văn bản vừa được cập nhật ở
+                # các bước trên. Một cờ tính tuần trước là một khẳng định đã lỗi
+                # thời — xem src/forms/effectivity.py.
+                from src.forms.effectivity import tinh_hieu_luc
+
+                dem = tinh_hieu_luc(session)
+                metrics["form_eff_recomputed"] = sum(dem.values())
+                session.commit()
             except Exception as e:
                 logger.error("Không nối lại được căn cứ biểu mẫu: %s", e)
 

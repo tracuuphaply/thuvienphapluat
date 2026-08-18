@@ -499,6 +499,29 @@ def _m013_legal_forms(conn: Connection) -> None:
         conn.execute(text(ddl))
 
 
+def _m014_form_effectivity(conn: Connection) -> None:
+    """Hiệu lực biểu mẫu và dấu vết mẫu bị TVPL gỡ.
+
+    Biểu mẫu là phụ lục kèm theo văn bản quy phạm nên nó không có hiệu lực riêng —
+    nó sống chết theo văn bản mẹ. TVPL không công bố điều đó, chỉ ghi ngày cập
+    nhật trang, nên phải suy từ căn cứ (xem src/forms/effectivity.py).
+    """
+    _add_columns(conn, "legal_forms", [
+        ("eff_state", "VARCHAR(30)"),
+        ("eff_state_as_of", "DATE"),
+        ("eff_note", "TEXT"),
+        ("eff_replaced_by", "VARCHAR(300)"),
+        ("last_seen_at", "DATE"),
+        ("delisted_at", "DATE"),
+    ])
+    # Lọc "biểu mẫu còn dùng được" là đường truy xuất chính của trang công khai và
+    # lệnh Telegram; thiếu chỉ mục thì mỗi lần lọc phải quét toàn bảng.
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS idx_legal_forms_eff "
+        "ON legal_forms(eff_state, is_business)"
+    ))
+
+
 MIGRATIONS: list[Migration] = [
     Migration("001_legacy_document_columns",
               "Các cột documents từng thêm bằng vòng lặp hardcode",
@@ -539,6 +562,9 @@ MIGRATIONS: list[Migration] = [
     Migration("013_legal_forms",
               "Kho biểu mẫu pháp lý (/bieumau, /hopdong) và căn cứ của chúng",
               _m013_legal_forms),
+    Migration("014_form_effectivity",
+              "Hiệu lực biểu mẫu suy từ căn cứ, và dấu vết mẫu bị TVPL gỡ",
+              _m014_form_effectivity),
 ]
 
 

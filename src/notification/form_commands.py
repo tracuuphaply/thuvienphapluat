@@ -23,6 +23,7 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from src.forms import effectivity as bm_eff
 from src.forms import search
 from src.forms.renderer import thu_muc_dung
 from src.legal.form_taxonomy import NGHIEP_VU, ten_nhom_hop_dong
@@ -46,12 +47,30 @@ def _nghiep_vu_cua(form: LegalForm) -> list[str]:
     return json.loads(form.nghiep_vu or "[]")
 
 
-def _dong_ket_qua(stt: int, form_key: str, title: str, nghiep_vu: list[str]) -> str:
+#: Biểu tượng hiệu lực, đặt NGAY TRƯỚC mã mẫu trong danh sách kết quả.
+#: Người dùng Telegram quét danh sách rất nhanh; nhãn chữ dài bị bỏ qua còn một
+#: ký tự màu thì không.
+_DAU_HIEU_LUC = {
+    bm_eff.CON_HIEU_LUC: "🟢",
+    bm_eff.CAN_KIEM_TRA: "🟡",
+    bm_eff.CO_BAN_THAY_THE: "🟠",
+    bm_eff.HET_HIEU_LUC: "🔴",
+    bm_eff.KHONG_RO: "⚪",
+}
+
+
+def _dau_hieu_luc(eff_state: str | None) -> str:
+    return _DAU_HIEU_LUC.get(eff_state or bm_eff.KHONG_RO, "⚪")
+
+
+def _dong_ket_qua(stt: int, form_key: str, title: str, nghiep_vu: list[str],
+                  eff_state: str | None = None) -> str:
     nhan = " · ".join(NGHIEP_VU.get(ma, ma) for ma in nghiep_vu[:2])
     # Tiêu đề biểu mẫu dài tới hơn 200 ký tự; Telegram giới hạn 4096 ký tự một
     # tin nên 10 kết quả chưa cắt là tràn tin nhắn.
     tom = title if len(title) <= 90 else title[:88] + "…"
-    return f"{stt}. `{form_key}`\n   {tom}" + (f"\n   _{nhan}_" if nhan else "")
+    return (f"{stt}. {_dau_hieu_luc(eff_state)} `{form_key}`\n   {tom}"
+            + (f"\n   _{nhan}_" if nhan else ""))
 
 
 # ──────────────────────────────────────────────
@@ -96,10 +115,17 @@ def tim_bieu_mau(session, tu_khoa: str) -> KetQua:
             f"🔍 Không thấy biểu mẫu nào khớp *{tu_khoa}*.\n\n"
             "Gõ `/bieumau` để xem danh sách nhóm nghiệp vụ."
         )
+    hl = {
+        k: v for k, v in session.query(LegalForm.form_key, LegalForm.eff_state)
+        .filter(LegalForm.form_key.in_([r.form_key for r in ket_qua])).all()
+    }
     dong = [f"🔍 *{len(ket_qua)} biểu mẫu khớp* “{tu_khoa}”\n"]
     for i, r in enumerate(ket_qua, 1):
-        dong.append(_dong_ket_qua(i, r.form_key, r.title, r.nghiep_vu))
-    dong.append("\nTải file: `/bieumau <mã>`")
+        dong.append(_dong_ket_qua(i, r.form_key, r.title, r.nghiep_vu,
+                                  hl.get(r.form_key)))
+    dong.append("\n🟢 còn hiệu lực · 🟡 cần kiểm tra · 🟠 có bản thay thế · "
+                "🔴 hết hiệu lực · ⚪ chưa xác minh")
+    dong.append("Tải file: `/bieumau <mã>`")
     return KetQua("\n".join(dong))
 
 
@@ -124,7 +150,8 @@ def liet_ke_nhom(session, ma_nhom: str) -> KetQua:
 
     dong = [f"📂 *{NGHIEP_VU[ma]}* — {len(thuoc_nhom)} mẫu\n"]
     for i, f in enumerate(thuoc_nhom[:GIOI_HAN_NHOM], 1):
-        dong.append(_dong_ket_qua(i, f.form_key, f.title or "", _nghiep_vu_cua(f)))
+        dong.append(_dong_ket_qua(i, f.form_key, f.title or "",
+                                  _nghiep_vu_cua(f), f.eff_state))
     if len(thuoc_nhom) > GIOI_HAN_NHOM:
         dong.append(f"\n… và {len(thuoc_nhom) - GIOI_HAN_NHOM} mẫu nữa. "
                     "Thu hẹp bằng `/bieumau <từ khoá>`.")
@@ -149,6 +176,25 @@ def chi_tiet_bieu_mau(session, form_key: str) -> KetQua:
     nhom = " · ".join(NGHIEP_VU.get(m, m) for m in _nghiep_vu_cua(form))
 
     dong = [f"📄 *{form.title}*", ""]
+    # Hiệu lực đứng TRƯỚC mọi metadata khác: đây là thứ quyết định người dùng có
+    # nên điền tờ giấy này hay không.
+    if form.delisted_at:
+        dong.append(f"🚫 *Nguồn đã gỡ biểu mẫu này* "
+                    f"({form.delisted_at:%d/%m/%Y}) — không nên dùng để nộp.")
+    trang_thai = form.eff_state or bm_eff.KHONG_RO
+    dong.append(f"{_dau_hieu_luc(trang_thai)} *{bm_eff.NHAN[trang_thai]}*"
+                + (f" _(tính đến {form.eff_state_as_of:%d/%m/%Y})_"
+                   if form.eff_state_as_of else ""))
+    if form.eff_note:
+        dong.append(f"_{form.eff_note[:300]}_")
+    if form.eff_replaced_by:
+        try:
+            ds = json.loads(form.eff_replaced_by)
+        except ValueError:
+            ds = []
+        if ds:
+            dong.append(f"➡️ Tìm mẫu mới ở: *{', '.join(ds[:3])}*")
+    dong.append("")
     if form.source == SOURCE_HOP_DONG and form.form_type_code:
         dong.append(f"Nhóm hợp đồng: {ten_nhom_hop_dong(form.form_type_code)}")
     elif form.field_name:

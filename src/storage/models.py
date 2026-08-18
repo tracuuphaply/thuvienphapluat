@@ -524,6 +524,30 @@ class LegalForm(Base):
     is_business = Column(Boolean, comment="Có phục vụ hoạt động kinh doanh không")
     excluded_reason = Column(String(120), comment="Lý do bị loại — để biết vì sao vắng")
 
+    # ── Hiệu lực (src/forms/effectivity.py) ──
+    # Biểu mẫu KHÔNG có hiệu lực riêng: nó là phụ lục kèm theo một văn bản quy
+    # phạm nên sống chết theo văn bản đó. TVPL không nói điều này — trang chỉ ghi
+    # "Cập nhật: <ngày>", mà đó là ngày họ sửa trang, không phải ngày pháp lý.
+    eff_state = Column(
+        String(30),
+        comment="con_hieu_luc | co_ban_thay_the | can_kiem_tra | het_hieu_luc | khong_ro",
+    )
+    # Mốc tính là BẮT BUỘC, cùng lý do với documents.eff_state_as_of: "còn hiệu
+    # lực" là khẳng định tại một thời điểm, cờ không kèm mốc thành lời nói dối kể
+    # từ hôm sau.
+    eff_state_as_of = Column(Date, comment="Mốc tính cờ hiệu lực")
+    eff_note = Column(Text, comment="Vì sao ra cờ đó — nêu rõ từng căn cứ")
+    eff_replaced_by = Column(
+        String(300), comment="JSON số hiệu văn bản đã thay thế/bãi bỏ căn cứ"
+    )
+
+    # ── Theo dõi mẫu bị TVPL gỡ ──
+    # Mẫu biến mất khỏi trang liệt kê là tín hiệu pháp lý, không phải lỗi cào:
+    # thường vì văn bản mẹ đã bị thay thế. Không ghi lại thì kho giữ mãi một biểu
+    # mẫu mà chính nguồn đã bỏ.
+    last_seen_at = Column(Date, comment="Lần cuối còn thấy trên trang liệt kê TVPL")
+    delisted_at = Column(Date, comment="Lần đầu phát hiện đã biến mất khỏi TVPL")
+
     # Trang công khai
     public_slug = Column(String(180), unique=True, nullable=True)
     published_hash = Column(

@@ -36,6 +36,7 @@ import logging
 from src.forms.relevance import BIEU_MAU_BUSINESS_FIELDS
 from src.forms.store import (
     KetQuaLuu,
+    danh_dau_bi_go,
     ghi_hang_doi,
     hang_doi_con_lai,
     luu_bieu_mau,
@@ -233,9 +234,19 @@ async def _cao(source: str, field: int | None, gioi_han: int | None,
         session = SessionLocal()
         try:
             them = ghi_hang_doi(session, muc)
-            session.commit()
             if them:
                 print(f"Ghi {them} mục mới vào hàng đợi.")
+            # Chỉ rà mẫu bị gỡ sau lượt liệt kê ĐẦY ĐỦ. Lượt có --limit hoặc
+            # --field cắt ngang kho, nên mọi mẫu chưa tới lượt sẽ trông như đã
+            # bị TVPL gỡ — đó là báo động giả trên chính dữ kiện pháp lý.
+            if not gioi_han and not field:
+                bi_go = danh_dau_bi_go(session, source)
+                if bi_go:
+                    print(f"⚠️  {len(bi_go)} biểu mẫu không còn trên TVPL: "
+                          f"{', '.join(bi_go[:5])}")
+            else:
+                print("Bỏ qua bước rà mẫu bị gỡ (lượt liệt kê không đầy đủ).")
+            session.commit()
         finally:
             session.close()
 

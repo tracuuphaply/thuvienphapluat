@@ -24,6 +24,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+from src.forms import effectivity as bm_eff
 from src.legal.form_taxonomy import NGHIEP_VU, ten_nhom_hop_dong
 from src.publish.site_exporter import content_hash, remove_orphan_pages
 from src.sources.tvpl_forms_parse import SOURCE_HOP_DONG
@@ -44,10 +45,13 @@ title: "{short_title}"
 nguon: "{source}"
 nghiep_vu: {nghiep_vu_yaml}
 phan_loai: "{phan_loai}"
+hieu_luc: "{hieu_luc}"
 tags: {tags}
 ---
 
 # {title}
+
+{khoi_hieu_luc}
 
 {khoi_meta}
 
@@ -100,6 +104,54 @@ def public_slug_bieu_mau(form: LegalForm) -> str:
     cáo thì không được đổi. Cùng nguyên tắc thứ nhất của src/storage/public_slug.py.
     """
     return slugify_doc_num(f"bm-{form.source}-{form.external_id}")
+
+
+def _khoi_hieu_luc(form: LegalForm) -> str:
+    """Khối hiệu lực, đặt NGAY DƯỚI tiêu đề.
+
+    Đây là thông tin quan trọng nhất trên trang: một biểu mẫu hết hiệu lực trông y
+    hệt một biểu mẫu còn dùng được, và người tải về không có cách nào tự biết. Đặt
+    nó dưới phần nội dung nghĩa là phần lớn người đọc sẽ tải file trước khi thấy.
+
+    Biểu mẫu bị TVPL gỡ được cảnh báo TRƯỚC hiệu lực: nguồn đã bỏ nó thì mọi suy
+    luận từ căn cứ đều là suy luận trên một tờ giấy không còn tồn tại ở đâu.
+    """
+    dong = []
+    if form.delisted_at:
+        dong.append(
+            f"> [!danger] Nguồn đã gỡ biểu mẫu này\n"
+            f"> Thư viện Pháp luật không còn liệt kê biểu mẫu này "
+            f"(phát hiện ngày {form.delisted_at:%d/%m/%Y}). Thường là vì văn bản "
+            f"kèm theo đã bị thay thế. Bản dưới đây giữ lại để tra cứu, KHÔNG nên "
+            f"dùng để nộp."
+        )
+
+    trang_thai = form.eff_state or bm_eff.KHONG_RO
+    nhan = bm_eff.NHAN.get(trang_thai, bm_eff.NHAN[bm_eff.KHONG_RO])
+    muc = {
+        bm_eff.CON_HIEU_LUC: "tip",
+        bm_eff.CAN_KIEM_TRA: "warning",
+        bm_eff.CO_BAN_THAY_THE: "warning",
+        bm_eff.HET_HIEU_LUC: "danger",
+        bm_eff.KHONG_RO: "info",
+    }.get(trang_thai, "info")
+
+    khoi = [f"> [!{muc}] {nhan}"]
+    if form.eff_note:
+        khoi.append(f"> {form.eff_note}")
+    if form.eff_replaced_by:
+        try:
+            ds = json.loads(form.eff_replaced_by)
+        except ValueError:
+            ds = []
+        if ds:
+            khoi.append(f"> **Tìm biểu mẫu mới ở:** {', '.join(ds)}")
+    if form.eff_state_as_of:
+        khoi.append(f"> *Tính đến {form.eff_state_as_of:%d/%m/%Y}. Biểu mẫu là phụ "
+                    f"lục kèm theo văn bản quy phạm nên hiệu lực của nó theo hiệu "
+                    f"lực của văn bản đó — nguồn KHÔNG công bố dữ kiện này.*")
+    dong.append("\n".join(khoi))
+    return "\n\n".join(dong)
 
 
 def _khoi_meta(form: LegalForm, nghiep_vu: list[str]) -> str:
@@ -177,6 +229,12 @@ def render_form_page(session, form: LegalForm,
                      slug_by_num: dict[str, str]) -> str:
     nghiep_vu = json.loads(form.nghiep_vu or "[]")
     tags = ["bieu-mau", form.source] + [f"nv-{m.replace('_', '-')}" for m in nghiep_vu]
+    # Cờ hiệu lực thành tag để Quartz lọc được: "cho tôi xem mọi biểu mẫu đã hết
+    # hiệu lực" là câu hỏi người vận hành hỏi thật.
+    if form.eff_state:
+        tags.append(f"hl-{form.eff_state.replace('_', '-')}")
+    if form.delisted_at:
+        tags.append("da-bi-go")
     khoi_ngay = (f'created: "{form.updated_on}"\nmodified: "{form.updated_on}"\n'
                  if form.updated_on else "")
     return PAGE_TEMPLATE.format(
@@ -188,6 +246,8 @@ def render_form_page(session, form: LegalForm,
         phan_loai=form.audience or "chua_ro",
         tags=_yaml_list(tags),
         title=form.title or form.form_key,
+        hieu_luc=form.eff_state or bm_eff.KHONG_RO,
+        khoi_hieu_luc=_khoi_hieu_luc(form),
         khoi_meta=_khoi_meta(form, nghiep_vu),
         ghi_nguon=GHI_NGUON,
         khoi_tai_ve=_khoi_tai_ve(form),

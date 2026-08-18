@@ -166,6 +166,27 @@ kèm khối ghi nguồn và link ngược.
 **DOCX là bản chính, PDF là bản phụ.** Biểu mẫu sinh ra để ĐIỀN; chỉ có PDF thì người
 dùng vẫn phải sang TVPL tải bản Word.
 
+**Biểu mẫu không có hiệu lực riêng — nó sống chết theo văn bản căn cứ.** TVPL không
+công bố dữ kiện này, trang chỉ ghi "Cập nhật: <ngày>" tức ngày họ sửa trang. Hệ thống
+suy hiệu lực từ căn cứ và **không bao giờ mặc định "còn hiệu lực"**:
+
+| Cờ | Nghĩa |
+|---|---|
+| 🟢 `con_hieu_luc` | mọi căn cứ còn hiệu lực |
+| 🟠 `co_ban_thay_the` | căn cứ đã bị thay thế/bãi bỏ — kèm số hiệu văn bản mới để đi tìm mẫu mới |
+| 🟡 `can_kiem_tra` | căn cứ bị sửa đổi, hoặc hết hiệu lực một phần |
+| 🔴 `het_hieu_luc` | căn cứ đã hết hiệu lực toàn bộ |
+| ⚪ `khong_ro` | căn cứ chưa có trong kho — chưa xác minh được, KHÔNG phải "còn hiệu lực" |
+
+Thứ tệ nhất thắng: mẫu có một căn cứ sống và một căn cứ chết là mẫu **đáng ngờ**.
+
+Đo trên 219 mẫu ngày 19/08/2026: 4 mẫu có căn cứ đã hết hiệu lực, 2 mẫu có bản thay
+thế, 23 mẫu cần kiểm tra. 189 mẫu chưa xác minh được vì kho văn bản chưa phủ hết căn
+cứ — con số đó sẽ giảm khi kho lớn lên, và `src/main.py` bước 9 tự tính lại mỗi ngày.
+
+Mẫu bị TVPL gỡ khỏi trang liệt kê được gắn `delisted_at` và cảnh báo riêng: nguồn đã
+bỏ nó thì bản đã tải chỉ còn giá trị tra cứu, không nên dùng để nộp.
+
 ## 6. Trang công khai
 
 Repo riêng: **[minhle2412/legal-vault-public](https://github.com/minhle2412/legal-vault-public)**

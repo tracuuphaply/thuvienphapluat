@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
+from datetime import date
 
 from sqlalchemy import text
 
@@ -215,6 +216,7 @@ def ghi_hang_doi(session, items) -> int:
 
     KHÔNG hạ cấp dòng đã OK: hàm chỉ chèn dòng còn thiếu.
     """
+    hom_nay = date.today()
     da_co = {
         k for (k,) in session.query(LegalForm.form_key).filter(
             LegalForm.form_key.in_([it.form_key for it in items])
@@ -226,9 +228,50 @@ def ghi_hang_doi(session, items) -> int:
             continue
         luu_bieu_mau(session, it, crawl_status=TRANG_THAI_CHO)
         them += 1
+
+    # Đóng mốc "còn thấy trên nguồn" cho MỌI mục vừa liệt kê, kể cả mục đã có.
+    # Đây là nửa còn lại của cơ chế phát hiện mẫu bị gỡ: không đóng mốc thì không
+    # phân biệt được "TVPL vẫn còn mẫu này" với "lượt cào chưa tới nó".
+    session.query(LegalForm).filter(
+        LegalForm.form_key.in_([it.form_key for it in items])
+    ).update({"last_seen_at": hom_nay, "delisted_at": None},
+             synchronize_session=False)
+
     if them:
         logger.info("Ghi %d mục mới vào hàng đợi biểu mẫu", them)
     return them
+
+
+def danh_dau_bi_go(session, source: str, moc: date | None = None) -> list[str]:
+    """Đánh dấu biểu mẫu không còn xuất hiện trên trang liệt kê TVPL.
+
+    MẤT KHỎI NGUỒN LÀ TÍN HIỆU PHÁP LÝ, KHÔNG PHẢI LỖI CÀO. Biểu mẫu biến mất
+    thường vì văn bản mẹ đã bị thay thế và TVPL gỡ luôn phụ lục cũ. Không ghi lại
+    thì kho giữ mãi một biểu mẫu mà chính nguồn đã bỏ, và người dùng tải về một tờ
+    giấy không còn tồn tại ở đâu.
+
+    KHÔNG XOÁ bản ghi: bản đã tải vẫn là bằng chứng về thứ từng có hiệu lực, và
+    báo cáo cũ có thể đã dẫn tới nó. Chỉ gắn `delisted_at`.
+
+    Chỉ chạy được sau một lượt liệt kê ĐẦY ĐỦ (không có --limit): lượt cào cắt
+    ngang sẽ làm mọi mẫu chưa tới lượt trông như đã bị gỡ.
+    """
+    hom_nay = moc or date.today()
+    rows = (
+        session.query(LegalForm)
+        .filter(LegalForm.source == source)
+        .filter(LegalForm.delisted_at.is_(None))
+        .filter((LegalForm.last_seen_at.is_(None)) | (LegalForm.last_seen_at < hom_nay))
+        .all()
+    )
+    for f in rows:
+        f.delisted_at = hom_nay
+        # Trang công khai phải đăng lại để hiện cảnh báo đã bị gỡ.
+        f.published_hash = None
+    if rows:
+        logger.warning("%d biểu mẫu %s không còn trên TVPL — đã gắn delisted_at",
+                       len(rows), source)
+    return [f.form_key for f in rows]
 
 
 def hang_doi_con_lai(session, source: str) -> list[FormListItem]:
@@ -290,6 +333,6 @@ def noi_lai_can_cu(session) -> int:
 
 __all__ = [
     "KetQuaLuu", "TRANG_THAI_CHO", "tim_doc_key", "luu_bieu_mau",
-    "ghi_hang_doi", "hang_doi_con_lai",
+    "ghi_hang_doi", "hang_doi_con_lai", "danh_dau_bi_go",
     "so_hieu_can_cu_chua_co", "noi_lai_can_cu",
 ]
