@@ -142,7 +142,17 @@ header.top{
 .c3-head .nhan{font-size:12px;color:var(--chu-m);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .c3-head button{padding:4px 8px;border-radius:5px;font-size:12px;color:var(--chu-m)}
 .c3-head button:hover{background:var(--giay-d);color:var(--chu)}
-.c3-body{flex:1 1 auto;overflow-y:auto;padding:20px 26px 60px;max-width:none}
+.c3-panes{flex:1 1 auto;display:flex;min-height:0;min-width:0}
+.c3-body{flex:1 1 auto;overflow-y:auto;padding:20px 26px 60px;max-width:none;min-width:0}
+
+/* Bộ chuyển khung. Bản đầu để chat sau một nút nhỏ ở góc phải thanh trên, và mở
+   trang ra thì cột 3 TRỐNG — một trang tên "Trợ lý pháp lý" mà không thấy trợ lý
+   ở đâu. Nay chat là khung MẶC ĐỊNH và bộ chuyển nằm ngay đầu cột, luôn thấy. */
+.seg{display:flex;gap:0;flex:0 0 auto;border:1px solid var(--line-d);border-radius:var(--r);overflow:hidden}
+.seg button{padding:4px 11px;font-size:12.5px;color:var(--chu-m);font-weight:600}
+.seg button+button{border-left:1px solid var(--line-d)}
+.seg button[aria-selected=true]{background:var(--navy);color:#fff}
+.seg button[disabled]{opacity:.4;cursor:not-allowed}
 .doc h1{font:700 21px/1.32 var(--serif);margin:0 0 4px;color:var(--navy)}
 :root[data-theme=dark] .doc h1{color:var(--navy-xl)}
 .doc .sh-lon{font-family:var(--mono);color:var(--son);font-weight:700;font-size:13px}
@@ -175,7 +185,7 @@ header.top{
 .sodo text{font-size:9.5px;fill:var(--chu-m);pointer-events:none}
 
 /* ── Chat ── */
-.chat{display:flex;flex-direction:column;height:100%}
+.chat{display:flex;flex-direction:column;min-height:0;min-width:0;flex:1 1 auto}
 .chat-log{flex:1 1 auto;overflow-y:auto;padding:18px 24px 10px}
 .tn{margin-bottom:16px;max-width:760px}
 .tn.u{margin-left:auto}
@@ -262,6 +272,22 @@ dialog .df .phu{border:1px solid var(--line-d);color:var(--chu-m)}
 dialog small{display:block;color:var(--chu-nhat);font-size:11.5px;margin-top:4px;line-height:1.5}
 
 .mnav{display:none}
+/* Từ 1400px trở lên, mở tài liệu thì hiện CẢ HAI khung: tài liệu bên trái, hỏi
+   đáp bên phải. Đọc trích dẫn mà phải nhảy qua lại giữa hai khung thì mất đúng
+   thứ khiến trích dẫn có giá trị — đối chiếu tại chỗ. */
+@media(min-width:1400px){
+  body[data-doi-xung=true] #c3-body{display:block!important;flex:1 1 auto}
+  body[data-doi-xung=true] #chat{
+    display:flex!important;flex:0 0 430px;border-left:1px solid var(--line);
+  }
+  body[data-doi-xung=true] .seg{display:none}
+  /* Khung hỏi đáp chỉ còn 430px: khối gợi ý chiếm ba dòng ở đó. Đã mở tài liệu
+     thì người dùng có câu hỏi của mình rồi, gợi ý hết việc. */
+  body[data-doi-xung=true] .goi-y{display:none}
+  body[data-doi-xung=true] .chat-log{padding:14px 16px 8px}
+  body[data-doi-xung=true] .chat-in{padding:8px 12px 12px}
+  body[data-doi-xung=true] .c3-body{padding:18px 20px 50px}
+}
 @media(max-width:1100px){:root{--c1:232px;--c2:300px}}
 
 /* ── Hẹp: một cột mỗi lần, chuyển bằng thanh dưới ──
@@ -303,7 +329,6 @@ dialog small{display:block;color:var(--chu-nhat);font-size:11.5px;margin-top:4px
     <input id="q" type="search" placeholder="Tra số hiệu, tên văn bản, tên biểu mẫu…" autocomplete="off">
   </div>
   <div class="top-actions">
-    <button id="btn-chat" aria-pressed="false" title="Hỏi trợ lý (có trích dẫn nguồn)">💬 Hỏi</button>
     <button id="btn-theme" title="Sáng/tối">🌙</button>
     <button id="btn-cfg" title="Cấu hình API">⚙️</button>
   </div>
@@ -333,13 +358,18 @@ dialog small{display:block;color:var(--chu-nhat);font-size:11.5px;margin-top:4px
 
   <main class="col c3" id="col3">
     <div class="c3-head">
+      <div class="seg" role="tablist" aria-label="Chế độ xem">
+        <button role="tab" data-view="chat" aria-selected="true">💬 Hỏi đáp</button>
+        <button role="tab" data-view="doc" aria-selected="false">📄 Tài liệu</button>
+      </div>
       <span class="nhan" id="c3-nhan">Chưa mở tài liệu</span>
-      <button id="btn-sodo" title="Sơ đồ láng giềng">🕸 Sơ đồ</button>
+      <button id="btn-sodo" title="Sơ đồ láng giềng">🕸</button>
       <button id="btn-goc" title="Mở trang đầy đủ">↗ Trang gốc</button>
     </div>
-    <div class="c3-body" id="c3-body"></div>
+    <div class="c3-panes" id="c3-panes">
+    <div class="c3-body" id="c3-body" hidden></div>
 
-    <div class="chat" id="chat" hidden>
+    <div class="chat" id="chat">
       <div class="chat-log" id="chat-log"></div>
       <div class="chat-in">
         <div class="goi-y" id="goi-y"></div>
@@ -350,6 +380,8 @@ dialog small{display:block;color:var(--chu-nhat);font-size:11.5px;margin-top:4px
         <div class="ghi" id="chat-ghi"></div>
       </div>
     </div>
+
+    </div><!-- /.c3-panes -->
 
     <aside class="ref" id="ref">
       <header>
@@ -428,7 +460,7 @@ const CH = {                       /* cấu hình lưu trong localStorage */
 const S = {                        /* trạng thái ứng dụng */
   d: null, kho: "van_ban", linhVuc: null, tab: "ds",
   mo: null, hoiThoai: [], nguon: {}, dangChay: false,
-  idxVB: [], idxBM: [], ke: null, dsCuoi: null,
+  idxVB: [], idxBM: [], ke: null, dsCuoi: null, view: 'chat',
 };
 
 /* ── Cờ hiệu lực → hình thức ─────────────────────────────── */
@@ -568,15 +600,11 @@ const GOC = "..";   /* trang Quartz nằm ở thư mục cha của /tro-ly/ */
 
 function moTaiLieu(kho, i) {
   S.mo = { kho, i };
-  $("#chat").hidden = true;
-  $("#btn-chat").setAttribute("aria-pressed", "false");
-  $("#c3-body").hidden = false;
   const v = (kho === "van_ban" ? S.d.van_ban : S.d.bieu_mau)[i];
-  $("#c3-nhan").textContent = kho === "van_ban" ? v.n + " — " + v.t : v.t;
   $("#c3-body").innerHTML = kho === "van_ban" ? htmlVanBan(v, i) : htmlBieuMau(v);
   $("#c3-body").scrollTop = 0;
   veDanhSach(undefined);          // giữ nguyên danh sách đang xem
-  if (innerWidth <= 860) hienCot("col3");
+  datKhung("doc");
 }
 
 function htmlVanBan(v, i) {
@@ -680,15 +708,38 @@ const NHAN_BUOC = {
   context_ready: "Dựng ngữ cảnh", tool_call: "Tra chéo văn bản", answer: "Soạn câu trả lời",
 };
 
-function moChat() {
-  $("#chat").hidden = false;
-  $("#c3-body").hidden = true;
-  $("#btn-chat").setAttribute("aria-pressed", "true");
-  $("#c3-nhan").textContent = "Hỏi trợ lý — mọi câu trả lời đều kèm trích dẫn";
-  if (!$("#chat-log").children.length) veGoiY();
-  capNhatGhiChat();
+/* MỘT chỗ duy nhất quyết định khung nào hiện. Bản đầu rải việc bật/tắt ở ba nơi
+   (moChat, moTaiLieu, nút toggle) và chúng lệch nhau — chat hiện mà nhãn vẫn ghi
+   "Chưa mở tài liệu". */
+function datKhung(view) {
+  S.view = view;
+  const coTaiLieu = !!S.mo;
+  const doiXung = innerWidth >= 1400 && coTaiLieu;
+  document.body.dataset.doiXung = String(doiXung);
+
+  $("#chat").hidden = !doiXung && view !== "chat";
+  $("#c3-body").hidden = !doiXung && view !== "doc";
+
+  $$(".seg button").forEach(b =>
+    b.setAttribute("aria-selected", String(b.dataset.view === view)));
+  $(".seg button[data-view=doc]").disabled = !coTaiLieu;
+
+  const v = coTaiLieu
+    ? (S.mo.kho === "van_ban" ? S.d.van_ban : S.d.bieu_mau)[S.mo.i] : null;
+  $("#c3-nhan").textContent = doiXung
+    ? (v.n ? v.n + " — " + v.t : v.t)
+    : view === "chat"
+      ? "Mọi câu trả lời đều kèm trích dẫn bấm được"
+      : (v ? (v.n ? v.n + " — " + v.t : v.t) : "Chưa mở tài liệu");
+
+  $("#btn-sodo").hidden = !coTaiLieu || (!doiXung && view !== "doc");
+  $("#btn-goc").hidden = !coTaiLieu || (!doiXung && view !== "doc");
+
+  if (view === "chat" || doiXung) {
+    if (!$("#chat-log").children.length) veGoiY();
+    capNhatGhiChat();
+  }
   if (innerWidth <= 860) hienCot("col3");
-  $("#chat-q").focus();
 }
 
 function capNhatGhiChat() {
@@ -787,14 +838,53 @@ async function hoi(cau) {
 /* Chế độ thử: không gọi mô hình nào. Nó tra trong kho rồi trả về tài liệu khớp
    kèm trích dẫn thật — đủ để kiểm giao diện trích dẫn hoạt động đúng trước khi
    có API, và KHÔNG bịa ra câu trả lời pháp lý nào. */
+/* Từ chức năng tiếng Việt — PHẢI bỏ trước khi tra.
+   Không bỏ thì câu "abcxyz câu hỏi vô nghĩa không liên quan gì" vẫn ra 5 văn bản,
+   vì "câu", "hỏi", "không", "liên", "quan" khớp bừa vào hàng nghìn tiêu đề. Kết
+   quả trông như tra cứu tồi, trong khi sự thật là KHÔNG CÓ GÌ khớp — và với một
+   trang pháp lý thì vẻ ngoài có liên quan còn tệ hơn câu "không tìm thấy". */
+const TU_CHUC_NANG = new Set(("cua va la co khong duoc cho den tu voi nhu thi ma "
+  + "nay do nao gi sao bao nhieu the nao cau hoi lien quan phai can nen se dang "
+  + "cac nhung mot hai ba trong ngoai tren duoi khi lam theo tai ve cung hay "
+  + "toi ban chung ho minh ai dau day kia ra vao len xuong").split(" "));
+
+/* Ngưỡng theo TỈ LỆ, không theo số tuyệt đối. Ngưỡng cố định 2 từ vẫn để nhiễu
+   lọt: câu 8 từ chỉ cần khớp 2 là đủ, nên "thủ tục sa thải người lao động trái
+   luật" ra 2273/QĐ-UBND — nó khớp đúng "thu" và "dong" (mà "dong" còn là "đồng",
+   "động", "đóng"). Tra theo âm tiết trong tiếng Việt vốn nhiễu; đòi khớp một nửa
+   số từ nội dung cắt được phần lớn. */
+const TI_LE_KHOP = 0.5;
+const TOI_THIEU_KHOP = 2;
+
 async function traLoiThu(hop, noi, cau) {
   veBuoc(hop, "retrieval", "processing");
   await new Promise(r => setTimeout(r, 260));
-  const tu = goDau(cau).split(/\s+/).filter(w => w.length > 2);
-  const diem = v => tu.reduce((a, w) => a + (goDau(v.n + " " + v.t).includes(w) ? 1 : 0), 0);
-  const top = S.d.van_ban.map(v => ({ v, s: diem(v) }))
-    .filter(x => x.s > 0).sort((a, b) => b.s - a.s).slice(0, 5);
-  veBuoc(hop, "retrieval", "done", top.length + " tài liệu");
+
+  const thoLoc = goDau(cau).split(/[\s,.;:?!()]+/).filter(Boolean);
+  const tu = [...new Set(thoLoc.filter(w => w.length > 2 && !TU_CHUC_NANG.has(w)))];
+  /* Số hiệu trong câu hỏi là tín hiệu mạnh nhất — người gõ "96/2024/NĐ-CP" muốn
+     đúng văn bản đó, không muốn 5 văn bản gần giống. */
+  const soHieu = (cau.match(/\d{1,4}[A-ZĐa-zđ]?\/\d{4}\/[A-ZĐ][A-ZĐ0-9\-]*/g) || [])
+    .map(x => goDau(x));
+
+  /* KHỚP THEO RANH GIỚI TỪ, KHÔNG KHỚP CHUỖI CON. Đây đúng bài học mà
+     src/analysis/lexicon.py của dự án này đã ghi: `if keyword in text` làm "nước"
+     khớp cả "nhà nước". Ở đây tệ hơn vì tiếng Việt đơn âm — sau khi gỡ dấu thì
+     "thu" là chuỗi con của "thủ", "thuế", "thuộc", "thù"; "dong" là chuỗi con của
+     "đồng", "động", "đóng", "dòng". Câu 8 từ vì vậy khớp bừa 4 từ vào một quyết
+     định cấp tỉnh chẳng liên quan gì. */
+  const chamDiem = v => {
+    if (soHieu.some(sh => goDau(v.n) === sh)) return 100;
+    const am = new Set(goDau(v.n + " " + v.t).split(/[^a-z0-9]+/).filter(Boolean));
+    return tu.reduce((a, w) => a + (am.has(w) ? 1 : 0), 0);
+  };
+  const top = S.d.van_ban.map(v => ({ v, s: chamDiem(v) }))
+    .filter(x => x.s >= (soHieu.length ? 1
+        : Math.max(TOI_THIEU_KHOP, Math.ceil(tu.length * TI_LE_KHOP))))
+    .sort((a, b) => b.s - a.s).slice(0, 5);
+
+  veBuoc(hop, "retrieval", "done",
+         tu.length ? `${top.length} tài liệu · ${tu.length} từ khoá` : "không có từ khoá");
 
   S.nguon = {};
   top.forEach((x, k) => {
@@ -803,12 +893,22 @@ async function traLoiThu(hop, noi, cau) {
     };
   });
   hop.append(noi);
-  const text = top.length
-    ? "Chế độ thử — chưa có API nên đây KHÔNG phải câu trả lời pháp lý.\n\n"
-      + "Các văn bản trong kho khớp câu hỏi của bạn:\n\n"
+
+  const dauCau = "Chế độ thử — chưa cấu hình API nên đây KHÔNG phải câu trả lời "
+    + "pháp lý, chỉ là tra tiêu đề trong kho.\n\n";
+  let text;
+  if (!tu.length && !soHieu.length) {
+    text = dauCau + "Câu hỏi không có từ khoá nào tra được. Thử gõ số hiệu văn bản "
+      + "hoặc một cụm cụ thể như “hợp đồng thuê đất”, “tờ khai thuế”.";
+  } else if (!top.length) {
+    text = dauCau + `Không có văn bản nào trong kho khớp từ khoá: ${tu.join(", ")}.\n\n`
+      + "Kho hiện chỉ có TIÊU ĐỀ và dữ kiện, chưa có toàn văn để tra nội dung "
+      + "điều khoản — đó là việc của API khi bạn cấu hình.";
+  } else {
+    text = dauCau + `Văn bản khớp từ khoá (${tu.join(", ")}):\n\n`
       + top.map((x, k) => `${k + 1}. ${x.v.n} [${k + 1}]`).join("\n")
-      + "\n\nBấm vào số trong ngoặc để xem nguồn. Cấu hình API ở ⚙️ để có câu trả lời thật."
-    : "Chế độ thử — không thấy văn bản nào trong kho khớp câu hỏi này.";
+      + "\n\nBấm số trong ngoặc để xem nguồn. Cấu hình API ở ⚙️ để có câu trả lời thật.";
+  }
   veTrichDan(noi, text);
   S.hoiThoai.push({ role: "assistant", content: text });
 }
@@ -931,7 +1031,8 @@ document.addEventListener("click", e => {
   if (td) { moNguon(td.dataset.td); return; }
 
   if (t.closest("#goi-y button")) { $("#chat-q").value = t.textContent.trim(); hoi(t.textContent.trim()); return; }
-  if (t.closest("#btn-chat")) { $("#chat").hidden ? moChat() : (moTaiLieu(S.mo?.kho || "van_ban", S.mo?.i || 0)); return; }
+  const seg = t.closest(".seg button");
+  if (seg && !seg.disabled) { datKhung(seg.dataset.view); return; }
   if (t.closest("#ref-dong")) { $("#ref").classList.remove("mo"); return; }
   if (t.closest("#ref-mo")) {
     const i = +$("#ref-mo").dataset.i;
@@ -1014,8 +1115,16 @@ if (localStorage.getItem("troly.theme") === "dark") {
   $("#btn-theme").textContent = "☀️";
 }
 hienCot(innerWidth <= 860 ? "col1" : "col3");
-nap().catch(e => {
+nap().then(() => datKhung("chat")).catch(e => {
   $("#ds").innerHTML = `<div class="trong">${esc(e.message)}</div>`;
+});
+
+/* Đổi khổ màn hình có thể bật/tắt chế độ hai khung — tính lại chứ không giữ
+   trạng thái cũ, nếu không thu nhỏ cửa sổ sẽ để cả hai khung chen nhau. */
+let henResize;
+addEventListener("resize", () => {
+  clearTimeout(henResize);
+  henResize = setTimeout(() => S.d && datKhung(S.view), 160);
 });
 </script>
 </body>
