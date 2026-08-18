@@ -5,9 +5,14 @@
 # đúng 6h sáng là mất hẳn ngày đó, không có cách nào biết. launchd với
 # StartCalendarInterval sẽ chạy ngay khi máy thức dậy nếu đã lỡ mốc.
 #
-# Cài HAI agent:
+# Cài BA agent:
 #   vn.legalvault.daily      cào + đồng bộ + rút hàng đợi báo cáo, mỗi ngày
+#   vn.legalvault.weeklyforms làm mới kho biểu mẫu, mỗi Chủ nhật
 #   vn.legalvault.quarterly  xếp hàng báo cáo tổng hợp ngành, đầu mỗi quý
+#
+# Biểu mẫu tách khỏi agent hằng ngày vì nó đổi chậm hơn văn bản rất nhiều: chạy
+# hằng ngày là tải lại gần như y nguyên kho cũ, mà mỗi lượt tải thừa lại đẩy
+# phiên tới gần ngưỡng chặn của Cloudflare hơn.
 #
 # Agent hằng quý chỉ XẾP HÀNG, không sinh báo cáo — agent hằng ngày rút hàng
 # đợi. Tách như vậy thì trần MAX_REPORTS_PER_DAY vẫn có tác dụng: 17 báo cáo
@@ -26,13 +31,15 @@ LABEL="vn.legalvault.daily"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 QLABEL="vn.legalvault.quarterly"
 QPLIST="$HOME/Library/LaunchAgents/$QLABEL.plist"
+FLABEL="vn.legalvault.weeklyforms"
+FPLIST="$HOME/Library/LaunchAgents/$FLABEL.plist"
 
 if [ "${1:-}" = "--uninstall" ]; then
-    for l in "$LABEL" "$QLABEL"; do
+    for l in "$LABEL" "$QLABEL" "$FLABEL"; do
         launchctl bootout "gui/$(id -u)/$l" 2>/dev/null || true
         rm -f "$HOME/Library/LaunchAgents/$l.plist"
     done
-    echo "Đã gỡ $LABEL và $QLABEL"
+    echo "Đã gỡ $LABEL, $QLABEL và $FLABEL"
     exit 0
 fi
 
@@ -114,8 +121,47 @@ chmod +x "$PROJECT_DIR/scripts/run_quarterly.sh"
 launchctl bootout "gui/$(id -u)/$QLABEL" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$QPLIST"
 
+# ── Agent biểu mẫu, hằng tuần ──
+#
+# Weekday 0 = Chủ nhật, 5h sáng: trước agent hằng ngày một tiếng để trang công
+# khai sinh ra trong ngày đã có kho biểu mẫu mới nhất.
+cat > "$FPLIST" <<FPLIST_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>$FLABEL</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>$PROJECT_DIR/scripts/run_weekly_forms.sh</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>$PROJECT_DIR</string>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key><integer>0</integer>
+        <key>Hour</key><integer>5</integer>
+        <key>Minute</key><integer>0</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>$PROJECT_DIR/data/logs/launchd.forms.log</string>
+    <key>StandardErrorPath</key>
+    <string>$PROJECT_DIR/data/logs/launchd.forms.err.log</string>
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>
+FPLIST_EOF
+
+chmod +x "$PROJECT_DIR/scripts/run_weekly_forms.sh"
+launchctl bootout "gui/$(id -u)/$FLABEL" 2>/dev/null || true
+launchctl bootstrap "gui/$(id -u)" "$FPLIST"
+
 echo "Đã cài $LABEL — chạy hằng ngày lúc $(printf '%02d:%02d' "$HOUR" "$MINUTE")"
 echo "Đã cài $QLABEL — chạy 1/1, 1/4, 1/7, 1/10 lúc 07:00"
+echo "Đã cài $FLABEL — làm mới kho biểu mẫu, Chủ nhật 05:00"
 echo "  plist:      $PLIST"
 echo "  kiểm tra:   launchctl print gui/$(id -u)/$LABEL | head -20"
 echo "  chạy ngay:  launchctl kickstart -k gui/$(id -u)/$LABEL"

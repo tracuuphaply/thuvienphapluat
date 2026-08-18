@@ -673,6 +673,21 @@ def run_pipeline(
                 # Không để lỗi xếp hàng làm hỏng lần cào đã thành công.
                 logger.error("Không xếp hàng được báo cáo: %s", e)
 
+            # ── Step 9: Nối lại căn cứ biểu mẫu ──
+            #
+            # Biểu mẫu cào từ tháng trước dẫn tới những văn bản mà kho lúc đó
+            # chưa có (đo trên mẫu thử: 2/2 căn cứ đều chưa có). Kho vừa lớn
+            # thêm ở bước trên, nên đây là lúc rẻ nhất để nối lại — không phải
+            # cào lại TVPL lần nào.
+            try:
+                from src.forms.store import noi_lai_can_cu
+
+                noi_them = noi_lai_can_cu(session)
+                metrics["form_refs_linked"] = noi_them
+                session.commit()
+            except Exception as e:
+                logger.error("Không nối lại được căn cứ biểu mẫu: %s", e)
+
             # ── Finalize crawl run ──
             finish_crawl_run(session, crawl_run, status="SUCCESS", **metrics)
             session.commit()

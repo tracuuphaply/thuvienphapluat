@@ -453,3 +453,135 @@ class CrawlRun(Base):
     log_path = Column(Text, nullable=True)
 
     __table_args__ = (Index("idx_crawl_runs_date", "run_date"),)
+
+
+class LegalForm(Base):
+    """Một biểu mẫu pháp lý — từ /bieumau hoặc /hopdong của TVPL.
+
+    KHÔNG khoá vào kho văn bản. Trang chi tiết có trường "Căn cứ: <số hiệu>",
+    nhưng đo thật trên mẫu thử: 2/2 số hiệu căn cứ (187/2026/NĐ-CP,
+    131/2025/TT-BTC) chưa nằm trong kho 4.467 văn bản. Nếu bắt biểu mẫu phải có
+    văn bản mẹ mới được lưu thì kho biểu mẫu gần như rỗng. Căn cứ là dữ liệu làm
+    giàu (bảng legal_form_refs), không phải điều kiện tồn tại.
+
+    Hai bộ mã lĩnh vực nằm cạnh nhau có chủ đích: `field_code` là mã 1–47 của
+    trang biểu mẫu, `tvpl_field_code` là mã 1–27 của trang văn bản mà cả hệ
+    thống đang dùng. Trùng tên nhưng khác mã ("Doanh nghiệp" = 11 và = 1), nên
+    ánh xạ phải hiện ra thành cột riêng kèm `tvpl_field_source` chứ không âm
+    thầm ghi đè — xem src/legal/form_taxonomy.py.
+    """
+
+    __tablename__ = "legal_forms"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    # Số hiệu id của TVPL chỉ duy nhất TRONG một kho: /bieumau/46696 và
+    # /hopdong/46696 là hai mẫu khác nhau. Khoá thật phải gồm cả kho.
+    form_key = Column(
+        String(120), unique=True, nullable=False,
+        comment="Định danh thật: {source}-{external_id}",
+    )
+    source = Column(String(10), nullable=False, comment="bieumau | hopdong")
+    external_id = Column(String(20), nullable=False, comment="id trên TVPL")
+    slug = Column(String(300), comment="Phần slug trong URL TVPL")
+    title = Column(Text, nullable=False)
+    url = Column(Text)
+
+    # Phân loại theo danh mục TVPL
+    form_type_code = Column(Integer, comment="Loại mẫu 1-13 (bieumau) | nhóm 1-24 (hopdong)")
+    form_type_name = Column(String(120))
+    field_code = Column(Integer, comment="Mã lĩnh vực 1-47 của trang biểu mẫu")
+    field_name = Column(String(120))
+    tvpl_field_code = Column(Integer, comment="Mã lĩnh vực 1-27 của trang văn bản")
+    tvpl_field_source = Column(
+        String(20), comment="chac | suy_dien — ánh xạ 47→27 phần lớn là suy đoán"
+    )
+
+    keywords = Column(Text, comment="JSON các từ khoá TVPL gắn cho mẫu")
+    updated_on = Column(Date, comment='Ngày "Cập nhật" TVPL hiển thị')
+
+    # File
+    body_html_path = Column(Text, comment="HTML gốc TVPL — nguồn nội bộ, KHÔNG đăng công khai")
+    body_md_path = Column(Text, comment="Markdown dựng lại — bản được đăng")
+    docx_path = Column(Text)
+    pdf_path = Column(Text)
+    body_hash = Column(
+        String(64),
+        comment="SHA-256 ruột mẫu: khoá cache phân loại LLM và cờ nội dung đã đổi",
+    )
+    body_chars = Column(Integer, comment="Độ dài ruột mẫu, để phát hiện trang hỏng")
+
+    # ── Phễu lọc doanh nghiệp (src/forms/relevance.py) ──
+    audience = Column(
+        String(20), comment="doanh_nghiep | co_quan_nha_nuoc | ca_nhan | khac"
+    )
+    # Tách nguồn khỏi kết luận, đúng như tvpl_field_source của bảng documents:
+    # quy tắc từ khoá và mô hình ngôn ngữ có độ tin cậy khác nhau, người đọc phải
+    # phân biệt được.
+    audience_source = Column(String(20), comment="quy_tac | llm | nguoi_duyet")
+    audience_confidence = Column(Float)
+    audience_reason = Column(Text, comment="Vì sao xếp vào nhóm đó — để soi lại")
+    nghiep_vu = Column(String(300), comment="JSON mã nhóm nghiệp vụ, tập đóng 12 nhóm")
+    is_business = Column(Boolean, comment="Có phục vụ hoạt động kinh doanh không")
+    excluded_reason = Column(String(120), comment="Lý do bị loại — để biết vì sao vắng")
+
+    # Trang công khai
+    public_slug = Column(String(180), unique=True, nullable=True)
+    published_hash = Column(
+        String(64), nullable=True, comment="SHA-256 bản đã đăng; NULL = chưa đăng"
+    )
+
+    crawl_status = Column(
+        String(20), nullable=False, default="OK",
+        comment="OK | EMPTY_BODY | FAILED — mẫu rỗng phải hiện ra, không lưu câm",
+    )
+    crawl_error = Column(Text)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        Index("idx_legal_forms_source", "source", "external_id"),
+        # Ba đường truy xuất chính: lọc mẫu doanh nghiệp, mở mục lục theo nghiệp
+        # vụ, và quét lại theo lĩnh vực khi hiệu chuẩn phễu.
+        Index("idx_legal_forms_business", "is_business", "audience"),
+        Index("idx_legal_forms_nghiep_vu", "nghiep_vu"),
+        Index("idx_legal_forms_field", "field_code"),
+        Index("idx_legal_forms_status", "crawl_status"),
+    )
+
+
+class LegalFormRef(Base):
+    """Căn cứ pháp lý của một biểu mẫu — bảng riêng vì quan hệ là nhiều-nhiều.
+
+    Trang /bieumau khai căn cứ thành một trường riêng, thường đúng một văn bản.
+    Trang /hopdong KHÔNG có trường đó: căn cứ nằm ngay trong ruột hợp đồng
+    ("Căn cứ Bộ luật Dân sự năm 2015 số 91/2015/QH13…") và thường có 2–4 cái.
+    Một cột text không chứa nổi, mà cũng không tra ngược được "văn bản này kéo
+    theo biểu mẫu nào" — thứ trang công khai cần để nối hai chiều.
+
+    `doc_key` rỗng là chuyện BÌNH THƯỜNG, không phải lỗi: kho mới có 4.467 văn
+    bản còn biểu mẫu dẫn tới cả những văn bản chưa cào. Các số hiệu đó được đẩy
+    sang crawl_frontier để kho lớn dần về phía phủ hết căn cứ.
+    """
+
+    __tablename__ = "legal_form_refs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    form_key = Column(String(120), nullable=False)
+    doc_num = Column(String(100), nullable=False, comment="Số hiệu như nguồn ghi")
+    doc_key = Column(
+        String(300), nullable=True, comment="FK mềm tới documents.doc_key khi kho đã có"
+    )
+    source = Column(
+        String(20), nullable=False,
+        comment="truong_can_cu | trong_ruot_mau — hai đường trích khác độ tin cậy",
+    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("idx_form_refs_unique", "form_key", "doc_num", unique=True),
+        Index("idx_form_refs_doc_num", "doc_num"),
+        Index("idx_form_refs_doc_key", "doc_key"),
+    )

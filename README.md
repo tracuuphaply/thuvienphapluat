@@ -13,6 +13,10 @@ dung đã sinh — xem [§ Trang công khai](#6-trang-công-khai).
 ```
 cào → Google Drive → vault Markdown → RAG (FTS5 + vector) → 3 loại báo cáo PDF
                                    ↘ trang tra cứu công khai (GitHub Pages)
+
+cào biểu mẫu → phễu 3 tầng (lĩnh vực → quy tắc → LLM) → DOCX/PDF dựng lại
+                                   ↘ lệnh Telegram /bieumau
+                                   ↘ trang tra cứu công khai
 ```
 
 ## Quy mô hiện tại
@@ -49,17 +53,23 @@ python -m scripts.compute_impact         # chấm điểm tác động 21 ngành
 python -m scripts.run_report_worker      # rút hàng đợi báo cáo
 python -m scripts.publish_site           # sinh nội dung trang công khai
 python -m scripts.gdrive_check           # kiểm kết nối Drive
+
+python -m scripts.crawl_forms --source hopdong   # cào 662 mẫu hợp đồng
+python -m scripts.crawl_forms --source bieumau   # cào biểu mẫu theo lĩnh vực
+python -m scripts.classify_forms                 # phễu lọc mẫu doanh nghiệp
+python -m scripts.build_forms                    # dựng DOCX + PDF
 ```
 
-Chạy tự động: `scripts/install_scheduler.sh` cài hai launchd agent — `run_daily.sh`
-(cào + báo cáo, hằng ngày) và `run_quarterly.sh` (báo cáo tổng hợp ngành, 1/1 · 1/4 ·
-1/7 · 1/10).
+Chạy tự động: `scripts/install_scheduler.sh` cài ba launchd agent — `run_daily.sh`
+(cào + báo cáo, hằng ngày), `run_weekly_forms.sh` (làm mới kho biểu mẫu, Chủ nhật) và
+`run_quarterly.sh` (báo cáo tổng hợp ngành, 1/1 · 1/4 · 1/7 · 1/10).
 
 ## Cấu trúc
 
 | Gói | Việc |
 |---|---|
-| `src/sources/` | Cào: RSS TVPL, API Bộ Tư pháp, tải `.docx` bằng Playwright |
+| `src/sources/` | Cào: RSS TVPL, API Bộ Tư pháp, tải `.docx` bằng Playwright, hai kho biểu mẫu |
+| `src/forms/` | Phễu lọc biểu mẫu doanh nghiệp, dựng lại DOCX/PDF, tìm kiếm |
 | `src/pipeline/` | Gộp trùng, truy vết bao đóng dẫn chiếu |
 | `src/legal/` | Dữ kiện pháp lý: thứ bậc văn bản, tỉnh thành (có sáp nhập 2025), cờ hiệu lực, 27 lĩnh vực TVPL |
 | `src/analysis/` | Chấm điểm tác động 21 ngành VSIC — đếm từ ràng buộc × liên quan ngành, phỏng theo RegData |
@@ -84,6 +94,10 @@ Drive. Telegram chỉ dùng để điều khiển báo cáo và nhận file.
 | `/xem <id>` | Chi tiết một báo cáo, kèm file PDF |
 | `/huy <id>` | Huỷ báo cáo còn đang chờ |
 | `/chay` | Chạy hàng đợi ngay, không đợi lịch |
+| `/bieumau` | Danh sách 12 nhóm nghiệp vụ kèm số lượng |
+| `/bieumau <từ khoá>` | Tìm biểu mẫu |
+| `/bieumau nhom <mã>` | Liệt kê cả nhóm nghiệp vụ |
+| `/bieumau <mã mẫu>` | Gửi file DOCX + PDF |
 
 Mọi lệnh đều **xếp hàng chứ không sinh báo cáo tại chỗ**, để cổng kiểm trích dẫn
 ở tầng worker không thể đi vòng. Báo cáo loại (c) không đặt tay được — hệ thống
@@ -120,6 +134,37 @@ Hai chốt chặn không được gỡ:
   xuất bản (`BLOCKED_CITATION`), không phải cảnh báo.
 - **Link và biểu đồ do code chèn, không để mô hình sinh.** URL do mô hình viết là URL
   bịa; biểu đồ do mô hình vẽ còn nguy hiểm hơn vì người đọc tin vào hình hơn chữ.
+
+## Kho biểu mẫu cho doanh nghiệp
+
+Nguồn: hai kho tách biệt của Thư viện Pháp luật — `/hopdong` (662 mẫu hợp đồng) và
+`/bieumau` (33.820 biểu mẫu). Không cần tài khoản TVPL: ruột biểu mẫu hiện với khách
+vãng lai. Vẫn cần Chrome thật vì Cloudflare chặn mọi thứ không phải điều hướng trình
+duyệt.
+
+**Chỉ giữ mẫu doanh nghiệp thật sự phải điền.** Lọc theo lĩnh vực là không đủ: 21 lĩnh
+vực nghi liên quan doanh nghiệp cộng lại đã 17.385 mẫu, mà riêng nhóm "Kế toán – Kiểm
+toán" chứa cả biểu quyết toán ngân sách của Kho bạc Nhà nước. Thứ phân biệt là **ai
+cầm bút điền**, nên phễu chạy ba tầng, mỗi tầng đắt hơn tầng trước:
+
+| Tầng | Cách làm | Chi phí |
+|---|---|---|
+| 1 | Whitelist 21 lĩnh vực | miễn phí |
+| 2 | Quy tắc từ khoá trên tiêu đề + khối đầu ruột mẫu | miễn phí |
+| 3 | Mô hình đọc khối đầu, trả nhãn `ai điền` + nhóm nghiệp vụ | 1 lượt gọi/mẫu, có cache |
+
+Tầng 2 chỉ kết luận khi CHẮC (một bên có điểm, bên kia bằng 0); mọi trường hợp lửng lơ
+đẩy lên tầng 3. Kết quả bám theo `body_hash` nên mỗi mẫu chỉ tốn một lượt gọi mô hình
+trong cả đời nó.
+
+**Đăng bản dựng lại, không đăng HTML của TVPL.** Ruột biểu mẫu là phụ lục của văn bản
+quy phạm — Điều 15 Luật Sở hữu trí tuệ loại khỏi đối tượng bảo hộ. Nhưng bản chuyển
+đổi sang HTML là công sức của TVPL, nên HTML gốc chỉ ở lại `data/forms/html/` làm
+nguyên liệu; thứ đăng ra ngoài là Markdown/DOCX/PDF dựng lại theo template nhà, luôn
+kèm khối ghi nguồn và link ngược.
+
+**DOCX là bản chính, PDF là bản phụ.** Biểu mẫu sinh ra để ĐIỀN; chỉ có PDF thì người
+dùng vẫn phải sang TVPL tải bản Word.
 
 ## 6. Trang công khai
 

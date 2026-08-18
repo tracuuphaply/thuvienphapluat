@@ -23,6 +23,15 @@ data/lark_cache.json
 data/moj_rejected.json
 data/tvpl_session.json
 data/tvpl_cookies.json
+# Kho biểu mẫu. html/ giữ HTML gốc của Thư viện Pháp luật làm nguyên liệu nội bộ
+# — 27 MB cho mới 67 mẫu, sẽ tới hàng trăm MB khi phủ hết kho, và tải lại được.
+# build/ là bản dựng lại, sinh ra được từ html/. Cả hai đều không thuộc về git.
+#
+# NGOẠI LỆ CÓ CHỦ ĐÍCH: năm trang thật ở tests/fixtures/forms/*.html.gz VẪN nằm
+# trong git (236 KB). Không có chúng thì bộ bóc HTML không test được nếu không có
+# mạng và không có Chrome, mà đó chính là chỗ đã sai bốn lần.
+data/forms/
+
 # Profile Chrome dùng cho CDP — chứa cookie đăng nhập và mật khẩu đã lưu
 # của trình duyệt. Không bao giờ đưa vào git.
 data/chrome_profile/

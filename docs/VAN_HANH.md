@@ -156,6 +156,53 @@ khi nâng/hạ trần, vì trần chỉ có ý nghĩa khi độ sâu trong kho l
 chặn `MIN_FREE_DISK_GB` dừng bao đóng trước khi đầy đĩa. Đừng đưa về 0: đầy ổ
 khởi động thì SQLite ghi hỏng giữa transaction.
 
+## Kho biểu mẫu
+
+Làm mới hằng tuần bằng `scripts/run_weekly_forms.sh` (launchd agent
+`vn.legalvault.weeklyforms`, Chủ nhật 5h). Bốn bước, đúng thứ tự:
+
+```bash
+python -m scripts.crawl_forms --source hopdong    # 662 mẫu hợp đồng
+python -m scripts.crawl_forms --source bieumau    # theo 21 lĩnh vực kinh doanh
+python -m scripts.classify_forms                  # phễu 3 tầng
+python -m scripts.build_forms                     # dựng DOCX + PDF
+```
+
+Phân loại trước, dựng file sau — dựng cho cả kho rồi mới biết phần lớn là báo cáo
+nội bộ của cơ quan nhà nước thì đã đốt công vô ích.
+
+### Bị Cloudflare chặn giữa chừng
+
+Chuyện bình thường. Bộ cào tự dừng sau 5 lần chặn liên tiếp (`MAX_BLOCKED_STREAK`)
+thay vì đốt hết danh sách — đo ngày 18/08/2026: sau ~67 trang thì bị chặn cứng, và
+bản không có cầu dao đã ghi ~600 dòng `FAILED` trong 40 phút mà không lấy được gì.
+
+Chạy lại chính lệnh đó để đi tiếp: trang đã tải nằm ở `data/forms/html/` và được
+**bóc lại từ đĩa**, không tải lại TVPL. Nếu vẫn bị chặn ngay từ đầu:
+
+- nghỉ 30–60 phút rồi thử lại
+- tăng `TVPL_RATE_LIMIT_SECONDS` (7 là mức an toàn, 3 thì bị chặn)
+- xuất lại cookie ra `data/tvpl_cookies.json` (xem HUONG_DAN_CHUYEN_GIAO §2.5)
+
+### Xem tình trạng kho
+
+```bash
+sqlite3 data/legal_docs.db \
+  "SELECT crawl_status, COUNT(*) FROM legal_forms GROUP BY 1;
+   SELECT audience, is_business, COUNT(*) FROM legal_forms GROUP BY 1,2;"
+```
+
+`crawl_status = EMPTY_BODY` nghĩa là trang tải được nhưng ruột mẫu rỗng — thường là
+dấu hiệu TVPL đổi markup. Chạy `python -m pytest tests/test_form_parse.py` để xác
+nhận: fixture ở `tests/fixtures/forms/` là bản sao trang thật, nếu test vẫn xanh mà
+kho vẫn rỗng thì markup mới khác fixture, cần lưu fixture mới.
+
+### Sửa bộ bóc rồi chạy lại mà không đụng TVPL
+
+HTML gốc nằm ở `data/forms/html/{form_key}.html`. `crawl_forms` bóc lại từ đó khi
+file đã có, nên sửa `src/sources/tvpl_forms_parse.py` rồi chạy lại là đủ. Dùng
+`--lam-lai` khi thật sự cần tải lại từ TVPL.
+
 ## Bảo trì dữ liệu
 
 ### Dò lại mã quan hệ của API Bộ Tư pháp

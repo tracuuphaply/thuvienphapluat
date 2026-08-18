@@ -35,7 +35,7 @@ from src.config import (
     TELEGRAM_ADMIN_CHAT_ID,
     DATA_DIR,
 )
-from src.notification import report_commands
+from src.notification import form_commands, report_commands
 from src.storage.database import get_session
 from src.rag.db_rag import RAGDatabase
 from src.rag.hybrid_search import hybrid_search
@@ -123,6 +123,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "*Báo cáo*\n"
         "📊 `/baocao` — Điều khiển báo cáo (đặt, xem, huỷ)\n"
         "🏢 `/nganh` — 21 mã ngành VSIC\n"
+        "📄 `/bieumau` — Tra cứu và tải biểu mẫu cho doanh nghiệp\n"
         "📋 `/hangdoi` — Báo cáo đang chờ và đã xong\n"
         "📄 `/xem <id>` — Chi tiết một báo cáo, tải PDF\n"
         "🗑️ `/huy <id>` — Huỷ báo cáo đang chờ\n"
@@ -220,6 +221,18 @@ async def baocao_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def nganh_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/nganh — 21 ngành VSIC."""
     await _tra_loi(update, report_commands.danh_sach_nganh())
+
+
+@restricted()
+async def bieumau_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/bieumau — tra cứu và tải biểu mẫu pháp lý cho doanh nghiệp.
+
+    Không xếp hàng như /baocao: biểu mẫu không có nội dung nào do mô hình sinh
+    ra, file đã dựng sẵn nằm trên đĩa nên gửi thẳng được.
+    """
+    with get_session() as session:
+        kq = form_commands.xu_ly(session, context.args)
+    await _tra_loi(update, kq)
 
 
 @restricted()
@@ -408,6 +421,7 @@ def main() -> None:
     # lệnh cũ im lặng biến mất thì trông như bot hỏng.
     app.add_handler(CommandHandler(["baocao", "report"], baocao_command))
     app.add_handler(CommandHandler(["nganh", "industries"], nganh_command))
+    app.add_handler(CommandHandler(["bieumau", "forms"], bieumau_command))
     app.add_handler(CommandHandler("hangdoi", hangdoi_command))
     app.add_handler(CommandHandler("xem", xem_command))
     app.add_handler(CommandHandler("huy", huy_command))

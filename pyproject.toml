@@ -23,6 +23,13 @@ dependencies = [
     "matplotlib>=3.8",
     # Tìm kiếm vector trong SQLite; thiếu thì hybrid search thoái hoá về BM25
     "sqlite-vec>=0.1.6",
+    # Bóc HTML biểu mẫu TVPL. Ruột mẫu do Aspose xuất từ Word: bảng lồng bảng,
+    # rowspan/colspan, mỗi chữ một thẻ <span> riêng. html.parser trần không dựng
+    # lại nổi cấu trúc bảng, mà bảng chính là toàn bộ nội dung của biểu mẫu.
+    "beautifulsoup4>=4.12",
+    # Xuất biểu mẫu ra .docx. Biểu mẫu sinh ra là để ĐIỀN — PDF không điền được,
+    # nên đây là định dạng người dùng thật sự cần, không phải tuỳ chọn.
+    "python-docx>=1.1",
 ]
 
 [project.optional-dependencies]

@@ -202,6 +202,21 @@ def summary_max_tokens() -> int:
     return int(os.getenv("SUMMARY_MAX_TOKENS", "3000"))
 
 
+def form_classifier_model() -> str:
+    """Model phân loại biểu mẫu (tầng 3 của phễu).
+
+    Để trống = dùng SUMMARY_MODEL. Đây là việc rẻ nhất trong hệ thống — đọc vài
+    trăm chữ rồi trả một nhãn — nhưng chạy tới hàng nghìn lượt, nên phải đặt
+    được model rẻ riêng thay vì kéo theo model sinh báo cáo.
+    """
+    return os.getenv("FORM_CLASSIFIER_MODEL", "") or summary_model()
+
+
+def form_classifier_max_tokens() -> int:
+    """Đầu ra là một khối JSON ngắn; 600 token là dư gấp nhiều lần."""
+    return int(os.getenv("FORM_CLASSIFIER_MAX_TOKENS", "600"))
+
+
 def report_prompt_path() -> str:
     return os.getenv("REPORT_PROMPT_PATH", "")
 
@@ -326,8 +341,16 @@ SNAPSHOTS_DIR = DATA_DIR / "snapshots"
 BACKUPS_DIR = DATA_DIR / "backups"
 LOGS_DIR = DATA_DIR / "logs"
 
+# Kho biểu mẫu. HTML gốc TVPL nằm riêng khỏi bản dựng lại: bản gốc chỉ là nguyên
+# liệu nội bộ và KHÔNG được đăng công khai, bản dựng lại thì có — để nhầm hai
+# thứ này vào một thư mục là sớm muộn cũng đẩy nhầm (xem README § Trang công khai).
+FORMS_DIR = DATA_DIR / "forms"
+FORMS_HTML_DIR = FORMS_DIR / "html"
+FORMS_BUILD_DIR = FORMS_DIR / "build"
+
 # Ensure directories exist
-for d in [TVPL_FILES_DIR, MOJ_FILES_DIR, SNAPSHOTS_DIR, BACKUPS_DIR, LOGS_DIR]:
+for d in [TVPL_FILES_DIR, MOJ_FILES_DIR, SNAPSHOTS_DIR, BACKUPS_DIR, LOGS_DIR,
+          FORMS_HTML_DIR, FORMS_BUILD_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 # ──────────────────────────────────────────────

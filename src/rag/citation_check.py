@@ -82,7 +82,7 @@ def _known_doc_nums(db_path: Path | None = None) -> set[str]:
         conn.close()
 
 
-def _fold_dau(s: str) -> str:
+def fold_dau(s: str) -> str:
     """Gỡ dấu tiếng Việt khỏi số hiệu để so khớp.
 
     Mô hình sinh báo cáo hay đánh rơi dấu Đ: viết "168/2025/ND-CP" thay vì
@@ -99,13 +99,17 @@ def _fold_dau(s: str) -> str:
                    if unicodedata.category(c) != "Mn")
 
 
+#: Tên cũ, giữ lại cho code và test đang import.
+_fold_dau = fold_dau
+
+
 def _norm_key(num: str) -> str:
     """Khoá so khớp: bỏ dấu tiếng Việt, hoa thường, và gộp dấu phân cách — để
 
     "89-2025-QH15", "89/2025/QH15" và "168/2025/ND-CP" ~ "168/2025/NĐ-CP" coi là
     một, tránh báo động giả.
     """
-    return _fold_dau(num).lower().replace("-", "/")
+    return fold_dau(num).lower().replace("-", "/")
 
 
 def check_citations(

@@ -1,0 +1,253 @@
+"""
+Phễu lọc "biểu mẫu phục vụ hoạt động kinh doanh" — hai tầng quy tắc.
+
+VÌ SAO LỌC THEO LĨNH VỰC LÀ KHÔNG ĐỦ. Cộng cả 21 lĩnh vực nghi là liên quan doanh
+nghiệp được 17.385 mẫu trên tổng 33.820 — quá nửa kho. Mà lĩnh vực "Kế toán –
+Kiểm toán" (1.220 mẫu) chứa cả biểu quyết toán ngân sách của Kho bạc Nhà nước lẫn
+báo cáo tài chính doanh nghiệp. Hai thứ đó cùng lĩnh vực, cùng loại mẫu, cùng cơ
+quan ban hành — không dấu hiệu phân loại nào tách được chúng.
+
+THỨ PHÂN BIỆT LÀ AI CẦM BÚT ĐIỀN. Biểu mẫu nào cũng tự khai điều đó ngay ở khối
+đầu ("Đơn vị báo cáo: Kho bạc Nhà nước", "Tên doanh nghiệp: …"). Phễu vì vậy chạy
+trên tiêu đề + khối đầu ruột mẫu, không chạy trên metadata.
+
+BA TẦNG, MỖI TẦNG ĐẮT HƠN TẦNG TRƯỚC:
+
+    1. whitelist lĩnh vực     ~17.385 / 33.820   miễn phí, ở module này
+    2. quy tắc từ khoá        cắt phần chắc chắn  miễn phí, ở module này
+    3. mô hình ngôn ngữ       phần còn lại        một lượt gọi/mẫu, ở classifier.py
+
+Tầng 2 chỉ được kết luận khi CHẮC — chắc giữ hoặc chắc loại. Mọi trường hợp lửng
+lơ phải đẩy lên tầng 3 chứ không đoán: quy tắc đoán sai thì không ai biết, còn
+đẩy lên tầng 3 chỉ tốn thêm ít tiền.
+
+Bộ đếm dùng `count_matches()` của src/analysis/lexicon.py chứ không dùng
+`if tu_khoa in van_ban`. Module đó ra đời từ đúng lỗi này: "nước" khớp cả "nhà
+nước" khiến một ngành ôm 97/314 văn bản. Ở đây hậu quả còn trực tiếp hơn — dấu
+hiệu LOẠI mà khớp nhầm là biểu mẫu doanh nghiệp bị vứt đi.
+"""
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass, field
+
+from src.analysis.lexicon import count_matches
+from src.legal.form_taxonomy import CO_QUAN_NHA_NUOC, DOANH_NGHIEP
+
+# ──────────────────────────────────────────────
+# Tầng 1 — whitelist lĩnh vực /bieumau
+# ──────────────────────────────────────────────
+#: 21 mã lĩnh vực của trang /bieumau (danh mục 47 nhóm, KHÔNG phải danh mục 27
+#: nhóm của trang văn bản). Số mẫu đo ngày 18/08/2026, tổng 17.385.
+#:
+#: LOẠI RA có chủ đích: 3 (bộ máy hành chính), 4 (bổ trợ tư pháp), 6 (cán bộ -
+#: công chức - viên chức), 12 (Đảng), 18 (giáo dục), 20 (hôn nhân - gia đình),
+#: 28 (quốc phòng - an ninh), 32 (thủ tục tố tụng), 34 (thi đua khen thưởng),
+#: 38 (trách nhiệm hình sự), 39 (tư pháp - hộ tịch), 40 (văn hoá - thể thao),
+#: 41 (văn thư lưu trữ), 45 (xuất nhập cảnh), 47 (y tế) — chủ doanh nghiệp không
+#: điền chúng để phục vụ kinh doanh.
+BIEU_MAU_BUSINESS_FIELDS: tuple[int, ...] = (
+    1,   # An toàn thực phẩm        248
+    2,   # Bảo hiểm                 635
+    7,   # Công nghệ thông tin    1.221
+    9,   # Chứng khoán            1.016
+    11,  # Doanh nghiệp             875
+    13,  # Đất đai – Nhà ở          592
+    14,  # Đấu thầu                 297
+    15,  # Đầu tư                   961
+    21,  # Kế toán – Kiểm toán    1.220
+    24,  # Lao động – Tiền lương  1.113
+    27,  # Phòng cháy chữa cháy      53
+    29,  # Sở hữu trí tuệ           265
+    30,  # Tài chính              1.599
+    31,  # Tài nguyên – Môi trường 1.647
+    33,  # Thủ tục hành chính       150
+    35,  # Thuế - Phí – Lệ phí    1.260
+    36,  # Thương mại             1.291
+    37,  # Tiền tệ - Ngân hàng    1.420
+    42,  # Vi phạm hành chính       269
+    44,  # Xây dựng - Đô thị        379
+    46,  # Xuất nhập khẩu           874
+)
+
+
+def linh_vuc_bieu_mau_kinh_doanh() -> frozenset[int]:
+    """Whitelist lĩnh vực, sau khi áp biến môi trường.
+
+    Dùng chung biến `BUSINESS_FIELD_CODES` với bộ lọc văn bản là SAI: hai bên
+    đánh mã khác nhau hoàn toàn. Biến riêng `FORM_FIELD_CODES` để người vận hành
+    đổi định nghĩa mà không vô tình đổi luôn phạm vi báo cáo.
+    """
+    raw = (os.getenv("FORM_FIELD_CODES", "") or "").strip()
+    if not raw:
+        return frozenset(BIEU_MAU_BUSINESS_FIELDS)
+    try:
+        codes = {int(x) for x in raw.replace(";", ",").split(",") if x.strip()}
+    except ValueError:
+        return frozenset(BIEU_MAU_BUSINESS_FIELDS)
+    return frozenset(codes) or frozenset(BIEU_MAU_BUSINESS_FIELDS)
+
+
+def la_linh_vuc_kinh_doanh(ma: int | None) -> bool:
+    return ma in linh_vuc_bieu_mau_kinh_doanh()
+
+
+# ──────────────────────────────────────────────
+# Tầng 2 — quy tắc từ khoá
+# ──────────────────────────────────────────────
+# Dấu hiệu LOẠI: mẫu do cơ quan nhà nước tự điền cho nội bộ bộ máy.
+#
+# Cố ý dùng CỤM ĐẦY ĐỦ chứ không dùng từ lẻ. "nhà nước" trần sẽ khớp cả "doanh
+# nghiệp nhà nước" — mà doanh nghiệp nhà nước chính là đối tượng phải điền biểu
+# mẫu kinh doanh. Một từ khoá quá rộng ở đây quét sạch cả nhóm mẫu hợp lệ.
+DAU_HIEU_LOAI: tuple[str, ...] = (
+    "kho bạc nhà nước",
+    "vụ ngân sách nhà nước",
+    "cơ quan nhà nước",
+    "ngân sách nhà nước",
+    "ngân sách trung ương",
+    "ngân sách địa phương",
+    "dự toán ngân sách",
+    "quyết toán ngân sách",
+    "đơn vị sự nghiệp công lập",
+    "công chức",
+    "viên chức",
+    "đảng viên",
+    "chi bộ",
+    "cấp uỷ",
+    "cấp ủy",
+    "ủy ban nhân dân",
+    "uỷ ban nhân dân",
+    "hội đồng nhân dân",
+    "quân nhân",
+    "quốc phòng",
+    "công an nhân dân",
+    "thi đua khen thưởng",
+    "học sinh",
+    "sinh viên",
+    "cơ sở giáo dục",
+    "bệnh viện",
+    "trạm y tế",
+    "hộ nghèo",
+    "người có công",
+)
+
+# Dấu hiệu GIỮ: chỉ dấu doanh nghiệp là bên điền.
+DAU_HIEU_GIU: tuple[str, ...] = (
+    "doanh nghiệp",
+    "công ty cổ phần",
+    "công ty trách nhiệm hữu hạn",
+    "hộ kinh doanh",
+    "hợp tác xã",
+    "người sử dụng lao động",
+    "người lao động",
+    "hợp đồng lao động",
+    "đăng ký doanh nghiệp",
+    "đăng ký kinh doanh",
+    "giấy chứng nhận đăng ký",
+    "chi nhánh",
+    "văn phòng đại diện",
+    "địa điểm kinh doanh",
+    "mã số thuế",
+    "hoá đơn",
+    "hóa đơn",
+    "tờ khai thuế",
+    "báo cáo tài chính",
+    "vốn điều lệ",
+    "cổ đông",
+    "thành viên góp vốn",
+    "tờ khai hải quan",
+    "xuất khẩu",
+    "nhập khẩu",
+    "nhãn hiệu",
+    "kinh doanh",
+)
+
+#: Tiêu đề nói lên chủ đề rõ hơn nhiều so với một lần xuất hiện đâu đó trong
+#: ruột mẫu — cùng tỉ lệ trọng số mà industry_classifier.py đã dùng.
+TRONG_SO_TIEU_DE = 3
+TRONG_SO_RUOT = 1
+
+#: Điểm tối thiểu để tầng 2 dám kết luận. Bằng đúng một lần khớp ở TIÊU ĐỀ, hoặc
+#: ba lần khớp trong ruột mẫu.
+NGUONG_CHAC = 3
+
+#: Chỉ đọc phần đầu ruột mẫu. Khối tự khai ("Đơn vị báo cáo: …") luôn nằm ở đây,
+#: còn phần thân đầy chỗ điền trống không nói lên ai điền.
+KY_TU_DAU_RUOT = 1500
+
+QUY_TAC = "quy_tac"
+CAN_HOI_LLM = "can_hoi_llm"
+
+
+@dataclass
+class KetQuaQuyTac:
+    """Kết luận của tầng 2. `audience` rỗng nghĩa là phải hỏi tầng 3."""
+
+    audience: str | None = None
+    diem_giu: int = 0
+    diem_loai: int = 0
+    dau_hieu_giu: list[str] = field(default_factory=list)
+    dau_hieu_loai: list[str] = field(default_factory=list)
+
+    @property
+    def chac_chan(self) -> bool:
+        return self.audience is not None
+
+    def ly_do(self) -> str:
+        if self.audience == DOANH_NGHIEP:
+            return "quy tắc — dấu hiệu doanh nghiệp: " + ", ".join(self.dau_hieu_giu[:4])
+        if self.audience == CO_QUAN_NHA_NUOC:
+            return "quy tắc — dấu hiệu cơ quan nhà nước: " + ", ".join(
+                self.dau_hieu_loai[:4])
+        return (
+            f"quy tắc không chắc (giữ {self.diem_giu} / loại {self.diem_loai}) "
+            f"— chuyển sang mô hình"
+        )
+
+
+def _cham_diem(tu_khoa: tuple[str, ...], tieu_de: str,
+               ruot: str) -> tuple[int, list[str]]:
+    diem = 0
+    trung: list[str] = []
+    for kw in tu_khoa:
+        o_tieu_de = count_matches(kw, tieu_de)
+        o_ruot = count_matches(kw, ruot)
+        if not (o_tieu_de or o_ruot):
+            continue
+        # Ruột mẫu chỉ tính MỘT lần cho mỗi từ khoá: một biểu mẫu nhắc "doanh
+        # nghiệp" 50 lần không vì thế mà thuộc về doanh nghiệp hơn.
+        diem += o_tieu_de * TRONG_SO_TIEU_DE + min(1, o_ruot) * TRONG_SO_RUOT
+        trung.append(kw)
+    return diem, trung
+
+
+def quyet_dinh_quy_tac(tieu_de: str, ruot_text: str = "") -> KetQuaQuyTac:
+    """Tầng 2. Chỉ kết luận khi một bên có điểm còn bên kia bằng 0.
+
+    "Một bên bằng 0" là điều kiện khắt khe có chủ đích. Mẫu vừa nhắc "doanh
+    nghiệp" vừa nhắc "cơ quan nhà nước" là mẫu thật sự nhập nhằng — ví dụ mẫu báo
+    cáo mà cơ quan gửi VỀ doanh nghiệp. Đoán ở đó là đoán sai, phải để mô hình
+    đọc.
+    """
+    td = (tieu_de or "").lower()
+    ruot = (ruot_text or "")[:KY_TU_DAU_RUOT].lower()
+
+    diem_loai, dh_loai = _cham_diem(DAU_HIEU_LOAI, td, ruot)
+    diem_giu, dh_giu = _cham_diem(DAU_HIEU_GIU, td, ruot)
+
+    kq = KetQuaQuyTac(diem_giu=diem_giu, diem_loai=diem_loai,
+                      dau_hieu_giu=dh_giu, dau_hieu_loai=dh_loai)
+    if diem_loai >= NGUONG_CHAC and diem_giu == 0:
+        kq.audience = CO_QUAN_NHA_NUOC
+    elif diem_giu >= NGUONG_CHAC and diem_loai == 0:
+        kq.audience = DOANH_NGHIEP
+    return kq
+
+
+__all__ = [
+    "BIEU_MAU_BUSINESS_FIELDS", "DAU_HIEU_LOAI", "DAU_HIEU_GIU",
+    "NGUONG_CHAC", "KY_TU_DAU_RUOT", "QUY_TAC", "CAN_HOI_LLM",
+    "KetQuaQuyTac", "linh_vuc_bieu_mau_kinh_doanh", "la_linh_vuc_kinh_doanh",
+    "quyet_dinh_quy_tac",
+]

@@ -21,7 +21,7 @@ import logging
 from pathlib import Path
 
 from src.config import PROJECT_ROOT
-from src.publish import moc_static, site_exporter
+from src.publish import form_exporter, moc_static, site_exporter
 from src.storage.database import get_session, init_db
 
 logger = logging.getLogger(__name__)
@@ -71,6 +71,22 @@ def main() -> None:
             return
 
         out_dir.mkdir(parents=True, exist_ok=True)
+
+        # BIỂU MẪU ĐĂNG TRƯỚC VĂN BẢN — thứ tự này quan trọng, không phải tuỳ ý.
+        # `export_forms()` là nơi gán `LegalForm.public_slug`, mà mục "Biểu mẫu
+        # kèm theo" trên trang văn bản chỉ liệt kê mẫu ĐÃ có slug (link tới trang
+        # chưa tồn tại là link gãy). Đăng văn bản trước thì mọi trang văn bản đều
+        # ghi "chưa ghi nhận biểu mẫu nào" dù quan hệ đã có trong kho — lỗi đã
+        # gặp thật, và nó im lặng vì câu chữ đó cũng là câu chữ hợp lệ.
+        #
+        # Bộ riêng chứ không dùng chung khuôn: trang biểu mẫu đăng NỘI DUNG (bản
+        # dựng lại của mình), trang văn bản chỉ đăng dữ kiện.
+        form_stats = form_exporter.export_forms(
+            session, out_dir, site_exporter.build_slug_index(session)
+        )
+        so_file = form_exporter.sao_chep_file_tai_ve(session, out_dir)
+        session.flush()
+
         stats = site_exporter.export_documents(
             session, out_dir, version, only_vbqppl=not args.all
         )
@@ -80,6 +96,10 @@ def main() -> None:
     print("\n=== Kết quả ===")
     for k, v in stats.as_dict().items():
         print(f"  {k:16} {v}")
+    print("  --- biểu mẫu ---")
+    for k, v in form_stats.as_dict().items():
+        print(f"  {k:16} {v}")
+    print(f"  {'file tai ve':16} {so_file}")
     print(f"\nNội dung đã sẵn ở: {out_dir}")
     print("Đưa lên trang công khai:")
     print("  cp -r %s/content ~/Downloads/legal-vault-public/" % out_dir)

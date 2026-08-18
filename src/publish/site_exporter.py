@@ -94,6 +94,10 @@ tags: {tags}
 
 {references_md}
 
+## Biểu mẫu kèm theo
+
+{bieu_mau_md}
+
 ## Nguồn gốc
 
 {sources_md}
@@ -154,6 +158,35 @@ def _impact_table(rows: list[dict]) -> str:
         for r in rows
     )
     return IMPACT_NOTE + body
+
+
+def _bieu_mau_kem_theo(session, doc: Document) -> str:
+    """Biểu mẫu mà kho ghi nhận là kèm theo văn bản này.
+
+    Đây là chiều ngược của quan hệ căn cứ: người đọc biết một Thông tư bắt nộp
+    báo cáo, và cái họ cần tiếp theo là ĐÚNG tờ mẫu ấy — không phải đi tìm lại từ
+    đầu. Nối theo `doc_key` chứ không theo số hiệu: số hiệu trùng giữa các tỉnh
+    nên nối theo số hiệu sẽ gắn biểu mẫu vào văn bản của địa phương khác.
+
+    Chỉ liệt kê mẫu đã đăng (`public_slug` có giá trị): link tới trang chưa tồn
+    tại là link gãy, tệ hơn không có link.
+    """
+    from src.storage.models import LegalForm, LegalFormRef
+
+    rows = (
+        session.query(LegalForm)
+        .join(LegalFormRef, LegalFormRef.form_key == LegalForm.form_key)
+        .filter(LegalFormRef.doc_key == doc.doc_key)
+        .filter(LegalForm.is_business.is_(True))
+        .filter(LegalForm.public_slug.isnot(None))
+        .order_by(LegalForm.title)
+        .all()
+    )
+    if not rows:
+        return "*Chưa ghi nhận biểu mẫu nào kèm theo văn bản này.*"
+    return "\n".join(
+        f"- [[{f.public_slug}|{_short(f.title or f.form_key, 90)}]]" for f in rows
+    )
 
 
 def _sources(doc: Document) -> str:
@@ -277,6 +310,7 @@ def render_page(session, doc: Document, impacts: list[dict],
         disclaimer=DISCLAIMER,
         impact_table=_impact_table(impacts),
         references_md=_references(session, doc, slug_by_num),
+        bieu_mau_md=_bieu_mau_kem_theo(session, doc),
         sources_md=_sources(doc),
     )
 

@@ -414,6 +414,91 @@ def _m012_slug_chu_thuong(conn: Connection) -> None:
     conn.execute(text("UPDATE documents SET published_hash = NULL"))
 
 
+def _m013_legal_forms(conn: Connection) -> None:
+    """Kho biểu mẫu pháp lý và bảng căn cứ của chúng.
+
+    `form_key` = "{source}-{external_id}" chứ không phải id trần: id TVPL chỉ
+    duy nhất trong MỘT kho, /bieumau/46696 và /hopdong/46696 là hai mẫu khác
+    nhau. Đây đúng bài học của doc_key — ràng buộc UNIQUE đặt sai chỗ thì bản
+    thứ hai bị coi là "đã biết" và bị nuốt im lặng.
+
+    Bảng refs tách riêng vì quan hệ biểu mẫu ↔ căn cứ là nhiều-nhiều: mẫu hợp
+    đồng dẫn 2–4 luật ngay trong ruột. `doc_key` để rỗng được — kho văn bản chưa
+    phủ hết căn cứ của biểu mẫu, và biểu mẫu không được chờ điều đó mới tồn tại.
+    """
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS legal_forms (
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            form_key            VARCHAR(120) NOT NULL UNIQUE,
+            source              VARCHAR(10)  NOT NULL,
+            external_id         VARCHAR(20)  NOT NULL,
+            slug                VARCHAR(300),
+            title               TEXT NOT NULL,
+            url                 TEXT,
+            form_type_code      INTEGER,
+            form_type_name      VARCHAR(120),
+            field_code          INTEGER,
+            field_name          VARCHAR(120),
+            tvpl_field_code     INTEGER,
+            tvpl_field_source   VARCHAR(20),
+            keywords            TEXT,
+            updated_on          DATE,
+            body_html_path      TEXT,
+            body_md_path        TEXT,
+            docx_path           TEXT,
+            pdf_path            TEXT,
+            body_hash           VARCHAR(64),
+            body_chars          INTEGER,
+            audience            VARCHAR(20),
+            audience_source     VARCHAR(20),
+            audience_confidence REAL,
+            audience_reason     TEXT,
+            nghiep_vu           VARCHAR(300),
+            is_business         BOOLEAN,
+            excluded_reason     VARCHAR(120),
+            public_slug         VARCHAR(180) UNIQUE,
+            published_hash      VARCHAR(64),
+            crawl_status        VARCHAR(20) NOT NULL DEFAULT 'OK',
+            crawl_error         TEXT,
+            created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """))
+    for ddl in (
+        "CREATE INDEX IF NOT EXISTS idx_legal_forms_source "
+        "ON legal_forms(source, external_id)",
+        "CREATE INDEX IF NOT EXISTS idx_legal_forms_business "
+        "ON legal_forms(is_business, audience)",
+        "CREATE INDEX IF NOT EXISTS idx_legal_forms_nghiep_vu "
+        "ON legal_forms(nghiep_vu)",
+        "CREATE INDEX IF NOT EXISTS idx_legal_forms_field "
+        "ON legal_forms(field_code)",
+        "CREATE INDEX IF NOT EXISTS idx_legal_forms_status "
+        "ON legal_forms(crawl_status)",
+    ):
+        conn.execute(text(ddl))
+
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS legal_form_refs (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            form_key   VARCHAR(120) NOT NULL,
+            doc_num    VARCHAR(100) NOT NULL,
+            doc_key    VARCHAR(300),
+            source     VARCHAR(20)  NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """))
+    for ddl in (
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_form_refs_unique "
+        "ON legal_form_refs(form_key, doc_num)",
+        "CREATE INDEX IF NOT EXISTS idx_form_refs_doc_num "
+        "ON legal_form_refs(doc_num)",
+        "CREATE INDEX IF NOT EXISTS idx_form_refs_doc_key "
+        "ON legal_form_refs(doc_key)",
+    ):
+        conn.execute(text(ddl))
+
+
 MIGRATIONS: list[Migration] = [
     Migration("001_legacy_document_columns",
               "Các cột documents từng thêm bằng vòng lặp hardcode",
@@ -451,6 +536,9 @@ MIGRATIONS: list[Migration] = [
     Migration("012_slug_chu_thuong",
               "Hạ chữ thường public_slug để khớp đường dẫn Quartz phát ra",
               _m012_slug_chu_thuong),
+    Migration("013_legal_forms",
+              "Kho biểu mẫu pháp lý (/bieumau, /hopdong) và căn cứ của chúng",
+              _m013_legal_forms),
 ]
 
 
