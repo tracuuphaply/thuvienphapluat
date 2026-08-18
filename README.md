@@ -187,6 +187,33 @@ cứ — con số đó sẽ giảm khi kho lớn lên, và `src/main.py` bước
 Mẫu bị TVPL gỡ khỏi trang liệt kê được gắn `delisted_at` và cảnh báo riêng: nguồn đã
 bỏ nó thì bản đã tải chỉ còn giá trị tra cứu, không nên dùng để nộp.
 
+## Trang trợ lý pháp lý
+
+Ứng dụng tĩnh riêng ở `/tro-ly/`, **thêm mới chứ không thay Quartz** — URL
+`/van-ban/*` đã phát ra trong báo cáo PDF nên không được đổi.
+
+Bố cục ba cột học từ [thuvien-vbpl-26.web.app](https://thuvien-vbpl-26.web.app):
+nav lĩnh vực (navy) · danh mục (giấy) · nội dung (trắng), cộng panel nguồn trích
+dẫn bên phải. Bảng màu navy `#1b3a5c` + son `#a1342c` + vàng `#c8a33c` + giấy
+`#f5f1e8` là bảng màu tài liệu hành chính, không phải bảng màu SaaS.
+
+**Hỏi đáp có trích dẫn kiểm chứng được.** Gọi `POST /chat` theo hợp đồng SSE của
+[R2AI2026](https://github.com/…): `sub_queries → retrieval → context_ready →
+tool_call → answer`. Mỗi số `[N]` trong câu trả lời là **thẻ bấm được** — bấm là mở
+panel với đúng đoạn nguồn. Chưa cấu hình API thì chạy **chế độ thử**: tra trong kho
+và trả về tài liệu khớp, KHÔNG gọi mô hình và KHÔNG bịa câu trả lời pháp lý.
+Endpoint cấu hình ở nút ⚙️, lưu trong `localStorage`.
+
+**Dữ liệu riêng, không dùng `contentIndex.json` của Quartz.** Đo ngày 19/08/2026:
+
+| | thô | gzip | parse |
+|---|---:|---:|---|
+| `contentIndex.json` (Quartz) | 17,42 MB | 1,72 MB | 3 bên cùng parse |
+| `tro-ly/du-lieu.json` | 1,50 MB | 0,28 MB | 1 lần |
+
+77% của contentIndex là trường `content` — toàn văn từng trang, chỉ để tìm kiếm.
+Bộ này chỉ mang metadata cần để lọc và tra.
+
 ## 6. Trang công khai
 
 Repo riêng: **[minhle2412/legal-vault-public](https://github.com/minhle2412/legal-vault-public)**

@@ -21,12 +21,13 @@ import logging
 from pathlib import Path
 
 from src.config import PROJECT_ROOT
-from src.publish import form_exporter, moc_static, site_exporter
+from src.publish import assistant_export, form_exporter, moc_static, site_exporter
 from src.storage.database import get_session, init_db
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_OUT = PROJECT_ROOT / "build" / "public-vault" / "content"
+TRO_LY_DIR = "tro-ly"
 
 
 def main() -> None:
@@ -91,6 +92,14 @@ def main() -> None:
             session, out_dir, version, only_vbqppl=not args.all
         )
         stats.mocs = moc_static.export_indexes(session, out_dir, version)
+
+        # Trang trợ lý là ứng dụng tĩnh RIÊNG, không phải trang Quartz — nó nằm
+        # cạnh `content/` chứ không ở trong. Lý do: Quartz copy .json từ content
+        # nhưng KHÔNG copy .html (đã thử), và một ứng dụng toàn màn hình thì
+        # không dùng được khung trang của Quartz.
+        tro_ly_dir = out_dir.parent / TRO_LY_DIR
+        tk_troly = assistant_export.xuat_du_lieu(session, tro_ly_dir)
+        assistant_export.chep_ung_dung(tro_ly_dir)
         session.commit()
 
     print("\n=== Kết quả ===")
@@ -100,9 +109,13 @@ def main() -> None:
     for k, v in form_stats.as_dict().items():
         print(f"  {k:16} {v}")
     print(f"  {'file tai ve':16} {so_file}")
+    print('  --- trang trợ lý ---')
+    for k, v in tk_troly.as_dict().items():
+        print(f'  {k:16} {v}')
     print(f"\nNội dung đã sẵn ở: {out_dir}")
     print("Đưa lên trang công khai:")
-    print("  cp -r %s/content ~/Downloads/legal-vault-public/" % out_dir)
+    print("  cp -r %s/. ~/Downloads/legal-vault-public/content/" % out_dir)
+    print("  cp -r %s ~/Downloads/legal-vault-public/" % (out_dir.parent / "tro-ly"))
     print("  cd ~/Downloads/legal-vault-public && git add -A "
           "&& git commit -m 'Cập nhật nội dung' && git push")
     print("\nGitHub Actions tự dựng lại trang. Xem docs/VIEC_CAN_BAN_LAM.md "
