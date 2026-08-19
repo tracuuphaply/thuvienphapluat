@@ -174,20 +174,35 @@ def _khoi_meta(form: LegalForm, nghiep_vu: list[str]) -> str:
 def _khoi_tai_ve(form: LegalForm) -> str:
     """Link tải. DOCX đứng trước: biểu mẫu là để ĐIỀN, PDF không điền được.
 
-    Bản Word ưu tiên GOOGLE DRIVE khi đã tải lên. Bản kèm trong repo vẫn giữ
-    nguyên làm đường dự phòng — Drive xem trước được ngay trên trình duyệt và
-    tải về được, còn file trong repo thì tuỳ trình duyệt mà mở hay tải.
+    Bản Word ưu tiên GOOGLE DRIVE khi đã tải lên: Drive xem trước được ngay trên
+    trình duyệt và tải về được, còn file trong repo thì tuỳ trình duyệt mà mở hay
+    tải.
+
+    NHƯNG BẢN TRONG REPO VẪN PHẢI CÓ LINK, kể cả khi đã có Drive. Nó là bản dự
+    phòng duy nhất nằm ngoài tầm với của một tài khoản Google — link Drive hỏng
+    vì đổi quyền, quá hạn mức hay xoá nhầm thì trang mất sạch đường tải bản Word,
+    mà đó chính là bản người ta cần (PDF không điền được). Có lúc `sao_chep_file_tai_ve()`
+    vẫn chép đủ 653 file .docx sang repo công khai trong khi hàm này thôi trỏ tới
+    chúng: 26,8 MB nằm đó không ai tới được thì không còn là bản lưu, chỉ là rác.
+    Nên nó xuống dòng phụ, chữ nghiêng, nói rõ dùng khi nào — không đứng ngang
+    hàng bắt người đọc phải chọn giữa hai bản y hệt nhau.
     """
     dong = []
+    docx = Path(form.docx_path) if form.docx_path else None
+    co_docx = bool(docx and docx.exists())
+    pdf = Path(form.pdf_path) if form.pdf_path else None
+
     if form.gdrive_docx_link:
         dong.append(f"- [Bản Word (.docx) — điền được]({form.gdrive_docx_link}) "
                     "*(Google Drive)*")
-    for nhan, duong_dan in (
-            (None if form.gdrive_docx_link else "Bản Word (.docx) — điền được",
-             form.docx_path),
-            ("Bản PDF — để in", form.pdf_path)):
-        if nhan and duong_dan and Path(duong_dan).exists():
-            dong.append(f"- [{nhan}](./{Path(duong_dan).name})")
+    elif co_docx:
+        dong.append(f"- [Bản Word (.docx) — điền được](./{docx.name})")
+    if pdf and pdf.exists():
+        dong.append(f"- [Bản PDF — để in](./{pdf.name})")
+    if form.gdrive_docx_link and co_docx:
+        dong.append(f"- *Bản lưu trong kho trang: [{docx.name}](./{docx.name}) "
+                    "— dùng khi link Drive ở trên không mở được.*")
+
     if not dong:
         return ("*Chưa dựng được file tải về cho biểu mẫu này. "
                 "Nội dung đầy đủ vẫn ở phần dưới.*")
@@ -381,6 +396,12 @@ def sao_chep_file_tai_ve(session, out_dir: Path) -> int:
 
     Chép chứ không link tượng trưng: trang công khai được đẩy sang một repo
     KHÁC, mà link tượng trưng thì không đi qua git sang repo đó.
+
+    RÀNG BUỘC ĐI KÈM: mọi file hàm này chép sang đều phải có một link trỏ tới nó
+    trong `_khoi_tai_ve()`. Hai hàm nằm cạnh nhau nhưng độc lập, nên sửa bên kia
+    mà quên bên này là file lặng lẽ thành mồ côi — nằm trong repo công khai, tính
+    vào dung lượng clone, không trang nào tới được. Đã xảy ra một lần với 653 file
+    .docx; test `test_moi_file_chep_sang_deu_co_duong_toi_tu_trang` giữ chốt này.
     """
     import shutil
 

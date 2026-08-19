@@ -112,8 +112,19 @@ class TestTrangBieuMau:
         master_session.commit()
         khoi = form_exporter._khoi_tai_ve(form_da_dung)
         assert "drive.google.com/file/d/1AbC_dEf-2345" in khoi
-        assert "hopdong-46696.docx" not in khoi     # không nhân đôi cùng một bản
+        assert khoi.index("drive.google.com") < khoi.index("hopdong-46696.docx")
         assert "hopdong-46696.pdf" in khoi          # PDF vẫn lấy từ repo
+
+    def test_ban_repo_van_co_link_khi_da_co_drive(self, master_session, form_da_dung):
+        """Bản .docx trong repo là dự phòng cho link Drive — nhưng chỉ dự phòng
+        được khi TỚI ĐƯỢC. Có lúc trang thôi trỏ tới nó mà bộ chép vẫn chép: 653
+        file .docx (26,8 MB) nằm trong repo công khai không ai tới được, tính vào
+        dung lượng clone mà không cứu được ai lúc link Drive hỏng."""
+        form_da_dung.gdrive_docx_link = "https://drive.google.com/file/d/1AbC_dEf-2345/view"
+        master_session.commit()
+        khoi = form_exporter._khoi_tai_ve(form_da_dung)
+        assert "(./hopdong-46696.docx)" in khoi
+        assert "kho trang" in khoi
 
     def test_chua_tai_len_drive_thi_van_dung_ban_trong_repo(self, master_session, form_da_dung):
         khoi = form_exporter._khoi_tai_ve(form_da_dung)
@@ -196,6 +207,27 @@ class TestXuatCaKho:
         out = tmp_path / "content"
         assert form_exporter.sao_chep_file_tai_ve(master_session, out) == 2
         assert (out / "bieu-mau" / "hopdong-46696.docx").exists()
+
+    def test_moi_file_chep_sang_deu_co_duong_toi_tu_trang(self, master_session,
+                                                          form_da_dung, tmp_path):
+        """Chép file sang repo công khai và trỏ link tới nó là hai hàm KHÁC nhau.
+
+        Sửa một bên mà quên bên kia thì file thành mồ côi trong im lặng — không
+        có gì hỏng, không có gì báo, chỉ có dung lượng repo phình ra vì những
+        file không trang nào tới được. Chốt ở đây để lần sau kêu lên.
+        """
+        form_da_dung.gdrive_docx_link = "https://drive.google.com/file/d/1AbC_dEf-2345/view"
+        master_session.commit()
+        out = tmp_path / "content"
+        form_exporter.export_forms(master_session, out)
+        form_exporter.sao_chep_file_tai_ve(master_session, out)
+
+        forms_dir = out / "bieu-mau"
+        trang = "\n".join(p.read_text(encoding="utf-8")
+                          for p in forms_dir.glob("*.md"))
+        mo_coi = [f.name for f in forms_dir.iterdir()
+                  if f.suffix in (".docx", ".pdf") and f.name not in trang]
+        assert not mo_coi, f"chép sang nhưng không trang nào trỏ tới: {mo_coi}"
 
     def test_xoa_trang_mo_coi(self, master_session, form_da_dung, tmp_path):
         out = tmp_path / "content"
