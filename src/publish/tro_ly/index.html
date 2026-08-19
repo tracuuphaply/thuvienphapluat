@@ -241,8 +241,13 @@ body[data-cotd=false] .mnav button[data-cot=col3]{display:none}
    là bắt họ mất mạch mỗi lần kiểm một nguồn. */
 /* Sơ đồ trích dẫn: cao cố định, không co giãn. Nó là phần phụ chú cho danh
    sách thẻ bên dưới, nên không được lấn chỗ của danh sách. */
+/* `.sodo.td-sodo` chứ không phải `.td-sodo`: quy tắc chung `.sodo canvas` đặt
+   height 360px và có CÙNG độ đặc hiệu (0,1,1), mà nó nằm sau trong file nên nó
+   thắng. Hệ quả đã gặp: canvas cao 360 px nằm trong hộp 215 px, phần dưới bị
+   `overflow:hidden` cắt mất — nhìn ra y như sơ đồ không tự khớp khung, trong
+   khi phép khớp vẫn chạy đúng trên một khung mà nó tưởng là cao 360. */
 .td-sodo{flex:0 0 auto;height:215px;margin:0 10px 9px}
-.td-sodo canvas{height:100%}
+.sodo.td-sodo canvas{height:100%}
 /* Khung 324 px không đủ chỗ cho dòng hướng dẫn thao tác — nó xuống hai dòng và
    che mất phần dưới sơ đồ. Cùng nội dung đã có ở sơ đồ nền và sơ đồ popup. */
 .td-sodo .ghi .goi{display:none}
@@ -1378,7 +1383,9 @@ function sdVua() {
   for (let i = 0; i < n; i++) t[i] = SD.y[i];
   t.sort();
   let y0 = t[q - 1], y1 = t[n - q];
-  const le = 30;
+  /* Lề co theo cỡ khung. 30 px cố định là 5% của khung nền 650 px nhưng tới
+     14% của khung trích dẫn 213 px — cùng một con số, hai ý nghĩa khác hẳn. */
+  const le = Math.max(10, Math.min(30, Math.min(SD.W, SD.H) * .1));
   /* Bao đóng đo ĐỐI XỨNG QUANH GỐC, không phải hộp bao thật. Nút đang mở được
      ghim ở gốc, nên lấy tâm hộp bao thật là đặt trọng tâm đám mây vào giữa
      khung và đẩy chính văn bản đang đọc ra rìa — đã thấy đúng như vậy.
@@ -1396,7 +1403,12 @@ function sdVua() {
      vẫn trong khung, nhưng "văn bản này nằm ở đâu" đọc rõ hơn khi nó ở giữa.
      Lấy hẳn gốc thì hộp phải mở đối xứng và mạng co lại còn nửa khung.
      Nửa đường: nửa vòng bao vẫn tính từ tâm ĐÃ CHỌN nên không nút nào bị cắt. */
-  const cxw = (x0 + x1) / 4, cyw = (y0 + y1) / 4;
+  /* Sơ đồ trích dẫn lấy ĐÚNG tâm hộp bao, không dung hoà về gốc. Việc dung hoà
+     có ý nghĩa khi nút ghim là văn bản người dùng đang đọc — phải giữ nó gần
+     giữa khung. Ở đây nút ghim chỉ là cái nối nhiều nhất trong tập, không có
+     vai trò riêng, nên đổi nửa khung trống lấy nó là lỗ. */
+  const gh = SD.tapChoSan ? 2 : 4;
+  const cxw = (x0 + x1) / gh, cyw = (y0 + y1) / gh;
   const hx = Math.max(cxw - x0, x1 - cxw, 1), hy = Math.max(cyw - y0, y1 - cyw, 1);
   const z = Math.min(40, Math.max(.02,
     Math.min((SD.W - le * 2) / (hx * 2), (SD.H - le * 2) / (hy * 2))));
