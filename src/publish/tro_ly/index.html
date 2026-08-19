@@ -401,7 +401,7 @@ dialog.cfg small{display:block;color:var(--fg-3);font-size:12.5px;margin-top:5px
 
     <div class="loc">
       <select id="loc-lv"><option value="">Mọi lĩnh vực</option></select>
-      <select id="loc-hl"><option value="">Mọi hiệu lực</option></select>
+      <select id="loc-hl"><option value="con_hieu_luc">Còn hiệu lực</option></select>
       <select id="loc-cap"><option value="">Mọi cấp</option></select>
     </div>
 
@@ -571,10 +571,19 @@ async function nap() {
 
 function dungLoc() {
   const hl = $("#loc-hl"), cap = $("#loc-cap");
-  hl.innerHTML = '<option value="">Mọi hiệu lực</option>';
+  /* KHÔNG có mục "Mọi hiệu lực", và "Còn hiệu lực" là mặc định.
+     Kho có 4.201 văn bản mà phần lớn đã hết hiệu lực; trộn chung thì danh sách
+     mở ra toàn văn bản chết, và với một trang pháp lý thì văn bản chết đứng
+     trước là dẫn người đọc đi sai. Muốn xem trạng thái khác thì chọn thẳng
+     trạng thái đó — không mục nào bị mất, chỉ không còn mục gộp.
+     Ô tra cứu vẫn KHÔNG chịu bộ lọc này: gõ đúng số hiệu một văn bản đã hết
+     hiệu lực thì phải ra nó, không thì người dùng tưởng kho không có. */
+  hl.innerHTML = "";
   const bang = S.kho === "bieu_mau" ? S.d.hieu_luc_bm : S.d.hieu_luc_vb;
   for (const [ma, ten] of Object.entries(bang))
-    hl.insertAdjacentHTML("beforeend", `<option value="${ma}">${esc(ten)}</option>`);
+    hl.insertAdjacentHTML("beforeend",
+      `<option value="${ma}"${ma === "con_hieu_luc" ? " selected" : ""}>${esc(ten)}</option>`);
+  if (!hl.value) hl.selectedIndex = 0;
   cap.hidden = S.kho === "bieu_mau";
   if (cap.options.length <= 1)
     for (const [ma, ten] of Object.entries(S.d.cap))
@@ -629,7 +638,12 @@ function veDanhSach(ds) {
   // danh sách MẶC ĐỊNH và xoá mất kết quả vừa tìm — người dùng phải gõ lại câu
   // tra cho từng tài liệu muốn xem.
   if (ds !== undefined) S.dsCuoi = ds;
-  const items = (ds !== undefined ? ds : S.dsCuoi) || locHienTai();
+  let items = (ds !== undefined ? ds : S.dsCuoi) || locHienTai();
+  /* CÒN HIỆU LỰC LÊN TRƯỚC — áp cho cả danh sách lọc và kết quả tra cứu.
+     Đặt ở đây chứ không đặt trong locHienTai() vì kết quả tra cứu đi đường
+     riêng, không qua bộ lọc; để trong đó thì tra cứu vẫn trộn lẫn. */
+  items = items.slice().sort((a, b) =>
+    (a.v.e === "con_hieu_luc" ? 0 : 1) - (b.v.e === "con_hieu_luc" ? 0 : 1));
   $("#dem-tong").textContent = items.length.toLocaleString("vi") + " mục";
   if (!items.length) {
     el.innerHTML = '<div class="trong">Không có tài liệu nào khớp bộ lọc.</div>';
@@ -782,7 +796,7 @@ const SD = {
   x: null, y: null, vx: null, vy: null, bkinh: null, sau: null, huong: null,
   ca: null, cb: null, cung: null, lech: null,
   alpha: 0, cam: { x: 0, y: 0, z: 1 }, tro: -1, keo: -1, panh: null,
-  toanKho: false, nhan: new Set(), tuTay: false, daDi: false,
+  toanKho: false, nhan: new Set(), tuTay: false, daDi: false, tam: null,
 };
 
 /* NGÂN SÁCH NÚT — 90, không phải 240.
@@ -952,6 +966,24 @@ function sdDung(goc) {
   SD.bkinh = new Float64Array(n); SD.sau = new Uint8Array(n); SD.huong = new Int8Array(n);
 
   const lang = new Map((S.ke.get(goc) || []).map(([j, , h]) => [j, h]));
+
+  /* THỨ HẠNG theo bậc, rồi gieo trên xoắn ốc r = C·√hạng.
+     Bản trước gieo mỗi bậc lên MỘT VÒNG bán kính riêng. Nghe hợp lý cho tới khi
+     gặp một văn bản mà phân bố bậc lệch hẳn: 01/2007/QH12 có 6 láng giềng trực
+     tiếp, và 4.163 nút còn lại đều ở bậc 2 — tất cả bị dồn lên một vòng bán kính
+     126, chu vi 792, tức cách nhau 0,19 đơn vị. Dưới sàn khoảng cách 0,09 thì
+     lực đẩy hoá tuyến tính và yếu dần về 0, nên mạng KHÔNG mở ra được: đo bán
+     kính trung vị 5 trên bán kính lớn nhất 442 — 4.163 nút chồng thành một chấm,
+     và trên màn hình chỉ còn thấy chừng 25 nút.
+     r = C·√hạng cho mật độ đều trên cả đĩa, mà hạng vẫn đi theo thứ tự bậc nên
+     nút nối nhau vẫn ở gần nhau. */
+  const hang = new Int32Array(n);
+  {
+    const thuTu = [...Array(n).keys()]
+      .sort((a, b) => (sau.get(ds[a]) ?? 99) - (sau.get(ds[b]) ?? 99) || a - b);
+    for (let r = 0; r < n; r++) hang[thuTu[r]] = r;
+  }
+
   for (let k = 0; k < n; k++) {
     const g = ds[k], d = sau.get(g) ?? 2;
     SD.sau[k] = Math.min(d, 2);
@@ -968,7 +1000,7 @@ function sdDung(goc) {
        vùng nào là vùng nào. */
     const g1 = k * 2.39996;
     const r0 = k === 0 ? 0 : SD.toanKho
-      ? (d >= 99 ? 460 : 34 + Math.min(d, 9) * 46) + (k % 7) * 3
+      ? 15 * Math.sqrt(hang[k])
       : 16 + Math.sqrt(k) * (d === 1 ? 7 : 12);
     SD.x[k] = Math.cos(g1) * r0; SD.y[k] = Math.sin(g1) * r0;
   }
@@ -1173,18 +1205,19 @@ function sdBuoc() {
      xảy ra ở (40, .055), (12, .02) và (4, .004). */
   const veTam = (SD.toanKho ? .02 : .011) * a;
   /* TRẦN VẬN TỐC CO THEO ALPHA — chốt chính quyết định mạng chuyển động NHANH
-     hay CHẬM. Đo dịch chuyển trung bình mỗi nút mỗi khung hình, trên chính đồ
-     thị 96/2024/NĐ-CP:
-        trần 1,5 + 23·α  → 11,15 px/khung (≈670 px/s), lắng 2,8 s   quá nhanh
-        trần 0,45 + 4,5·α →  1,92 px/khung (≈115 px/s), lắng 5,3 s
-        trần 0,40 + 3,5·α →  1,30 px/khung (≈ 78 px/s), lắng 5,7 s  ← chọn
-        trần 0,35 + 3,0·α →  0,59 px/khung (≈ 35 px/s), lắng 5,9 s  gần như đứng
-     Chậm không đồng nghĩa lâu: thời gian lắng do tốc độ nguội của alpha định,
-     còn trần chỉ định mỗi khung hình đi được bao xa. Hai thứ chỉnh riêng. */
-  /* Mạng toàn kho đi xa hơn nhiều — 4.170 nút phải tự sắp lại từ vòng gieo —
-     nên trần rộng hơn. Bù lại từng chấm ở cỡ đó nhỏ và mắt đọc thành chuyển
-     động của cả đám, không phải của từng nút. */
-  const tran = SD.toanKho ? 1 + 12 * a : .4 + 3.5 * a, tran2 = tran * tran;
+     hay CHẬM. Đo dịch chuyển trung bình / đỉnh mỗi nút mỗi khung hình trên đồ
+     thị 96/2024/NĐ-CP, chạy tới khi alpha về 0:
+        1,50 + 23,0·α  → 11,15 px  đỉnh 96,1  lắng 2,8 s   quá nhanh
+        0,40 +  3,5·α  →  1,32 px  đỉnh 11,0  lắng 5,7 s   vẫn còn nhanh
+        0,28 +  2,2·α  →  0,35 px  đỉnh  5,1  lắng 7,5 s   ← chọn
+        0,20 +  1,6·α  →  0,10 px  đỉnh  1,3  lắng 9,3 s   gần như đứng yên
+     Chậm KHÔNG đồng nghĩa lâu, và đây là chỗ dễ trộn lẫn: thời gian lắng do tốc
+     độ nguội của alpha định, còn trần chỉ định mỗi khung hình đi được bao xa.
+     Hai thứ chỉnh riêng.
+     Mạng toàn kho đi xa hơn — 4.170 nút phải tự sắp lại từ vòng gieo — nên trần
+     rộng hơn. Đo số nút còn nằm trong khung sau khi lắng: trần 1 + 12·α để 95
+     nút lọt ra ngoài, trần 0,6 + 7·α chỉ 26. Đi chậm hơn thì lắng gọn hơn. */
+  const tran = SD.toanKho ? .6 + 7 * a : .28 + 2.2 * a, tran2 = tran * tran;
   for (let i = 1; i < n; i++) {
     SD.vx[i] -= SD.x[i] * veTam; SD.vy[i] -= SD.y[i] * veTam;
     if (i === SD.keo) { SD.vx[i] = SD.vy[i] = 0; continue; }
@@ -1193,10 +1226,10 @@ function sdBuoc() {
     if (v2 > tran2) { const s = tran / Math.sqrt(v2); SD.vx[i] *= s; SD.vy[i] *= s; }
     SD.x[i] += SD.vx[i]; SD.y[i] += SD.vy[i];
   }
-  /* Tốc độ NGUỘI định thời gian lắng: 0,014 cho ~344 khung hình ≈ 5,7 giây ở
-     60 fps. Mạng toàn kho nguội nhanh hơn vì mỗi bước tốn ~21 ms chứ không phải
-     0,33 ms — cùng số bước là gấp sáu lần thời gian chờ. */
-  const nguoi = SD.toanKho ? .018 : .014;
+  /* Tốc độ NGUỘI định thời gian lắng: 0,011 cho ~450 khung hình ≈ 7,5 giây ở
+     60 fps. Mạng toàn kho nguội nhanh hơn vì mỗi bước tốn ~17 ms chứ không phải
+     0,33 ms — cùng số bước là gấp năm mươi lần thời gian chờ. */
+  const nguoi = SD.toanKho ? .014 : .011;
   SD.alpha = a > .006 ? a - (a - .0015) * nguoi : 0;
   if (!SD.alpha && SD.toanKho) {
     if (!S.boCucKho) S.boCucKho = new Float64Array(S.d.van_ban.length * 2);
@@ -1218,13 +1251,32 @@ function sdMau(k, mo) {
    thước đó đổi theo bề rộng cửa sổ, và mạng 240 nút với mạng 4.170 nút giãn ra
    hai cỡ khác hẳn nhau. Đo bao đóng rồi đặt độ phóng là cách duy nhất đúng cho
    cả hai. Người dùng vừa chạm vào khung nhìn là dừng, không giành tay lái. */
+/* Khớp tức thì, dùng lúc khởi tạo và khi đổi phạm vi. */
+function sdVuaNgay() {
+  for (let k = 0; k < 60; k++) sdVua();
+}
+
 function sdVua() {
   if (SD.tuTay || !SD.ds.length) return;
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (let i = 0; i < SD.ds.length; i++) {
-    if (SD.x[i] < x0) x0 = SD.x[i]; if (SD.x[i] > x1) x1 = SD.x[i];
-    if (SD.y[i] < y0) y0 = SD.y[i]; if (SD.y[i] > y1) y1 = SD.y[i];
-  }
+  const n = SD.ds.length;
+  /* Khớp theo PHÂN VỊ 97, không theo nút xa nhất.
+     Đồ thị này có đuôi dài: đo phân vị bán kính ở chế độ toàn kho —
+        p50 54 · p90 163 · p95 242 · p98 332 · p99 453 · lớn nhất 1.414
+     Khoảng 1% nút (≈42 cái, hầu hết thuộc các cụm rời không nối vào phần chính)
+     nằm ngoài 453 trong khi 90% nằm trong 163. Khớp theo nút xa nhất là để MỘT
+     nút quyết định độ phóng cho 4.170 nút: phần đông co lại còn 12% khung — đúng
+     cái đốm nhỏ nhìn thấy trên ảnh chụp.
+     Đổi lại, vài nút ở đuôi nằm ngoài khung; lăn chuột ra là thấy. Với mạng lân
+     cận 90 nút thì không có đuôi nên p97 ≈ nút xa nhất, hành vi không đổi. */
+  if (!SD.tam || SD.tam.length !== n) SD.tam = new Float64Array(n);
+  const t = SD.tam;
+  for (let i = 0; i < n; i++) t[i] = SD.x[i];
+  t.sort();
+  const q = Math.max(1, Math.round(n * .015));
+  let x0 = t[q - 1], x1 = t[n - q];
+  for (let i = 0; i < n; i++) t[i] = SD.y[i];
+  t.sort();
+  let y0 = t[q - 1], y1 = t[n - q];
   const le = 30;
   /* Bao đóng đo ĐỐI XỨNG QUANH GỐC, không phải hộp bao thật. Nút đang mở được
      ghim ở gốc, nên lấy tâm hộp bao thật là đặt trọng tâm đám mây vào giữa
@@ -1452,7 +1504,12 @@ function khoiSoDo(goc) {
   SD.cChu = sdDoc("--fg-3");
   sdCo();
   sdDung(goc);
+  /* Khớp khung NGAY, không nội suy, trước khung hình đầu. Nội suy 7% mỗi khung
+     hình mà khởi đầu z = 1 thì nửa giây đầu khung nhìn còn đang thu về — trong
+     nửa giây đó mạng nằm ngoài khung và chỉ thấy phần giữa. */
+  sdVuaNgay();
   sdNong();
+  sdVuaNgay();
   if (!cv.dataset.gan) { sdGanSuKien(cv); cv.dataset.gan = "1"; }
   capNhatGhiSoDo();
   sdVong(SD.id);
@@ -1798,9 +1855,13 @@ document.addEventListener("click", e => {
 
   if (t.closest("#goi-y button")) { hoi(t.textContent.trim()); return; }
   if (t.closest("#doc-dong")) { dongTaiLieu(); return; }
+  /* Bấm ra NGOÀI popup thì đóng. Cú bấm vào phần nền của <dialog> có target
+     đúng bằng chính thẻ dialog — mọi cú bấm vào ruột đều có target là con của
+     nó. Đó là cách phân biệt duy nhất không cần thêm lớp phủ giả. */
+  if (t === $("#dlg-doc")) { dongTaiLieu(); return; }
   if (t.closest("#sodo-pv")) {
     SD.toanKho = !SD.toanKho;
-    sdDung(SD.ds[0]); sdNong(); capNhatGhiSoDo();
+    sdDung(SD.ds[0]); sdVuaNgay(); sdNong(); sdVuaNgay(); capNhatGhiSoDo();
     return;
   }
   if (t.closest("#doc-sodo")) {
