@@ -297,3 +297,88 @@ class TestChayPheu:
 
 def test_ket_qua_phan_loai_mac_dinh_khong_rong():
     assert KetQuaPhanLoai(audience=KHAC).nghiep_vu == []
+
+
+@pytest.fixture
+def form_tho(master_session, tmp_path):
+    """Dựng biểu mẫu với HTML tự viết — kiểm soát chính xác tín hiệu trong ruột.
+
+    Fixture trang thật không dùng được cho các ca này: mẫu /bieumau/47131 thì tầng
+    2 quyết được (điểm giữ 3), còn thân "khoán việc" có "Mã số thuế" nên vừa có
+    tín hiệu giữ vừa có tín hiệu loại — không phải ca loại thuần.
+    """
+    def _tao(form_key, source, title, than):
+        p = tmp_path / f"{form_key}.html"
+        p.write_text(
+            f'<html><body><div class="divTNPL"><div>{than}</div></div></body></html>',
+            encoding="utf-8")
+        f = LegalForm(
+            form_key=form_key, source=source, external_id=form_key.split("-")[-1],
+            title=title, crawl_status="OK", body_html_path=str(p), body_hash="h",
+            field_code=11 if source == "bieumau" else None,
+        )
+        master_session.add(f)
+        master_session.commit()
+        return f
+    return _tao
+
+
+#: Thân mẫu KHÔNG chứa tín hiệu nào của cả hai phía — buộc tầng 2 phải bó tay.
+THAN_TRUNG_TINH = ("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM Độc lập - Tự do - Hạnh phúc "
+                   "Hôm nay, ngày … tháng … năm …, tại … " * 6)
+
+
+class TestMacDinhTheoKho:
+    """LỖI ĐÃ XẢY RA THẬT, ĐO ĐƯỢC: 548/662 mẫu hợp đồng biến mất.
+
+    Bản đầu để mọi mẫu mà hai tầng quy tắc không dám kết luận rơi vào hư vô, chờ
+    tầng 3. Người dùng tắt tầng 3 (không có quota mô hình), nên cào đủ 662 mẫu mà
+    trang công khai chỉ có 105 — 105 giữ + 9 loại + 548 KHÔNG AI XỬ LÝ.
+
+    Mặc định phải NGƯỢC NHAU giữa hai kho vì bản chất hai kho ngược nhau. Đây là
+    GIẢ ĐỊNH về kho, không phải bằng chứng về mẫu, nên `audience_source` ghi
+    "mac_dinh_nguon" chứ không ghi "quy_tac".
+    """
+
+    def test_hop_dong_khong_ket_luan_duoc_thi_GIU(self, master_session, form_tho):
+        """Hợp đồng là văn bản giao dịch — không loại được thì giữ."""
+        form_tho("hopdong-9003", "hopdong", "HỢP ĐỒNG KHOÁN VIỆC", THAN_TRUNG_TINH)
+        tk = pheu.chay_pheu(master_session, dung_mo_hinh=False)
+        assert tk.mac_dinh_giu == 1
+        f = master_session.query(LegalForm).one()
+        assert f.is_business is True
+        assert f.audience_source == pheu.NGUON_MAC_DINH
+        assert "Mặc định theo kho" in f.audience_reason
+
+    def test_bieu_mau_khong_ket_luan_duoc_thi_KHONG_giu(self, master_session,
+                                                       form_tho):
+        """Kho /bieumau 33.820 mẫu phần lớn là báo cáo nội bộ cơ quan nhà nước.
+
+        Mặc định giữ ở đây sẽ nhấn chìm kho bằng biểu quyết toán ngân sách — đúng
+        thứ phễu sinh ra để lọc.
+        """
+        form_tho("bieumau-9001", "bieumau", "MẪU ĐƠN KHÔNG RÕ AI ĐIỀN",
+                 THAN_TRUNG_TINH)
+        tk = pheu.chay_pheu(master_session, dung_mo_hinh=False)
+        assert tk.mac_dinh_giu == 0
+        assert master_session.query(LegalForm).one().is_business is None
+
+    def test_quy_tac_LOAI_thang_mac_dinh_giu(self, master_session, form_tho):
+        """9 mẫu bị loại đúng: viên chức, quốc phòng, kho bạc, học sinh.
+
+        Mặc định theo kho KHÔNG được ghi đè kết luận có bằng chứng.
+        """
+        form_tho("hopdong-9002", "hopdong",
+                 "HỢP ĐỒNG LÀM VIỆC KHÔNG XÁC ĐỊNH THỜI HẠN ĐỐI VỚI VIÊN CHỨC",
+                 THAN_TRUNG_TINH)
+        tk = pheu.chay_pheu(master_session, dung_mo_hinh=False)
+        assert tk.tang2_loai == 1 and tk.mac_dinh_giu == 0
+        f = master_session.query(LegalForm).one()
+        assert f.is_business is False
+        assert f.audience_source == pheu.NGUON_QUY_TAC
+
+    def test_mac_dinh_ghi_do_tin_cay_0(self, master_session, form_tho):
+        """Giả định về kho không phải bằng chứng — độ tin cậy phải là 0."""
+        form_tho("hopdong-9004", "hopdong", "HỢP ĐỒNG KHOÁN VIỆC", THAN_TRUNG_TINH)
+        pheu.chay_pheu(master_session, dung_mo_hinh=False)
+        assert master_session.query(LegalForm).one().audience_confidence == 0.0

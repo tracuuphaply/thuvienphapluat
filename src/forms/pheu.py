@@ -26,6 +26,7 @@ from src.legal.form_taxonomy import (
     ten_linh_vuc_bieu_mau,
 )
 from src.sources.tvpl_forms_parse import (
+    SOURCE_BIEU_MAU,
     SOURCE_HOP_DONG,
     FormParseError,
     chu_trong_ruot,
@@ -37,6 +38,26 @@ logger = logging.getLogger(__name__)
 
 NGUON_QUY_TAC = "quy_tac"
 NGUON_LLM = "llm"
+NGUON_MAC_DINH = "mac_dinh_nguon"
+
+#: Khi HAI TẦNG QUY TẮC KHÔNG DÁM KẾT LUẬN thì mặc định theo KHO, không phải một
+#: mặc định chung.
+#:
+#: LỖI ĐÃ MẮC: bản đầu để mọi mẫu không kết luận được rơi vào hư vô, chờ tầng 3.
+#: Người dùng tắt tầng 3 (không có quota mô hình) nên 548/662 mẫu hợp đồng biến
+#: mất vĩnh viễn — cào đủ 662 mà trang công khai chỉ có 105.
+#:
+#: Mặc định phải NGƯỢC NHAU giữa hai kho, vì bản chất hai kho ngược nhau:
+#:   /hopdong  662 mẫu, gần như toàn bộ là giao dịch dân sự - thương mại. Quy tắc
+#:             ở đây dùng để LOẠI trường hợp rõ ràng của nhà nước (hợp đồng làm
+#:             việc với viên chức, nhà ở công vụ Bộ Quốc phòng). Không loại được
+#:             thì GIỮ.
+#:   /bieumau  33.820 mẫu, phần lớn là báo cáo nội bộ của cơ quan nhà nước. Ở đây
+#:             phải có BẰNG CHỨNG mới giữ, nếu không kho ngập mẫu Kho bạc.
+MAC_DINH_THEO_KHO = {
+    SOURCE_HOP_DONG: DOANH_NGHIEP,
+    SOURCE_BIEU_MAU: None,
+}
 
 LY_DO_NGOAI_LINH_VUC = "ngoai_linh_vuc_kinh_doanh"
 LY_DO_KHONG_PHAI_DN = "nguoi_dien_khong_phai_doanh_nghiep"
@@ -51,13 +72,14 @@ class ThongKePheu:
     tang3_goi: int = 0
     tang3_giu: int = 0
     tang3_loai: int = 0
+    mac_dinh_giu: int = 0
     bo_qua_da_phan_loai: int = 0
     khong_doc_duoc_ruot: int = 0
     loi_mo_hinh: int = 0
 
     @property
     def giu(self) -> int:
-        return self.tang2_giu + self.tang3_giu
+        return self.tang2_giu + self.tang3_giu + self.mac_dinh_giu
 
     @property
     def loai(self) -> int:
@@ -69,7 +91,8 @@ class ThongKePheu:
             f"(tầng 1 loại {self.tang1_loai}; "
             f"tầng 2 giữ {self.tang2_giu}, loại {self.tang2_loai}; "
             f"tầng 3 gọi {self.tang3_goi} → giữ {self.tang3_giu}, "
-            f"loại {self.tang3_loai})  "
+            f"loại {self.tang3_loai}; "
+            f"mặc định theo kho giữ {self.mac_dinh_giu})  "
             f"bỏ qua {self.bo_qua_da_phan_loai} đã phân loại, "
             f"{self.khong_doc_duoc_ruot} không đọc được ruột, "
             f"{self.loi_mo_hinh} lỗi mô hình"
@@ -174,6 +197,17 @@ def chay_pheu(session, gioi_han: int | None = None, chay_lai: bool = False,
             continue
 
         if not dung_mo_hinh:
+            mac_dinh = MAC_DINH_THEO_KHO.get(form.source)
+            if mac_dinh:
+                # Ghi rõ nguồn là "mặc định theo kho", KHÔNG phải "quy tắc" —
+                # đây là giả định về bản chất kho, không phải bằng chứng về mẫu.
+                _ghi_ket_luan(
+                    form, mac_dinh, NGUON_MAC_DINH, 0.0,
+                    "Hai tầng quy tắc không kết luận. Mặc định theo kho: mẫu hợp "
+                    "đồng là văn bản giao dịch nên coi là phục vụ kinh doanh, trừ "
+                    "khi có dấu hiệu rõ ràng của cơ quan nhà nước.",
+                    _nghiep_vu_mac_dinh(form))
+                tk.mac_dinh_giu += 1
             continue
 
         # Tầng 3
@@ -205,7 +239,8 @@ def chay_pheu(session, gioi_han: int | None = None, chay_lai: bool = False,
 
 
 __all__ = [
-    "ThongKePheu", "NGUON_QUY_TAC", "NGUON_LLM",
+    "ThongKePheu", "NGUON_QUY_TAC", "NGUON_LLM", "NGUON_MAC_DINH",
+    "MAC_DINH_THEO_KHO",
     "LY_DO_NGOAI_LINH_VUC", "LY_DO_KHONG_PHAI_DN", "LY_DO_CHUA_CO_RUOT",
     "CO_QUAN_NHA_NUOC", "doc_ruot_mau", "chay_pheu",
 ]
