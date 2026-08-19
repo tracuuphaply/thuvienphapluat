@@ -33,6 +33,8 @@ from src.storage.models import LegalForm
 
 logger = logging.getLogger(__name__)
 
+# Quy tắc dựng URL công khai nằm ở src/storage/gdrive.py::lien_ket_cong_khai —
+# MỘT chỗ cho cả văn bản lẫn biểu mẫu, vì cùng một cái bẫy `ouid`.
 TEN_THU_MUC = "Biểu mẫu doanh nghiệp"
 CO_LO = 20
 
@@ -47,21 +49,6 @@ NGHI_GIAY = 0.35
 #: phút và không thu được gì. Hỏng hàng loạt là tín hiệu hệ thống, không phải
 #: chuyện của từng file, và phải dừng để người chạy xử lý.
 TRAN_HONG_LIEN_TIEP = 12
-
-
-def lien_ket_sach(file_id: str) -> str:
-    """Dựng URL từ ID, KHÔNG dùng `webViewLink` mà Drive trả về.
-
-    `webViewLink` cho file Office có dạng
-        https://docs.google.com/document/d/<ID>/edit?usp=drivesdk&ouid=1035188…
-    và `ouid` là MÃ TÀI KHOẢN GOOGLE của người tải lên. Đăng nguyên chuỗi đó lên
-    một trang công khai là phát tán định danh tài khoản chủ kho ra cho mọi khách
-    ghé qua — không cần thiết cho việc gì, mà lại không rút lại được.
-
-    Dạng `/file/d/<ID>/view` mở được cho khách vãng lai (đã đo: HTTP 200 khi gọi
-    không kèm phiên đăng nhập) và có sẵn nút tải về.
-    """
-    return f"https://drive.google.com/file/d/{file_id}/view"
 
 
 def _ten_file(form: LegalForm) -> str:
@@ -129,7 +116,7 @@ def main() -> None:
         for i, f in enumerate(forms, 1):
             kq = gdrive.upload_file(f.docx_path, thu_muc_bm, _ten_file(f))
             if kq and kq.get("id"):
-                f.gdrive_docx_link = lien_ket_sach(kq["id"])
+                f.gdrive_docx_link = kq["link"]
                 f.gdrive_folder_id = thu_muc_bm
                 f.gdrive_uploaded_at = date.today()
                 # Trang công khai phải dựng lại: liên kết tải về đổi chỗ.

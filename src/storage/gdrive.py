@@ -449,6 +449,20 @@ def ensure_folder_path(doc_data: dict[str, Any]) -> str | None:
     return folder_id
 
 
+def lien_ket_cong_khai(file_id: str) -> str:
+    """URL dựng từ ID — dùng cái này khi liên kết sẽ được ĐĂNG CÔNG KHAI.
+
+    KHÔNG dùng `webViewLink` mà Drive trả về. Với file Office nó có dạng
+        https://docs.google.com/document/d/<ID>/edit?usp=drivesdk&ouid=1035188…
+    và `ouid` là MÃ TÀI KHOẢN GOOGLE của người tải lên. Đã lọt ra 7 trang văn bản
+    trên repo công khai trước khi bắt được — phát tán định danh chủ kho cho mọi
+    khách ghé qua, mà không rút lại được sau khi đã đẩy lên.
+
+    Dạng `/file/d/<ID>/view` mở được cho khách vãng lai và có sẵn nút tải về.
+    """
+    return f"https://drive.google.com/file/d/{file_id}/view"
+
+
 def upload_file(
     local_path: str | Path,
     folder_id: str,
@@ -515,6 +529,7 @@ def upload_file(
         return {
             "id": file["id"],
             "webViewLink": file.get("webViewLink", ""),
+            "link": lien_ket_cong_khai(file["id"]),
         }
 
     except Exception as e:
@@ -566,7 +581,10 @@ def upload_document_files(doc_data: dict[str, Any]) -> dict[str, Any]:
         if uploaded:
             result["uploaded"].append(kind)
             if link_key:
-                result[link_key] = uploaded["webViewLink"]
+                # `link` chứ không phải `webViewLink`: hai trường này khác nhau ở
+                # chỗ `webViewLink` mang theo `ouid` — mã tài khoản Google — và
+                # hai trường này đều được ĐĂNG CÔNG KHAI trên trang văn bản.
+                result[link_key] = uploaded["link"]
         else:
             result["failed"].append(kind)
 

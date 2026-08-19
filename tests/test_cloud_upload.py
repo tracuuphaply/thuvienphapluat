@@ -29,6 +29,35 @@ class TestKetQuaUpload:
         assert not UploadOutcome("gdrive").ok
 
 
+class TestLienKetDangCongKhai:
+    """Liên kết Drive được ĐĂNG LÊN TRANG CÔNG KHAI, nên nó là dữ liệu rời tay.
+
+    Đã lọt thật: 7 trang văn bản trên repo công khai mang chuỗi
+    `?usp=drivesdk&ouid=103518860918943299966` — `ouid` là mã tài khoản Google
+    của người tải lên. Bắt được trước khi đẩy, nhưng chỉ vì soát tay; nhóm test
+    này để lần sau máy bắt.
+    """
+
+    def test_dung_URL_tu_ID_chu_khong_lay_webViewLink(self):
+        from src.storage.gdrive import lien_ket_cong_khai
+
+        assert (lien_ket_cong_khai("1AbC_dEf-2345")
+                == "https://drive.google.com/file/d/1AbC_dEf-2345/view")
+
+    def test_khong_mang_theo_ma_tai_khoan(self):
+        """`webViewLink` của file Office luôn kèm ouid; URL dựng tay thì không."""
+        from src.storage.gdrive import lien_ket_cong_khai
+
+        assert "ouid" not in lien_ket_cong_khai("1AbC_dEf-2345")
+
+    def test_khong_mang_theo_tham_so_truy_vet_nao(self):
+        """`usp=drivesdk` vô hại nhưng nó là dấu hiệu link chưa qua tay mình —
+        và chính chỗ đó là chỗ ouid đi kèm."""
+        from src.storage.gdrive import lien_ket_cong_khai
+
+        assert "?" not in lien_ket_cong_khai("1AbC_dEf-2345")
+
+
 class TestThoatKyTuTruyVanDrive:
     """Tên thư mục lấy từ số hiệu, mà số hiệu là dữ liệu bên ngoài đưa vào.
 
