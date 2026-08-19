@@ -168,10 +168,29 @@ python -m scripts.crawl_forms --source bieumau --chi-hang-doi
 python -m scripts.crawl_forms --source bieumau --tiep-tuc
 python -m scripts.classify_forms                  # phễu 3 tầng
 python -m scripts.build_forms                     # dựng DOCX + PDF
+python -m scripts.upload_forms_gdrive             # đưa bản .docx lên Drive
 ```
 
 Phân loại trước, dựng file sau — dựng cho cả kho rồi mới biết phần lớn là báo cáo
 nội bộ của cơ quan nhà nước thì đã đốt công vô ích.
+
+### Đưa biểu mẫu lên Drive
+
+`upload_forms_gdrive` chỉ tải bản **.docx**, không tải .pdf. Bản Word là bản điền
+được — thứ người ta thật sự cần ở một biểu mẫu; đo trên 653 mẫu thì docx 24 MB
+còn pdf 74 MB, tức gấp bốn dung lượng để thêm một thứ đã có đường lấy khác (bản
+PDF vẫn tải trực tiếp từ trang công khai).
+
+Chạy lại được: mẫu nào đã có `gdrive_docx_link` thì bỏ qua, và kho được ghi theo
+từng lô 20 mẫu chứ không đợi hết.
+
+**Nếu thấy báo `DỪNG SỚM`** thì đó là Drive chặn theo hạn mức ghi, không phải lỗi
+file. Đo lần chạy đầu ngày 19/08/2026: 256 lượt trót lọt rồi 394 lượt hỏng liên
+tiếp. Chờ vài phút rồi chạy lại lệnh đó, nó tiếp từ chỗ dừng.
+
+Liên kết ghi vào kho được dựng lại từ ID file (`drive.google.com/file/d/<ID>/view`)
+chứ **không** dùng `webViewLink` mà Drive trả về: chuỗi đó chứa `ouid=…`, tức mã
+tài khoản Google của người tải lên, và trang công khai thì ai cũng đọc được.
 
 ### Vì sao tách hai pha `--chi-hang-doi` rồi `--tiep-tuc`
 
