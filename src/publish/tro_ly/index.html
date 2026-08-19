@@ -286,13 +286,21 @@ dialog.doc-modal::backdrop{background:rgba(15,15,15,.6);backdrop-filter:blur(2px
 .tai-ve a:hover{opacity:.85}
 .tai-ve a.phu{background:var(--bg);color:var(--fg);border:1px solid var(--line);box-shadow:var(--sh-2)}
 
-/* ── Sơ đồ láng giềng ── */
+/* ── Sơ đồ lực ── */
 .sodo{border:1px solid var(--line);border-radius:var(--r-2);background:var(--bg-2);
   margin:12px 0;position:relative;overflow:hidden}
-.sodo svg{display:block;width:100%;height:300px}
-.sodo .ghi{position:absolute;left:12px;bottom:9px;font-size:11.5px;color:var(--fg-3)}
-.sodo circle{cursor:pointer}
-.sodo text{font-size:9.5px;fill:var(--fg-3);pointer-events:none}
+.sodo canvas{display:block;width:100%;height:360px;cursor:grab;touch-action:none}
+.sodo canvas:active{cursor:grabbing}
+.sodo .ghi{
+  position:absolute;left:12px;bottom:9px;font-size:11px;color:var(--fg-3);
+  pointer-events:none;line-height:1.5;
+}
+.sodo .pv{
+  position:absolute;right:9px;top:9px;padding:4px 10px;font-size:12px;
+  border-radius:var(--r);background:var(--bg);color:var(--fg-2);
+  border:1px solid var(--line);box-shadow:var(--sh-2);
+}
+.sodo .pv:hover{color:var(--fg);background:var(--bg-3)}
 
 /* ── Hộp thoại cấu hình ── */
 dialog.cfg{
@@ -674,9 +682,16 @@ function moTaiLieu(kho, i) {
   veDanhSach(undefined);          // giữ nguyên danh sách đang xem
   const d = $("#dlg-doc");
   if (!d.open) d.showModal();
+  /* Sơ đồ khởi động SAU showModal(), không phải sau khi gắn markup.
+     <dialog> chưa mở thì nội dung bên trong CHƯA CÓ BỐ CỤC: getBoundingClientRect
+     trả 0, canvas nhận width 0 và không vẽ được gì. Lỗi này im lặng — không có
+     ngoại lệ nào, chỉ là một khung trống. */
+  if (kho === "van_ban") khoiSoDo(i);
 }
 
 function dongTaiLieu() {
+  SD.id++;            /* cắt vòng lặp mô phỏng: đóng popup là hết việc của nó */
+  SD.cv = null;
   const d = $("#dlg-doc");
   if (d.open) d.close();
 }
@@ -698,7 +713,7 @@ function htmlVanBan(v, i) {
     </tbody></table>
     <div class="canh-bao"><b>Bản trích dữ kiện</b>Trang này chỉ hiện dữ kiện và quan hệ
       dẫn chiếu. Toàn văn và phụ lục nằm ở trang đầy đủ — bấm “Trang gốc”.</div>
-    ${ke.length ? `<h3>Quan hệ dẫn chiếu (${ke.length})</h3>${htmlSoDo(i)}` : ""}
+    ${ke.length ? `<h3>Vị trí trong mạng lưới (${ke.length} quan hệ trực tiếp)</h3>${htmlSoDo()}` : ""}
     ${htmlBieuMauKemTheo(v.n)}
   </div>`;
 }
@@ -741,41 +756,604 @@ function htmlBieuMau(v) {
   </div>`;
 }
 
-/* ════════════════ Sơ đồ láng giềng ════════════════
-   Chỉ bậc 1, và CHẶN TRẦN số nút. Đây là toàn bộ cách giải bài "sơ đồ quá nặng":
-   không bao giờ vẽ cả đồ thị. Văn bản trung tâm thật sự có bậc rất cao —
-   32/2001/QH10 có 1.780 cạnh — nên không chặn trần thì một nút cũng đủ treo. */
-const TRAN_NUT = 26;
+/* ════════════════ Sơ đồ lực trên canvas ════════════════
 
-function htmlSoDo(goc) {
-  const lang = (S.ke.get(goc) || []);
-  const chon = lang.slice(0, TRAN_NUT);
-  const W = 640, H = 290, cx = W / 2, cy = H / 2;
-  const R = Math.min(cx, cy) - 42;
-  const nut = chon.map(([j, t, huong], k) => {
-    const g = (k / chon.length) * Math.PI * 2 - Math.PI / 2;
-    return { j, t, huong, x: cx + R * Math.cos(g), y: cy + R * Math.sin(g) };
+   Bản trước là SVG TĨNH: 26 láng giềng bậc 1 xếp đều trên một vòng tròn. Nó nói
+   được "văn bản này nối với ai" nhưng không nói được điều quan trọng hơn — văn
+   bản này NẰM Ở ĐÂU trong kho. Vòng tròn đều là bố cục do mình áp đặt, không
+   phải hình dạng thật của quan hệ.
+
+   Đây là mô phỏng lực, bố cục tự mọc ra từ chính các cạnh.
+
+   VÌ SAO CANVAS CHỨ KHÔNG SVG. Đo trên chính kho này: 4.201 nút, 23.801 cạnh.
+   SVG nghĩa là 28 nghìn phần tử DOM, mỗi khung hình phải cập nhật thuộc tính
+   từng phần tử — đúng thứ khiến sơ đồ toàn cục của Quartz không mở nổi. Canvas
+   vẽ cùng chừng ấy hình bằng vài lệnh path gộp.
+
+   VÌ SAO PHẢI CÓ CÂY TỨ PHÂN. Lực đẩy là lực giữa MỌI CẶP nút: 4.201 nút thành
+   17,6 triệu phép mỗi khung hình. Cây tứ phân Barnes–Hut gộp các nút ở xa thành
+   một khối tâm, đưa xuống O(n log n) ≈ 50 nghìn phép. Không có nó thì chế độ
+   toàn kho là bất khả thi chứ không phải chậm.
+   ───────────────────────────────────────────────────────── */
+
+const SD = {
+  id: 0, cv: null, ctx: null, W: 0, H: 0, dpr: 1,
+  goc: 0, ds: [], viTri: new Map(),
+  x: null, y: null, vx: null, vy: null, bkinh: null, sau: null, huong: null,
+  ca: null, cb: null, cung: null, lech: null,
+  alpha: 0, cam: { x: 0, y: 0, z: 1 }, tro: -1, keo: -1, panh: null,
+  toanKho: false, nhan: new Set(), tuTay: false, daDi: false,
+};
+
+/* NGÂN SÁCH NÚT — 90, không phải 240.
+   Không phải giới hạn tốc độ: đo được 1,0 ms mỗi bước cho 240 nút, thừa sức
+   60 fps. Đây là giới hạn ĐỌC ĐƯỢC. Khung 638×360 với 240 nút và 1.200 cạnh
+   cho ra một mảng xám đặc — bố cục đúng nhưng không nói được gì. 90 nút là mức
+   còn phân biệt được từng nút và lần được từng cạnh. */
+const SD_TRAN = 90;
+/* θ = 1,5 (bình phương sẵn). d3 dùng 0,9 cho vài trăm nút; ở 4.170 nút thì
+   0,9 tốn 36 ms mỗi bước — 22 fps, thấy giật. Nới θ là gộp sớm hơn, sai số bố
+   cục lớn hơn nhưng ở cỡ này không ai đọc từng nút, người ta đọc hình dạng. */
+const SD_THETA2 = 2.25;
+
+/* ── Cây tứ phân, mảng phẳng ──
+   Dựng lại MỖI khung hình: nút di chuyển liên tục nên cây cũ vô dụng. Dùng mảng
+   phẳng cấp phát sẵn chứ không dùng đối tượng — 4.200 lần chèn × độ sâu ~12 là
+   ~50 nghìn đối tượng mỗi khung hình, đủ để bộ dọn rác giật hình đều đặn. */
+let qCon = new Int32Array(0), qX, qY, qM, qLa, qNua, qCx, qCy, qDem = 0;
+
+function qCapPhat(n) {
+  const c = Math.max(256, Math.ceil(n * 4));
+  if (qCon.length >= c * 4) return;
+  qCon = new Int32Array(c * 4); qX = new Float64Array(c); qY = new Float64Array(c);
+  qM = new Float64Array(c); qLa = new Int32Array(c);
+  qNua = new Float64Array(c); qCx = new Float64Array(c); qCy = new Float64Array(c);
+}
+
+function qO(cx, cy, nua) {
+  /* Ghi vượt sức chứa của TypedArray KHÔNG ném lỗi — nó lặng lẽ bỏ qua, và cây
+     thành ra sai lệch chứ không sập. Nới gấp đôi rồi dựng lại từ đầu là cách
+     duy nhất để hỏng thành ồn ào. */
+  if (qDem >= qX.length) { qCapPhat(qX.length * 2); throw new RangeError("cay-tran"); }
+  const k = qDem++;
+  qCon[k * 4] = qCon[k * 4 + 1] = qCon[k * 4 + 2] = qCon[k * 4 + 3] = -1;
+  qX[k] = qY[k] = qM[k] = 0; qLa[k] = -1; qNua[k] = nua; qCx[k] = cx; qCy[k] = cy;
+  return k;
+}
+
+function qChen(k, i, px, py, sau) {
+  for (;;) {
+    qX[k] += px; qY[k] += py; qM[k]++;
+    const co = qCon[k * 4] >= 0;
+    if (!co && qLa[k] < 0) { qLa[k] = i; return; }
+    if (!co) {
+      /* Ô lá đã có người: tách tư rồi đẩy CẢ HAI xuống. Chốt độ sâu 22 là để
+         hai nút trùng toạ độ tuyệt đối không làm vòng lặp chia mãi không dừng —
+         đã gặp khi hai văn bản khởi tạo cùng một điểm. */
+      const cu = qLa[k]; qLa[k] = -1;
+      if (sau > 22) { qLa[k] = cu; return; }
+      const nua = qNua[k] / 2;
+      for (let o = 0; o < 4; o++)
+        qCon[k * 4 + o] = qO(qCx[k] + (o & 1 ? nua : -nua), qCy[k] + (o & 2 ? nua : -nua), nua);
+      const oc = (SD.x[cu] > qCx[k] ? 1 : 0) | (SD.y[cu] > qCy[k] ? 2 : 0);
+      qChen(qCon[k * 4 + oc], cu, SD.x[cu], SD.y[cu], sau + 1);
+    }
+    k = qCon[k * 4 + ((px > qCx[k] ? 1 : 0) | (py > qCy[k] ? 2 : 0))];
+    sau++;
+  }
+}
+
+/* SÀN KHOẢNG CÁCH: 0,3 px, và trần vận tốc mới là thứ giữ ổn định.
+   Đã thử cả hai đầu và cả hai đều hỏng theo kiểu riêng:
+     · sàn 1e-6 KHÔNG kèm trần vận tốc → hai nút chồng nhau sinh lực 3,8×10⁷,
+       mạng bắn ra 10⁸ px ngay khung hình đầu;
+     · sàn 2 px → lực đẩy ở cự ly gần hoá TUYẾN TÍNH theo dx, tức yếu dần về 0
+       đúng lúc cần nó nhất. Mạng 240 nút co vào hộp 33 px rồi kẹt luôn ở đó,
+       vì đến 2 px thì lực đẩy không còn đủ sức mở ra. Đo được nguyên quỹ đạo:
+       279 → 97 → 48 → 33 và dừng.
+   Nên: sàn chỉ để chống chia cho 0, còn chống nổ là việc của trần vận tốc. */
+const SD_SAN2 = .09;
+
+/* Duyệt bằng NGĂN XẾP TƯỜNG MINH, không đệ quy.
+   Ở 4.170 nút, mỗi nút thăm hơn trăm ô; chi phí gọi hàm của JS nhân lên từng
+   ấy lần là phần lớn thời gian. Ngăn xếp cấp phát một lần, dùng lại mọi bước. */
+let qNgan = new Int32Array(4096);
+
+function qDay(goc, i, luc) {
+  const xi = SD.x[i], yi = SD.y[i];
+  let dinh = 0;
+  qNgan[dinh++] = goc;
+  let vx = 0, vy = 0;
+  while (dinh) {
+    const k = qNgan[--dinh];
+    const dx = qX[k] - xi, dy = qY[k] - yi;
+    let d2 = dx * dx + dy * dy;
+    if (d2 < SD_SAN2) d2 = SD_SAN2;
+    const w = qNua[k] * 2;
+    if (qCon[k * 4] < 0 || w * w < SD_THETA2 * d2) {
+      if (qLa[k] === i && qM[k] === 1) continue;
+      const f = luc * qM[k] / d2;
+      vx -= dx * f; vy -= dy * f;
+      continue;
+    }
+    if (dinh + 4 > qNgan.length) {
+      const moi = new Int32Array(qNgan.length * 2);
+      moi.set(qNgan); qNgan = moi;
+    }
+    for (let o = 0; o < 4; o++) {
+      const c = qCon[k * 4 + o];
+      if (qM[c]) qNgan[dinh++] = c;
+    }
+  }
+  SD.vx[i] += vx; SD.vy[i] += vy;
+}
+
+/* ── Chọn tập nút ──
+   Chế độ lân cận đi BFS từ văn bản đang mở. Vượt ngân sách thì cắt tầng ngoài
+   theo BẬC GIẢM DẦN, giữ lại các đầu mối được dẫn chiếu nhiều — chúng là thứ
+   định vị văn bản trong kho, còn nút bậc 1 cụt thì không nói thêm gì.
+   Đo trên kho này: từ một văn bản bất kỳ, bậc 2 đã chạm trung vị 604 nút và
+   bậc 3 là 3.142 — nên "toàn bộ kho" không phải một lựa chọn mặc định được. */
+function sdChonNut(goc) {
+  if (SD.toanKho) {
+    const ds = [], sau = new Map();
+    for (let i = 0; i < S.d.van_ban.length; i++) if (S.ke.has(i)) { ds.push(i); sau.set(i, 2); }
+    if (!sau.has(goc)) { ds.push(goc); }
+    sau.set(goc, 0);
+    for (const [j] of (S.ke.get(goc) || [])) sau.set(j, 1);
+    return { ds, sau };
+  }
+  const sau = new Map([[goc, 0]]), ds = [goc];
+  let vien = [goc];
+  for (let d = 1; d <= 2 && ds.length < SD_TRAN; d++) {
+    const ung = [];
+    for (const u of vien)
+      for (const [v] of (S.ke.get(u) || []))
+        if (!sau.has(v)) { sau.set(v, d); ung.push(v); }
+    if (d === 2) ung.sort((a, b) => (S.ke.get(b) || []).length - (S.ke.get(a) || []).length);
+    const lay = ung.slice(0, Math.max(0, SD_TRAN - ds.length));
+    for (const v of ung) if (!lay.includes(v)) sau.delete(v);
+    ds.push(...lay); vien = lay;
+  }
+  return { ds, sau };
+}
+
+function sdDung(goc) {
+  const { ds, sau } = sdChonNut(goc);
+  const n = ds.length;
+  SD.goc = 0; SD.ds = ds;
+  SD.viTri = new Map(ds.map((g, k) => [g, k]));
+  const k0 = SD.viTri.get(goc);
+  if (k0 > 0) {   /* văn bản đang mở luôn là chỉ số 0, để vẽ sau cùng và nằm trên */
+    ds[k0] = ds[0]; ds[0] = goc;
+    SD.viTri = new Map(ds.map((g, k) => [g, k]));
+  }
+
+  SD.x = new Float64Array(n); SD.y = new Float64Array(n);
+  SD.vx = new Float64Array(n); SD.vy = new Float64Array(n);
+  SD.bkinh = new Float64Array(n); SD.sau = new Uint8Array(n); SD.huong = new Int8Array(n);
+
+  const lang = new Map((S.ke.get(goc) || []).map(([j, , h]) => [j, h]));
+  for (let k = 0; k < n; k++) {
+    const g = ds[k], d = sau.get(g) ?? 2;
+    SD.sau[k] = d;
+    SD.huong[k] = k === 0 ? 0 : (lang.get(g) || 0);
+    const deg = (S.ke.get(g) || []).length;
+    /* Bán kính theo CHẾ ĐỘ. Cùng một cỡ nút, 90 nút thì vừa mắt còn 4.170 nút
+       thành một mảng đặc không thấy khe hở nào — số nút gấp 46 lần thì diện
+       tích mỗi nút phải nhỏ đi tương ứng. */
+    SD.bkinh[k] = SD.toanKho
+      ? (k === 0 ? 5 : Math.min(3.4, 1.1 + Math.sqrt(deg) * .2))
+      : (k === 0 ? 7.5 : Math.min(7, 2.3 + Math.sqrt(deg) * .5));
+    /* Gieo vị trí THEO CHỈ SỐ, không theo ngẫu nhiên: mở lại cùng một văn bản
+       phải ra cùng một hình. Bố cục đổi mỗi lần mở thì không ai nhận ra nổi
+       vùng nào là vùng nào. */
+    const g1 = k * 2.39996, r0 = k === 0 ? 0 : 16 + Math.sqrt(k) * (d === 1 ? 7 : 12);
+    SD.x[k] = Math.cos(g1) * r0; SD.y[k] = Math.sin(g1) * r0;
+  }
+
+  const ca = [], cb = [];
+  for (const [a, b] of S.d.do_thi.canh) {
+    const i = SD.viTri.get(a), j = SD.viTri.get(b);
+    if (i !== undefined && j !== undefined && i !== j) { ca.push(i); cb.push(j); }
+  }
+  SD.ca = new Int32Array(ca); SD.cb = new Int32Array(cb);
+
+  /* Độ cứng lò xo CHIA THEO BẬC, và độ lệch chia phần dịch chuyển giữa hai đầu.
+     Đây là chỗ bản đầu sai và cho ra một cục tròn đặc: mỗi cạnh kéo bằng một
+     lực như nhau, nên nút có 200 cạnh bị kéo mạnh gấp 200 lần nút có 1 cạnh —
+     mọi thứ sập vào các đầu mối. Chia cho bậc NHỎ HƠN trong hai đầu là cách
+     d3-force làm, và nó chính là thứ khiến bố cục xoè ra thành hình đọc được.
+     Độ lệch để nút bậc thấp dịch nhiều hơn: cái đuôi phải quay quanh cái đầu,
+     không phải ngược lại. */
+  const bac = new Int32Array(n);
+  for (let e = 0; e < SD.ca.length; e++) { bac[SD.ca[e]]++; bac[SD.cb[e]]++; }
+  SD.cung = new Float64Array(SD.ca.length);
+  SD.lech = new Float64Array(SD.ca.length);
+  for (let e = 0; e < SD.ca.length; e++) {
+    const i = SD.ca[e], j = SD.cb[e];
+    SD.cung[e] = 1 / Math.min(bac[i] || 1, bac[j] || 1);
+    SD.lech[e] = bac[i] / ((bac[i] || 1) + (bac[j] || 1));
+  }
+
+  /* Nhãn chỉ hiện cho văn bản đang mở và các đầu mối lớn nhất. Vẽ 4.200 nhãn
+     là 4.200 lần đo chữ mỗi khung hình, và kết quả là một mảng chữ chồng nhau
+     không đọc được — đắt gấp đôi mà tệ hơn. */
+  /* Ứng viên nhãn: các đầu mối lớn nhất. Vẽ hết 4.200 nhãn là 4.200 lần đo chữ
+     mỗi khung hình, cho ra một mảng chữ chồng nhau — đắt gấp bội mà tệ hơn.
+     Ai thật sự được vẽ thì do phép kiểm chồng lấn trong sdVe quyết. */
+  SD.nhan = new Set(
+    [...Array(n).keys()].slice(1)
+      .sort((a, b) => SD.bkinh[b] - SD.bkinh[a])
+      .slice(0, SD.toanKho ? 40 : 30));
+
+  SD.alpha = 1; SD.cam = { x: 0, y: 0, z: 1 }; SD.tro = -1; SD.keo = -1; SD.tuTay = false;
+  qCapPhat(n * 2);
+}
+
+/* CHẠY NÓNG trước khi vẽ khung đầu, có HẠN MỨC THỜI GIAN.
+   Không có nó thì khung đầu là hình xoắn ốc gieo sẵn — một vòng ốc đều tăm tắp
+   chẳng liên quan gì tới quan hệ thật, và người xem nhìn thấy nó trước khi nhìn
+   thấy đồ thị. Hạn mức chứ không phải số bước cố định: một bước ở chế độ lân cận
+   tốn 0,4 ms còn ở chế độ toàn kho tốn 15,6 ms — cùng 90 bước là 36 ms với cái
+   này và 1,4 giây với cái kia. */
+function sdNong() {
+  const han = performance.now() + 110;
+  for (let k = 0; k < 90 && performance.now() < han; k++) { sdBuoc(); sdVua(); }
+}
+
+function sdBuoc() {
+  const n = SD.ds.length;
+  if (!n) return;
+  const a = SD.alpha;
+  /* Thang lực lấy theo d3-force: lực đẩy ~ -30/d². Hằng số lớn hơn một bậc là
+     đủ để MỘT bước đẩy nút ra 1.500 px — mạng nổ tung ngay khung hình đầu và
+     khung nhìn chỉ còn nền trống. Đã đo đúng như vậy khi để -620.
+     Mạng lớn cần lực đẩy NHỎ hơn: tổng lực dồn lên mỗi nút tăng theo số nút. */
+  /* Hằng số đo bằng cách quét, không phải chép từ d3. Đồ thị này DÀY hơn đồ thị
+     mẫu của d3 nhiều — bậc trung bình 10,7 — nên độ cứng lò xo cộng dồn lớn hơn
+     hẳn và lực đẩy phải theo kịp. Quét trên 96/2024/NĐ-CP: lực 46 cho bao đóng
+     41 px (đặc quánh), 120 → 63, 300 → 114, 600 → 148. */
+  const luc = -(SD.toanKho ? 40 : 300) * a;
+  /* Chiều dài lò xo giãn theo SỐ NÚT. Với hằng số cố định, mạng hình sao —
+     96/2024/NĐ-CP có 239 quan hệ trực tiếp, tức 239 lá quanh một tâm — xếp
+     thành vòng bán kính đúng bằng chiều dài lò xo, ra một đốm 80 px bất kể
+     khung rộng bao nhiêu. Vòng phải đủ chu vi cho ngần ấy lá. */
+  const dai = SD.toanKho ? 30 : 40, loxo = a;
+
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i < n; i++) {
+    if (SD.x[i] < x0) x0 = SD.x[i]; if (SD.x[i] > x1) x1 = SD.x[i];
+    if (SD.y[i] < y0) y0 = SD.y[i]; if (SD.y[i] > y1) y1 = SD.y[i];
+  }
+  const nua = Math.max(x1 - x0, y1 - y0, 1) / 2 + 1;
+  let goc;
+  for (let lan = 0; lan < 3; lan++) {
+    try {
+      qDem = 0;
+      goc = qO((x0 + x1) / 2, (y0 + y1) / 2, nua);
+      for (let i = 0; i < n; i++) qChen(goc, i, SD.x[i], SD.y[i], 0);
+      break;
+    } catch (err) {
+      if (err.message !== "cay-tran" || lan === 2) return;
+    }
+  }
+  /* Chuyển TỔNG toạ độ thành KHỐI TÂM ngay sau khi dựng cây, một lần cho mỗi ô.
+     Để nguyên tổng thì mỗi lần thăm một ô phải chia hai lần, mà số lần thăm là
+     hàng trăm nghìn mỗi bước — phép chia là thứ đắt nhất trong vòng trong. */
+  for (let k = 0; k < qDem; k++) { const m = qM[k]; if (m) { qX[k] /= m; qY[k] /= m; } }
+  for (let i = 0; i < n; i++) if (i !== SD.keo) qDay(goc, i, luc);
+
+  for (let e = 0; e < SD.ca.length; e++) {
+    const i = SD.ca[e], j = SD.cb[e];
+    /* Khoảng cách tính trên vị trí DỰ BÁO (đã cộng vận tốc hiện thời), đúng
+       cách d3-force làm. Tính trên vị trí hiện tại thì lò xo luôn phản ứng
+       CHẬM một bước so với chuyển động đang có, và hệ dao động: đo được quỹ đạo
+       121 → 89 → 115 → 51 → 19 → 42 rồi nảy quanh đó, thay vì lắng dần. */
+    let dx = SD.x[j] + SD.vx[j] - SD.x[i] - SD.vx[i];
+    let dy = SD.y[j] + SD.vy[j] - SD.y[i] - SD.vy[i];
+    let d = Math.max(Math.hypot(dx, dy), .5);
+    const f = (d - dai) / d * loxo * SD.cung[e], b = SD.lech[e];
+    /* Đầu nào BẬC CAO thì dịch ÍT. `lech[e]` là tỉ phần bậc của i, nên i phải
+       nhận (1 − lech) còn j nhận lech. Đảo hai vế là mỗi đầu mối bị cả trăm cạnh
+       giật mạnh nhất, và cả mạng sập vào một điểm — đo được 34×34 px cho 240 nút
+       khi để nhầm chiều. */
+    dx *= f; dy *= f;
+    if (i !== SD.keo) { SD.vx[i] += dx * (1 - b); SD.vy[i] += dy * (1 - b); }
+    if (j !== SD.keo) { SD.vx[j] -= dx * b; SD.vy[j] -= dy * b; }
+  }
+
+  /* Lực về tâm giữ mạng khỏi trôi; riêng văn bản đang mở bị kéo mạnh gấp bội để
+     nó ở lại giữa khung — cả sơ đồ tồn tại là để trả lời "nó nằm ở đâu", mà nó
+     trôi khỏi màn hình thì câu trả lời mất. */
+  /* Văn bản đang mở GHIM tại gốc toạ độ, không thả trôi.
+     Bố cục lực không có toạ độ tuyệt đối — ghim một nút không làm sai cấu trúc,
+     nó chỉ chọn hệ quy chiếu. Đổi lại, khung nhìn luôn biết đặt tâm ở đâu, và
+     câu hỏi mà cả sơ đồ này sinh ra để trả lời — "văn bản này nằm ở đâu" — có
+     một chỗ cố định để nhìn. Thả trôi thì nó dạt ra rìa, và người xem phải đi
+     tìm chính thứ mình đang đọc. */
+  SD.x[0] = SD.y[0] = SD.vx[0] = SD.vy[0] = 0;
+  /* Bộ ba (lực đẩy, lực về tâm, chiều dài lò xo) của chế độ toàn kho quét trên
+     4.170 nút, chấm bằng tỉ lệ nút nằm trong 40% bán kính — đĩa phân bố đều cho
+     ~16%, vành khuyên rỗng ruột cho ~0:
+        đẩy 150 · tâm .055  →  1,9%   vành khuyên rõ, lỗ giữa to
+        đẩy  40 · tâm .020  → 12,9%   gần đều  ← chọn
+        đẩy  12 · tâm .006  → 22,5%   dồn cục vào giữa
+     Và một bờ vực: đẩy quá yếu so với lò xo thì cả mạng sập vào bán kính 14 —
+     xảy ra ở (40, .055), (12, .02) và (4, .004). */
+  const veTam = (SD.toanKho ? .02 : .011) * a;
+  for (let i = 1; i < n; i++) {
+    const g = veTam;
+    SD.vx[i] -= SD.x[i] * g; SD.vy[i] -= SD.y[i] * g;
+    if (i === SD.keo) { SD.vx[i] = SD.vy[i] = 0; continue; }
+    SD.vx[i] *= .62; SD.vy[i] *= .62;
+    /* Trần vận tốc: chốt chặn cuối. Một cấu hình bất thường nào đó vẫn có thể
+       sinh lực lớn, và mạng bay ra ngoài khung thì không có đường quay lại —
+       khung nhìn tự vừa sẽ thu nhỏ theo nút bay xa nhất, kéo cả phần còn lại
+       thành một chấm. 24 px/khung hình đã là nhanh hơn mắt theo kịp; để 60 thì
+       mỗi bước vọt qua điểm cân bằng và hệ nảy thay vì lắng. */
+    const v2 = SD.vx[i] * SD.vx[i] + SD.vy[i] * SD.vy[i];
+    if (v2 > 576) { const s = 24 / Math.sqrt(v2); SD.vx[i] *= s; SD.vy[i] *= s; }
+    SD.x[i] += SD.vx[i]; SD.y[i] += SD.vy[i];
+  }
+  /* Mạng lớn nguội NHANH hơn: mỗi bước ở chế độ toàn kho tốn hàng chục ms, và
+     300 bước là chờ hơn mười giây trước khi hình đứng yên. */
+  const nguoi = SD.toanKho ? .04 : .021;
+  SD.alpha = a > .006 ? a - (a - .0015) * nguoi : 0;
+}
+
+function sdMau(k, mo) {
+  if (k === 0) return mo;
+  if (SD.sau[k] === 1) return SD.huong[k] > 0 ? SD.cAccent : SD.cDo;
+  return SD.cMo;
+}
+
+/* Khung nhìn TỰ VỪA trong lúc mạng còn đang giãn.
+   Không có nó thì mọi hằng số lực phải chỉnh tay cho vừa đúng 638×360 — mà kích
+   thước đó đổi theo bề rộng cửa sổ, và mạng 240 nút với mạng 4.170 nút giãn ra
+   hai cỡ khác hẳn nhau. Đo bao đóng rồi đặt độ phóng là cách duy nhất đúng cho
+   cả hai. Người dùng vừa chạm vào khung nhìn là dừng, không giành tay lái. */
+function sdVua() {
+  if (SD.tuTay || !SD.ds.length) return;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i < SD.ds.length; i++) {
+    if (SD.x[i] < x0) x0 = SD.x[i]; if (SD.x[i] > x1) x1 = SD.x[i];
+    if (SD.y[i] < y0) y0 = SD.y[i]; if (SD.y[i] > y1) y1 = SD.y[i];
+  }
+  const le = 30;
+  /* Bao đóng đo ĐỐI XỨNG QUANH GỐC, không phải hộp bao thật. Nút đang mở được
+     ghim ở gốc, nên lấy tâm hộp bao thật là đặt trọng tâm đám mây vào giữa
+     khung và đẩy chính văn bản đang đọc ra rìa — đã thấy đúng như vậy.
+     Trần phóng 6, không phải 2,2: mạng dày co lại thành đốm nhỏ, trần thấp khoá
+     luôn nó ở đó — bố cục đúng mà khung nhìn không cho xem. */
+  const rx = Math.max(-x0, x1, 1), ry = Math.max(-y0, y1, 1);
+  const z = Math.min(6, Math.max(.05,
+    Math.min((SD.W - le * 2) / (rx * 2), (SD.H - le * 2) / (ry * 2))));
+  const cx = 0, cy = 0;
+  /* Nội suy chứ không gán thẳng: gán thẳng thì mỗi khung hình khung nhìn giật
+     một nấc theo nút bay xa nhất, nhìn như hình bị rung. */
+  const k = .12;
+  SD.cam.z += (z - SD.cam.z) * k;
+  SD.cam.x += (cx - SD.cam.x) * k;
+  SD.cam.y += (cy - SD.cam.y) * k;
+}
+
+function sdVe() {
+  const c = SD.ctx, n = SD.ds.length;
+  if (!c) return;
+  c.setTransform(SD.dpr, 0, 0, SD.dpr, 0, 0);
+  c.clearRect(0, 0, SD.W, SD.H);
+  const z = SD.cam.z, ox = SD.W / 2 + SD.cam.x, oy = SD.H / 2 + SD.cam.y;
+  const X = i => SD.x[i] * z + ox, Y = i => SD.y[i] * z + oy;
+
+  const noi = SD.tro >= 0 ? SD.tro : (SD.keo >= 0 ? SD.keo : -1);
+  const ke = new Set();
+  if (noi >= 0) for (let e = 0; e < SD.ca.length; e++) {
+    if (SD.ca[e] === noi) ke.add(SD.cb[e]);
+    if (SD.cb[e] === noi) ke.add(SD.ca[e]);
+  }
+
+  /* Cạnh vẽ thành MỘT path gộp rồi stroke một lần. 23.801 lệnh stroke riêng lẻ
+     là 23.801 lần đổi trạng thái ngữ cảnh — chỗ tốn nhất của cả khung hình. */
+  c.lineWidth = 1;
+  c.strokeStyle = SD.cCanh;
+  c.globalAlpha = SD.toanKho ? .1 : .26;
+  c.beginPath();
+  for (let e = 0; e < SD.ca.length; e++) {
+    const i = SD.ca[e], j = SD.cb[e];
+    if (noi >= 0 && (i === noi || j === noi)) continue;
+    c.moveTo(X(i), Y(i)); c.lineTo(X(j), Y(j));
+  }
+  c.stroke();
+
+  if (noi >= 0) {
+    c.globalAlpha = .95; c.strokeStyle = SD.cAccent; c.lineWidth = 1.4;
+    c.beginPath();
+    for (let e = 0; e < SD.ca.length; e++) {
+      const i = SD.ca[e], j = SD.cb[e];
+      if (i !== noi && j !== noi) continue;
+      c.moveTo(X(i), Y(i)); c.lineTo(X(j), Y(j));
+    }
+    c.stroke();
+  }
+
+  c.globalAlpha = 1;
+  for (let k = n - 1; k >= 0; k--) {
+    const r = SD.bkinh[k] * Math.min(1.25, Math.max(.75, z));
+    const sang = noi < 0 || k === noi || ke.has(k);
+    c.globalAlpha = sang ? 1 : .3;
+    c.fillStyle = sdMau(k, SD.cGoc);
+    c.beginPath(); c.arc(X(k), Y(k), r, 0, 6.2832); c.fill();
+    if (k === 0 || k === noi) {
+      c.lineWidth = 2; c.strokeStyle = SD.cNen; c.stroke();
+      c.lineWidth = 1.6; c.strokeStyle = k === 0 ? SD.cGoc : SD.cAccent;
+      c.beginPath(); c.arc(X(k), Y(k), r + 3.5, 0, 6.2832); c.stroke();
+    }
+  }
+
+  c.globalAlpha = 1;
+  const chuFont = getComputedStyle(document.body).fontFamily;
+  c.textAlign = "center";
+  const hienNhan = z > .55;
+  /* Nhãn nào ĐÈ lên nhãn đã vẽ thì bỏ. Chỉ giới hạn theo SỐ LƯỢNG là không đủ:
+     trên canvas 309 px của màn điện thoại, 14 nhãn vẫn chồng thành một đống chữ
+     không đọc được — cùng con số ấy trên canvas 638 px lại thưa. Cái quyết định
+     là CHỖ, không phải số. Văn bản đang mở và nút đang trỏ luôn được vẽ trước,
+     nên chúng luôn thắng chỗ. */
+  const hop = [];
+  const veNhan = k => {
+    const v = S.d.van_ban[SD.ds[k]];
+    const t = v.n.length > 20 ? v.n.slice(0, 19) + "…" : v.n;
+    const chinh = k === 0 || k === noi;
+    c.font = (k === 0 ? "600 " : "") + "10px " + chuFont;
+    const w = c.measureText(t).width, hh = 12;
+    const px = X(k), py = Y(k) + SD.bkinh[k] * Math.min(1.25, Math.max(.75, z)) + 11;
+    if (px < -60 || px > SD.W + 60 || py < -20 || py > SD.H + 20) return;
+    const o = [px - w / 2 - 3, py - hh, px + w / 2 + 3, py + 3];
+    if (hop.some(q => o[0] < q[2] && o[2] > q[0] && o[1] < q[3] && o[3] > q[1])) return;
+    hop.push(o);
+    c.globalAlpha = chinh ? 1 : .72;
+    c.fillStyle = k === 0 ? SD.cGoc : SD.cChu;
+    c.fillText(t, px, py);
+  };
+  veNhan(0);
+  if (noi > 0) veNhan(noi);
+  if (hienNhan) for (const k of SD.nhan) if (k !== 0 && k !== noi) veNhan(k);
+  c.globalAlpha = 1;
+}
+
+function sdDoc(ten) {
+  return getComputedStyle(document.documentElement).getPropertyValue(ten).trim();
+}
+
+function sdVong(id) {
+  if (id !== SD.id || !SD.cv || !SD.cv.isConnected) return;
+  if (SD.alpha > 0 || SD.keo >= 0) { sdBuoc(); sdVua(); }
+  sdVe();
+  requestAnimationFrame(() => sdVong(id));
+}
+
+function sdCo() {
+  const h = SD.cv.getBoundingClientRect();
+  SD.dpr = Math.min(devicePixelRatio || 1, 2);
+  SD.W = h.width || SD.cv.parentElement.getBoundingClientRect().width;
+  SD.H = h.height || 360;
+  SD.cv.width = Math.round(SD.W * SD.dpr); SD.cv.height = Math.round(SD.H * SD.dpr);
+}
+
+function sdGan(k) {   /* nút gần con trỏ nhất, theo toạ độ màn hình */
+  const z = SD.cam.z, ox = SD.W / 2 + SD.cam.x, oy = SD.H / 2 + SD.cam.y;
+  let tot = -1, gan = 14 * 14;
+  for (let i = 0; i < SD.ds.length; i++) {
+    const dx = SD.x[i] * z + ox - k.x, dy = SD.y[i] * z + oy - k.y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < gan) { gan = d2; tot = i; }
+  }
+  return tot;
+}
+
+/* Chuột và cảm ứng đi qua Pointer Events, không phải mouse/touch riêng: một bộ
+   xử lý cho cả hai, và `setPointerCapture` giữ được cú kéo khi con trỏ ra ngoài
+   canvas — thiếu nó thì kéo nhanh là nút rớt lại giữa chừng. */
+function sdGanSuKien(cv) {
+  const toado = e => {
+    const h = cv.getBoundingClientRect();
+    return { x: e.clientX - h.left, y: e.clientY - h.top };
+  };
+  cv.addEventListener("pointerdown", e => {
+    const k = toado(e), i = sdGan(k);
+    cv.setPointerCapture(e.pointerId);
+    if (i >= 0) { SD.keo = i; SD.alpha = Math.max(SD.alpha, .34); }
+    else { SD.panh = { x: e.clientX - SD.cam.x, y: e.clientY - SD.cam.y }; SD.tuTay = true; }
+    SD.daDi = false;
   });
-  /* Xanh = văn bản này dẫn chiếu TỚI; đỏ = BỊ dẫn chiếu. Hai chiều ngược
-     nhau về nghĩa pháp lý nên phải khác màu, không chỉ khác mũi tên. */
-  const mau = h => h > 0 ? "var(--accent)" : "var(--t-red)";
-  return `<div class="sodo"><svg viewBox="0 0 ${W} ${H}" role="img"
-      aria-label="Sơ đồ quan hệ dẫn chiếu bậc 1">
-    ${nut.map(n => `<line x1="${cx}" y1="${cy}" x2="${n.x.toFixed(1)}" y2="${n.y.toFixed(1)}"
-        stroke="${mau(n.huong)}" stroke-width="1" opacity=".38"/>`).join("")}
-    ${nut.map(n => {
-      const v = S.d.van_ban[n.j];
-      return `<g><circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="6"
-          fill="${mau(n.huong)}" data-mo-vb="${n.j}"><title>${esc(v.n)} — ${esc(v.t)}
-          (${esc(S.d.do_thi.quan_he[n.t] || "")})</title></circle>
-        <text x="${n.x.toFixed(1)}" y="${(n.y + 16).toFixed(1)}" text-anchor="middle"
-          >${esc(v.n.length > 17 ? v.n.slice(0, 16) + "…" : v.n)}</text></g>`;
-    }).join("")}
-    <circle cx="${cx}" cy="${cy}" r="9" fill="var(--fg)" stroke="var(--bg)" stroke-width="2.5"/>
-  </svg>
-  <div class="ghi">Bậc 1 · ${chon.length}/${lang.length} nút ·
-    <span style="color:var(--accent)">▬</span> dẫn chiếu tới ·
-    <span style="color:var(--t-red)">▬</span> bị dẫn chiếu</div></div>`;
+  cv.addEventListener("pointermove", e => {
+    const k = toado(e);
+    if (SD.keo >= 0) {
+      const z = SD.cam.z;
+      SD.x[SD.keo] = (k.x - SD.W / 2 - SD.cam.x) / z;
+      SD.y[SD.keo] = (k.y - SD.H / 2 - SD.cam.y) / z;
+      SD.daDi = true; return;
+    }
+    if (SD.panh) {
+      SD.cam.x = e.clientX - SD.panh.x; SD.cam.y = e.clientY - SD.panh.y;
+      SD.daDi = true; return;
+    }
+    const i = sdGan(k);
+    if (i !== SD.tro) { SD.tro = i; cv.title = i >= 0 ? nhanNut(i) : ""; }
+  });
+  const thoi = () => { SD.keo = -1; SD.panh = null; };
+  cv.addEventListener("pointerup", e => {
+    /* Bấm mà không rê = mở văn bản đó. Rê rồi thả thì KHÔNG mở — nếu không thì
+       mỗi lần kéo một nút cho dễ nhìn lại nhảy sang tài liệu khác. */
+    if (!SD.daDi) {
+      const i = sdGan(toado(e));
+      if (i > 0) { thoi(); moTaiLieu("van_ban", SD.ds[i]); return; }
+    }
+    thoi();
+  });
+  cv.addEventListener("pointercancel", thoi);
+  cv.addEventListener("pointerleave", () => { SD.tro = -1; });
+  cv.addEventListener("wheel", e => {
+    e.preventDefault();
+    const h = cv.getBoundingClientRect();
+    const mx = e.clientX - h.left - SD.W / 2, my = e.clientY - h.top - SD.H / 2;
+    const cu = SD.cam.z;
+    const moi = Math.min(9, Math.max(.06, cu * Math.exp(-e.deltaY * .0016)));
+    /* Phóng quanh CON TRỎ, không quanh tâm khung: phóng quanh tâm thì vùng đang
+       nhìn trôi đi mất và phải rê lại từ đầu sau mỗi nấc. */
+    SD.cam.x = mx - (mx - SD.cam.x) * (moi / cu);
+    SD.cam.y = my - (my - SD.cam.y) * (moi / cu);
+    SD.cam.z = moi;
+    SD.tuTay = true;
+  }, { passive: false });
+}
+
+function nhanNut(i) {
+  const v = S.d.van_ban[SD.ds[i]];
+  return v.n + " — " + v.t;
+}
+
+function khoiSoDo(goc) {
+  const cv = $("#sodo-cv");
+  if (!cv) return;
+  SD.id++; SD.cv = cv; SD.ctx = cv.getContext("2d");
+  SD.cGoc = sdDoc("--fg"); SD.cAccent = sdDoc("--accent"); SD.cDo = sdDoc("--t-red");
+  SD.cMo = sdDoc("--fg-3"); SD.cCanh = sdDoc("--fg-3"); SD.cNen = sdDoc("--bg-2");
+  SD.cChu = sdDoc("--fg-3");
+  sdCo();
+  sdDung(goc);
+  sdNong();
+  if (!cv.dataset.gan) { sdGanSuKien(cv); cv.dataset.gan = "1"; }
+  capNhatGhiSoDo();
+  sdVong(SD.id);
+}
+
+function capNhatGhiSoDo() {
+  const el = $("#sodo-ghi");
+  /* Nói rõ đang xem PHẦN NÀO của kho. Một sơ đồ 90 nút và một sơ đồ 4.170 nút
+     trông na ná nhau khi thu nhỏ, mà ý nghĩa thì khác hẳn — không ghi thì người
+     xem tưởng mình đang nhìn cả kho trong khi chỉ thấy lân cận. */
+  const lang = (S.ke.get(SD.ds[0]) || []).length;
+  const cat = !SD.toanKho && lang > SD.ds.length - 1;
+  if (el) el.innerHTML = (SD.toanKho
+      ? `Toàn kho · ${SD.ds.length.toLocaleString("vi")} văn bản`
+      : `Lân cận bậc 1–2 · ${SD.ds.length.toLocaleString("vi")} nút`
+        + (cat ? ` (trong ${lang.toLocaleString("vi")} quan hệ trực tiếp)` : ""))
+    + ` · ${SD.ca.length.toLocaleString("vi")} cạnh
+    · <span style="color:var(--accent)">●</span> dẫn chiếu tới
+    · <span style="color:var(--t-red)">●</span> bị dẫn chiếu
+    · <span style="opacity:.7">kéo để xoay · lăn chuột để phóng · bấm để mở</span>`;
+  const b = $("#sodo-pv");
+  if (b) b.textContent = SD.toanKho ? "Thu về lân cận" : "Xem toàn kho";
+}
+
+function htmlSoDo() {
+  return `<div class="sodo">
+    <canvas id="sodo-cv"></canvas>
+    <button id="sodo-pv" class="pv"></button>
+    <div class="ghi" id="sodo-ghi"></div>
+  </div>`;
 }
 
 /* ════════════════ Chat có trích dẫn ════════════════ */
@@ -1091,6 +1669,11 @@ document.addEventListener("click", e => {
 
   if (t.closest("#goi-y button")) { hoi(t.textContent.trim()); return; }
   if (t.closest("#doc-dong")) { dongTaiLieu(); return; }
+  if (t.closest("#sodo-pv")) {
+    SD.toanKho = !SD.toanKho;
+    sdDung(SD.ds[0]); sdNong(); capNhatGhiSoDo();
+    return;
+  }
   if (t.closest("#doc-sodo")) {
     $("#doc-noi .sodo")?.scrollIntoView({ behavior: "smooth", block: "center" });
     return;
@@ -1111,6 +1694,14 @@ document.addEventListener("click", e => {
     $("#dlg-cfg").close(); capNhatGhiChat();
     return;
   }
+});
+
+let henCo;
+addEventListener("resize", () => {
+  clearTimeout(henCo);
+  henCo = setTimeout(() => {
+    if (SD.cv && SD.cv.isConnected) { sdCo(); SD.alpha = Math.max(SD.alpha, .12); }
+  }, 120);
 });
 
 let hen;
