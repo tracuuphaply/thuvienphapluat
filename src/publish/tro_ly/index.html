@@ -77,11 +77,15 @@ code,kbd{font-family:var(--mono);font-size:.86em;
 /* ── Thanh trên ── */
 header.top{
   flex:0 0 auto; display:flex; align-items:center; gap:12px;
-  padding:0 12px; height:45px; background:var(--bg);
+  padding:0 12px; height:52px; background:var(--bg);
   border-bottom:1px solid var(--line); z-index:40;
 }
-.brand{display:flex;align-items:center;gap:7px;font-weight:600;font-size:14px;white-space:nowrap}
-.brand small{font-weight:400;color:var(--fg-3);font-size:12px}
+.brand{
+  display:flex;align-items:center;gap:8px;font-weight:600;font-size:17px;
+  white-space:nowrap;padding:5px 9px 5px 6px;border-radius:var(--r);color:var(--fg);
+}
+.brand .ic{font-size:21px;line-height:1}
+.brand:hover{background:var(--hover)}
 .tim-toan{flex:1 1 auto;max-width:520px;position:relative}
 .tim-toan input{
   width:100%; padding:5px 10px 5px 30px; border-radius:var(--r);
@@ -164,6 +168,14 @@ header.top{
 
 /* ── Cột giữa: hỏi đáp ── */
 .chat{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
+/* Sơ đồ nền: chiếm phần trên của khung hỏi đáp, co giãn theo khung. Chiều cao
+   tối thiểu 260 px — dưới mức đó thì 4.170 nút thành một vạch, thà không vẽ. */
+.sodo.nen{
+  flex:1 1 auto;min-height:260px;margin:4px 26px 8px;
+}
+.sodo.nen canvas{height:100%}
+.chat[data-nen=false] .sodo.nen{display:none}
+.chat[data-nen=true] .chat-log{flex:0 0 auto;max-height:34%}
 .chat-log{flex:1 1 auto;overflow-y:auto;padding:6px 28px 8px}
 .tn{margin:0 auto 20px;max-width:680px}
 .tn .ai{font-size:12px;color:var(--fg-3);margin-bottom:5px;font-weight:500}
@@ -292,9 +304,15 @@ dialog.doc-modal::backdrop{background:rgba(15,15,15,.6);backdrop-filter:blur(2px
 .sodo canvas{display:block;width:100%;height:360px;cursor:grab;touch-action:none}
 .sodo canvas:active{cursor:grabbing}
 .sodo .ghi{
-  position:absolute;left:12px;bottom:9px;font-size:11px;color:var(--fg-3);
-  pointer-events:none;line-height:1.5;
+  position:absolute;left:0;right:0;bottom:0;padding:7px 12px 8px;
+  font-size:11px;color:var(--fg-3);pointer-events:none;line-height:1.5;
+  /* Nền mờ dần thay vì chữ trần. Trên canvas 349 px của điện thoại, chú thích
+     xuống ba dòng và nằm đè lên giữa đám nút — không đọc được chữ mà cũng không
+     thấy được nút. */
+  background:linear-gradient(to top,var(--bg-2) 62%,transparent);
 }
+.sodo .ghi .goi{opacity:.7}
+@media(max-width:900px){.sodo .ghi .goi{display:none}}
 .sodo .pv{
   position:absolute;right:9px;top:9px;padding:4px 10px;font-size:12px;
   border-radius:var(--r);background:var(--bg);color:var(--fg-2);
@@ -362,8 +380,10 @@ dialog.cfg small{display:block;color:var(--fg-3);font-size:12.5px;margin-top:5px
   .chat-in textarea{min-height:58px}
   .doc-modal{width:100vw;height:100vh;max-height:none;border-radius:0}
   .doc-modal .mb{padding:20px 16px 48px}
+  .sodo.nen{margin:4px 12px 6px;min-height:200px}
+  .brand{font-size:15px}
+  .brand .ic{font-size:18px}
   .doc h1{font-size:24px}
-  .brand small{display:none}
   header.top{gap:8px;padding:0 8px}
 }
 </style>
@@ -371,7 +391,8 @@ dialog.cfg small{display:block;color:var(--fg-3);font-size:12.5px;margin-top:5px
 <body>
 
 <header class="top">
-  <div class="brand">⚖️ <span>Trợ lý pháp luật</span> <small>văn bản · biểu mẫu</small></div>
+  <button class="brand" id="btn-home" title="Về trang đầu">
+    <span class="ic">⚖️</span><span>Trợ lý pháp luật</span></button>
   <div class="tim-toan">
     <span class="ic">🔍</span>
     <input id="q" type="search" placeholder="Tra số hiệu, tên văn bản, tên biểu mẫu…" autocomplete="off">
@@ -415,7 +436,15 @@ dialog.cfg small{display:block;color:var(--fg-3);font-size:12.5px;margin-top:5px
       <span>Hỏi đáp</span>
       <span class="nhan" id="c3-nhan">mọi câu trả lời đều kèm trích dẫn bấm được</span>
     </div>
-    <div class="chat" id="chat">
+    <div class="chat" id="chat" data-nen="false">
+      <!-- Sơ đồ toàn kho chiếm chỗ trống của khung hỏi đáp khi chưa có câu nào.
+           Chỗ này vốn là một khoảng trắng lớn, mà cái đáng nhìn nhất của kho —
+           4.170 văn bản dẫn chiếu nhau — thì nằm giấu trong popup. Có câu trả
+           lời thì nó nhường chỗ, vì lúc đó thứ phải đọc là câu trả lời. -->
+      <div class="sodo nen" id="sodo-nen">
+        <canvas id="sodo-nen-cv"></canvas>
+        <div class="ghi"></div>
+      </div>
       <div class="chat-log" id="chat-log"></div>
       <div class="chat-in">
         <div class="goi-y" id="goi-y"></div>
@@ -700,7 +729,8 @@ function moTaiLieu(kho, i) {
      <dialog> chưa mở thì nội dung bên trong CHƯA CÓ BỐ CỤC: getBoundingClientRect
      trả 0, canvas nhận width 0 và không vẽ được gì. Lỗi này im lặng — không có
      ngoại lệ nào, chỉ là một khung trống. */
-  if (kho === "van_ban") khoiSoDo(i);
+  if (kho === "van_ban") khoiSoDo(i, $("#sodo-cv"), false);
+  else { SD.id++; SD.cv = null; }   /* trang biểu mẫu không có sơ đồ — dừng cái đang chạy */
 }
 
 function dongTaiLieu() {
@@ -708,6 +738,9 @@ function dongTaiLieu() {
   SD.cv = null;
   const d = $("#dlg-doc");
   if (d.open) d.close();
+  /* Sơ đồ nền nhận lại bộ mô phỏng — nhưng KHÔNG chạy lại hoạt ảnh: bố cục toàn
+     kho đã nhớ, và đóng một popup thì không phải lúc bắt người ta chờ 6 giây. */
+  datNen();
 }
 
 function htmlVanBan(v, i) {
@@ -950,7 +983,12 @@ function sdChonNut(goc) {
   return { ds, sau };
 }
 
-function sdDung(goc) {
+/* `boQuaNho`: bỏ qua bố cục đã nhớ và dựng lại từ đầu.
+   Dùng khi người dùng TỰ bấm đổi phạm vi — lúc đó họ muốn xem mạng lưới được
+   dựng ra, không phải thấy nó hiện sẵn. Còn khi chỉ mở một văn bản khác trong
+   cùng phạm vi thì dùng lại bố cục nhớ, vì bố cục không đổi mà chờ lắng lại 6
+   giây là chờ vô ích. */
+function sdDung(goc, boQuaNho) {
   const { ds, sau } = sdChonNut(goc);
   const n = ds.length;
   SD.goc = 0; SD.ds = ds;
@@ -1049,7 +1087,7 @@ function sdDung(goc) {
      lại mỗi lần mở một văn bản là bắt người dùng ngồi xem lại đúng cái hoạt
      ảnh ấy. Lần đầu lắng thật và có hoạt ảnh; từ lần sau hiện ra ngay.
      Chỉ nhớ chế độ toàn kho: bố cục lân cận khác nhau theo từng văn bản. */
-  if (SD.toanKho && S.boCucKho) {
+  if (SD.toanKho && S.boCucKho && !boQuaNho) {
     /* Đánh số theo CHỈ SỐ TOÀN CỤC của văn bản, không theo chỉ số cục bộ trong
        SD.ds. Thứ tự cục bộ đổi mỗi lần mở, vì văn bản đang mở luôn bị hoán về
        vị trí 0 — nhớ theo chỉ số cục bộ là mỗi lần mở lại hoán vị hai nút, đủ
@@ -1214,10 +1252,13 @@ function sdBuoc() {
      Chậm KHÔNG đồng nghĩa lâu, và đây là chỗ dễ trộn lẫn: thời gian lắng do tốc
      độ nguội của alpha định, còn trần chỉ định mỗi khung hình đi được bao xa.
      Hai thứ chỉnh riêng.
-     Mạng toàn kho đi xa hơn — 4.170 nút phải tự sắp lại từ vòng gieo — nên trần
-     rộng hơn. Đo số nút còn nằm trong khung sau khi lắng: trần 1 + 12·α để 95
-     nút lọt ra ngoài, trần 0,6 + 7·α chỉ 26. Đi chậm hơn thì lắng gọn hơn. */
-  const tran = SD.toanKho ? .6 + 7 * a : .28 + 2.2 * a, tran2 = tran * tran;
+     MỘT bộ thông số cho CẢ HAI phạm vi. Trước đây chia hai, vì mạng toàn kho
+     phải đi xa hơn để tự sắp lại. Nhưng chia hai nghĩa là hai chuyển động khác
+     nhau trong cùng một khung, và người xem bấm qua bấm lại giữa chúng — nhịp
+     phải giống nhau, không thì mỗi lần đổi phạm vi là một cảm giác khác.
+     Lấy bộ của toàn kho (0,6 + 7·α, nguội 0,014) vì đó là bộ đã được nghiệm thu
+     bằng mắt. */
+  const tran = .6 + 7 * a, tran2 = tran * tran;
   for (let i = 1; i < n; i++) {
     SD.vx[i] -= SD.x[i] * veTam; SD.vy[i] -= SD.y[i] * veTam;
     if (i === SD.keo) { SD.vx[i] = SD.vy[i] = 0; continue; }
@@ -1226,10 +1267,9 @@ function sdBuoc() {
     if (v2 > tran2) { const s = tran / Math.sqrt(v2); SD.vx[i] *= s; SD.vy[i] *= s; }
     SD.x[i] += SD.vx[i]; SD.y[i] += SD.vy[i];
   }
-  /* Tốc độ NGUỘI định thời gian lắng: 0,011 cho ~450 khung hình ≈ 7,5 giây ở
-     60 fps. Mạng toàn kho nguội nhanh hơn vì mỗi bước tốn ~17 ms chứ không phải
-     0,33 ms — cùng số bước là gấp năm mươi lần thời gian chờ. */
-  const nguoi = SD.toanKho ? .014 : .011;
+  /* Tốc độ NGUỘI định thời gian lắng: 0,014 cho ~376 khung hình ≈ 6,3 giây ở
+     60 fps. Cùng một giá trị cho hai phạm vi, cùng lý do như trần vận tốc. */
+  const nguoi = .014;
   SD.alpha = a > .006 ? a - (a - .0015) * nguoi : 0;
   if (!SD.alpha && SD.toanKho) {
     if (!S.boCucKho) S.boCucKho = new Float64Array(S.d.van_ban.length * 2);
@@ -1383,7 +1423,7 @@ function sdVe() {
   const hop = [];
   const veNhan = k => {
     const v = S.d.van_ban[SD.ds[k]];
-    const t = v.n.length > 20 ? v.n.slice(0, 19) + "…" : v.n;
+    const t = tenNgan(v);
     const chinh = k === 0 || k === noi;
     c.font = (k === 0 ? "600 " : "") + "10px " + chuFont;
     const w = c.measureText(t).width, hh = 12;
@@ -1495,20 +1535,33 @@ function nhanNut(i) {
   return v.n + " — " + v.t;
 }
 
-function khoiSoDo(goc) {
-  const cv = $("#sodo-cv");
+/* Tên ngắn để vẽ trên sơ đồ. Thường là số hiệu, nhưng có văn bản KHÔNG CÓ số
+   hiệu — Hiến pháp năm 2013 mang đúng chữ "Không số" trong kho, và nó là văn bản
+   được dẫn chiếu nhiều thứ hai (826 quan hệ). Dán "Không số" lên nút trung tâm
+   của cả sơ đồ thì nhãn không nói gì cả. */
+function tenNgan(v) {
+  const t = /\d/.test(v.n) ? v.n : (v.t || v.n);
+  return t.length > 22 ? t.slice(0, 21) + "…" : t;
+}
+
+/* MỘT bộ mô phỏng, hai chỗ dùng: sơ đồ trong popup tài liệu và sơ đồ nền ở
+   khung hỏi đáp. Chúng không bao giờ cùng nhìn thấy được — popup che hết khung
+   phía sau — nên dùng chung một `SD` thay vì nhân đôi cả bộ máy. Chỗ nào đang
+   hiện thì chỗ đó nắm `SD`; `SD.id` cắt vòng lặp của chỗ cũ. */
+function khoiSoDo(goc, cv, toanKho, chayLai) {
   if (!cv) return;
   SD.id++; SD.cv = cv; SD.ctx = cv.getContext("2d");
+  if (toanKho !== undefined) SD.toanKho = toanKho;
   SD.cGoc = sdDoc("--fg"); SD.cAccent = sdDoc("--accent"); SD.cDo = sdDoc("--t-red");
   SD.cMo = sdDoc("--fg-3"); SD.cCanh = sdDoc("--fg-3"); SD.cNen = sdDoc("--bg-2");
   SD.cChu = sdDoc("--fg-3");
   sdCo();
-  sdDung(goc);
+  sdDung(goc, chayLai);
   /* Khớp khung NGAY, không nội suy, trước khung hình đầu. Nội suy 7% mỗi khung
      hình mà khởi đầu z = 1 thì nửa giây đầu khung nhìn còn đang thu về — trong
      nửa giây đó mạng nằm ngoài khung và chỉ thấy phần giữa. */
   sdVuaNgay();
-  sdNong();
+  if (!chayLai) sdNong();
   sdVuaNgay();
   if (!cv.dataset.gan) { sdGanSuKien(cv); cv.dataset.gan = "1"; }
   capNhatGhiSoDo();
@@ -1516,7 +1569,11 @@ function khoiSoDo(goc) {
 }
 
 function capNhatGhiSoDo() {
-  const el = $("#sodo-ghi");
+  /* Tìm ô chú thích TRONG CÙNG khung với canvas đang vẽ, không tra theo id cố
+     định: hai khung dùng chung một bộ mô phỏng nhưng mỗi khung có ô chú thích
+     riêng, tra theo id thì cái ẩn cũng bị ghi. */
+  const khung = SD.cv && SD.cv.parentElement;
+  const el = khung && khung.querySelector(".ghi");
   /* Nói rõ đang xem PHẦN NÀO của kho. Một sơ đồ 90 nút và một sơ đồ 4.170 nút
      trông na ná nhau khi thu nhỏ, mà ý nghĩa thì khác hẳn — không ghi thì người
      xem tưởng mình đang nhìn cả kho trong khi chỉ thấy lân cận. */
@@ -1529,8 +1586,8 @@ function capNhatGhiSoDo() {
     + ` · ${SD.ca.length.toLocaleString("vi")} cạnh
     · <span style="color:var(--accent)">●</span> dẫn chiếu tới
     · <span style="color:var(--t-red)">●</span> bị dẫn chiếu
-    · <span style="opacity:.7">kéo để xoay · lăn chuột để phóng · bấm để mở</span>`;
-  const b = $("#sodo-pv");
+    · <span class="goi">kéo để xoay · lăn chuột để phóng · bấm để mở</span>`;
+  const b = khung && khung.querySelector(".pv");
   if (b) b.textContent = SD.toanKho ? "Thu về lân cận" : "Xem toàn kho";
 }
 
@@ -1538,8 +1595,46 @@ function htmlSoDo() {
   return `<div class="sodo">
     <canvas id="sodo-cv"></canvas>
     <button id="sodo-pv" class="pv"></button>
-    <div class="ghi" id="sodo-ghi"></div>
+    <div class="ghi"></div>
   </div>`;
+}
+
+/* ════════════════ Sơ đồ nền ở khung hỏi đáp ════════════════
+   Tâm sơ đồ nền là văn bản ĐƯỢC DẪN CHIẾU NHIỀU NHẤT trong kho, không phải một
+   văn bản ngẫu nhiên: nó là điểm mốc có nghĩa để định vị mọi thứ còn lại, và
+   cũng là câu trả lời cho "văn bản nào là trung tâm của kho này". */
+function nutTrungTam() {
+  let tot = 0, nhieu = -1;
+  for (const [i, ke] of S.ke) if (ke.length > nhieu) { nhieu = ke.length; tot = i; }
+  return tot;
+}
+
+function coNen() {
+  return !!(S.d && !S.hoiThoai.length && !$("#dlg-doc").open);
+}
+
+/* Bật/tắt sơ đồ nền. Nó và sơ đồ trong popup dùng chung một bộ mô phỏng, nên
+   mỗi lần đổi chỗ hiển thị là một lần khởi tạo lại — rẻ, vì bố cục toàn kho đã
+   được nhớ sau lần lắng đầu. */
+function datNen(chayLai) {
+  const bat = coNen();
+  $("#chat").dataset.nen = String(bat);
+  if (!bat) { if (SD.cv === $("#sodo-nen-cv")) { SD.id++; SD.cv = null; } return; }
+  khoiSoDo(nutTrungTam(), $("#sodo-nen-cv"), true, chayLai);
+}
+
+function veHome() {
+  S.hoiThoai = []; S.nguon = {}; S.tdChon = null;
+  $("#chat-log").innerHTML = "";
+  $("#goi-y").hidden = false;
+  $("#q").value = "";
+  S.kho = "van_ban"; S.linhVuc = null;
+  dongTaiLieu();
+  dungLoc(); dungNhom(); veDanhSach(null); veNguon();
+  $$(".c1 [data-kho]").forEach(b =>
+    b.setAttribute("aria-selected", String(b.dataset.kho === "van_ban")));
+  hienCot("col2");
+  datNen(true);
 }
 
 /* ════════════════ Chat có trích dẫn ════════════════ */
@@ -1647,6 +1742,10 @@ async function hoi(cau) {
   $("#goi-y").hidden = true;
   themTinNhan("user", cau);
   S.hoiThoai.push({ role: "user", content: cau });
+  /* Tắt sơ đồ nền SAU khi đã ghi câu hỏi vào hội thoại, không trước:
+     `coNen()` xét `S.hoiThoai.length`, gọi trước thì nó vẫn thấy hội thoại rỗng
+     và giữ sơ đồ lại. */
+  datNen();
 
   const hop = document.createElement("div");
   hop.className = "tn a";
@@ -1861,7 +1960,8 @@ document.addEventListener("click", e => {
   if (t === $("#dlg-doc")) { dongTaiLieu(); return; }
   if (t.closest("#sodo-pv")) {
     SD.toanKho = !SD.toanKho;
-    sdDung(SD.ds[0]); sdVuaNgay(); sdNong(); sdVuaNgay(); capNhatGhiSoDo();
+    sdDung(SD.ds[0], true);
+    sdVuaNgay(); capNhatGhiSoDo();
     return;
   }
   if (t.closest("#doc-sodo")) {
@@ -1874,6 +1974,7 @@ document.addEventListener("click", e => {
     open(`${GOC}/${S.mo.kho === "van_ban" ? "van-ban" : "bieu-mau"}/${v.s}`, "_blank");
     return;
   }
+  if (t.closest("#btn-home")) { veHome(); return; }
   if (t.closest("#btn-cfg")) {
     $("#cfg-url").value = CH.url; $("#cfg-key").value = CH.key; $("#dlg-cfg").showModal();
     return;
@@ -1890,7 +1991,7 @@ let henCo;
 addEventListener("resize", () => {
   clearTimeout(henCo);
   henCo = setTimeout(() => {
-    if (SD.cv && SD.cv.isConnected) { sdCo(); SD.alpha = Math.max(SD.alpha, .12); }
+    if (SD.cv && SD.cv.isConnected) { sdCo(); sdVuaNgay(); }
   }, 120);
 });
 
@@ -1935,7 +2036,7 @@ addEventListener("keydown", e => {
 /* ── Khởi động ── */
 hienCot("col2");
 veNguon();
-nap().then(() => { veGoiY(); capNhatGhiChat(); }).catch(e => {
+nap().then(() => { veGoiY(); capNhatGhiChat(); datNen(true); }).catch(e => {
   $("#ds").innerHTML = `<div class="trong">${esc(e.message)}</div>`;
 });
 
