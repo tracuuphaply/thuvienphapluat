@@ -517,7 +517,7 @@ const CH = {                       /* cấu hình lưu trong localStorage */
 const S = {                        /* trạng thái ứng dụng */
   d: null, kho: "van_ban", linhVuc: null,
   mo: null, hoiThoai: [], nguon: {}, tdChon: null, dangChay: false,
-  idxVB: [], idxBM: [], ke: null, dsCuoi: null,
+  idxVB: [], idxBM: [], ke: null, dsCuoi: null, boCucKho: null,
 };
 
 /* ── Cờ hiệu lực → hình thức ─────────────────────────────── */
@@ -854,6 +854,10 @@ function qChen(k, i, px, py, sau) {
    Nên: sàn chỉ để chống chia cho 0, còn chống nổ là việc của trần vận tốc. */
 const SD_SAN2 = .09;
 
+/* Dưới ngưỡng này thì tính lực đẩy CHÍNH XÁC từng cặp, trên thì dùng cây tứ
+   phân. 400 nút = 160 nghìn cặp ≈ 0,9 ms, vẫn thừa cho 60 fps. */
+const SD_CHINH_XAC = 400;
+
 /* Duyệt bằng NGĂN XẾP TƯỜNG MINH, không đệ quy.
    Ở 4.170 nút, mỗi nút thăm hơn trăm ô; chi phí gọi hàm của JS nhân lên từng
    ấy lần là phần lớn thời gian. Ngăn xếp cấp phát một lần, dùng lại mọi bước. */
@@ -989,6 +993,24 @@ function sdDung(goc) {
 
   SD.alpha = 1; SD.cam = { x: 0, y: 0, z: 1 }; SD.tro = -1; SD.keo = -1; SD.tuTay = false;
   qCapPhat(n * 2);
+
+  /* BỐ CỤC TOÀN KHO NHỚ LẠI GIỮA CÁC LẦN MỞ.
+     Nó KHÔNG phụ thuộc văn bản nào đang mở — cùng 4.170 nút, cùng 23.801 cạnh,
+     chỉ đổi cái được tô sáng. Mà lắng nó mất khoảng 6 giây ở ~30 fps, nên tính
+     lại mỗi lần mở một văn bản là bắt người dùng ngồi xem lại đúng cái hoạt
+     ảnh ấy. Lần đầu lắng thật và có hoạt ảnh; từ lần sau hiện ra ngay.
+     Chỉ nhớ chế độ toàn kho: bố cục lân cận khác nhau theo từng văn bản. */
+  if (SD.toanKho && S.boCucKho) {
+    /* Đánh số theo CHỈ SỐ TOÀN CỤC của văn bản, không theo chỉ số cục bộ trong
+       SD.ds. Thứ tự cục bộ đổi mỗi lần mở, vì văn bản đang mở luôn bị hoán về
+       vị trí 0 — nhớ theo chỉ số cục bộ là mỗi lần mở lại hoán vị hai nút, đủ
+       để bố cục "nhớ lại" thành bố cục của một kho khác. */
+    for (let k = 0; k < n; k++) {
+      const g = SD.ds[k] * 2;
+      SD.x[k] = S.boCucKho[g]; SD.y[k] = S.boCucKho[g + 1];
+    }
+    SD.alpha = 0;
+  }
 }
 
 /* CHẠY NÓNG trước khi vẽ khung đầu, có HẠN MỨC THỜI GIAN.
@@ -998,6 +1020,7 @@ function sdDung(goc) {
    tốn 0,4 ms còn ở chế độ toàn kho tốn 15,6 ms — cùng 90 bước là 36 ms với cái
    này và 1,4 giây với cái kia. */
 function sdNong() {
+  if (!SD.alpha) return;   /* bố cục nhớ lại thì đã ở thế cân bằng, chạy nữa là phí */
   const han = performance.now() + 110;
   for (let k = 0; k < 90 && performance.now() < han; k++) { sdBuoc(); sdVua(); }
 }
@@ -1026,6 +1049,28 @@ function sdBuoc() {
     if (SD.x[i] < x0) x0 = SD.x[i]; if (SD.x[i] > x1) x1 = SD.x[i];
     if (SD.y[i] < y0) y0 = SD.y[i]; if (SD.y[i] > y1) y1 = SD.y[i];
   }
+  /* MẠNG NHỎ TÍNH CHÍNH XÁC, KHÔNG XẤP XỈ.
+     Cây tứ phân gộp các nút ở xa thành một khối tâm — nhanh, nhưng khi một nút
+     đi qua ranh giới ô thì tập ô được gộp ĐỔI ĐỘT NGỘT và lực nhảy một bậc. Ở
+     4.170 nút không ai thấy; ở 90 nút thì thấy rõ từng nút giật. Mà 90 nút chỉ
+     là 8.100 cặp, rẻ hơn cả việc dựng cây — xấp xỉ ở đây là trả tiền để mua sự
+     giật. */
+  if (n <= SD_CHINH_XAC) {
+    for (let i = 0; i < n; i++) {
+      if (i === SD.keo) continue;
+      const xi = SD.x[i], yi = SD.y[i];
+      let vx = 0, vy = 0;
+      for (let j = 0; j < n; j++) {
+        if (j === i) continue;
+        const dx = SD.x[j] - xi, dy = SD.y[j] - yi;
+        let d2 = dx * dx + dy * dy;
+        if (d2 < SD_SAN2) d2 = SD_SAN2;
+        const f = luc / d2;
+        vx -= dx * f; vy -= dy * f;
+      }
+      SD.vx[i] += vx; SD.vy[i] += vy;
+    }
+  } else {
   const nua = Math.max(x1 - x0, y1 - y0, 1) / 2 + 1;
   let goc;
   for (let lan = 0; lan < 3; lan++) {
@@ -1043,6 +1088,7 @@ function sdBuoc() {
      hàng trăm nghìn mỗi bước — phép chia là thứ đắt nhất trong vòng trong. */
   for (let k = 0; k < qDem; k++) { const m = qM[k]; if (m) { qX[k] /= m; qY[k] /= m; } }
   for (let i = 0; i < n; i++) if (i !== SD.keo) qDay(goc, i, luc);
+  }
 
   for (let e = 0; e < SD.ca.length; e++) {
     const i = SD.ca[e], j = SD.cb[e];
@@ -1063,9 +1109,34 @@ function sdBuoc() {
     if (j !== SD.keo) { SD.vx[j] -= dx * b; SD.vy[j] -= dy * b; }
   }
 
-  /* Lực về tâm giữ mạng khỏi trôi; riêng văn bản đang mở bị kéo mạnh gấp bội để
-     nó ở lại giữa khung — cả sơ đồ tồn tại là để trả lời "nó nằm ở đâu", mà nó
-     trôi khỏi màn hình thì câu trả lời mất. */
+  /* GỠ CHỒNG LẤN — chỉ ở mạng nhỏ, và đây là thứ tạo ra dáng TRÒN GÓI ĐỀU.
+     Lực đẩy 1/d² giữ các nút xa nhau về trung bình nhưng không cấm hai nút nằm
+     đè lên nhau; chỗ đè đó là cái mắt đọc thành "một cục lổn nhổn" thay vì một
+     đĩa gói đều. Đẩy nhau đúng bằng phần chồng, mỗi bên một nửa: cục bộ, không
+     kéo theo phần còn lại, nên nó gói chặt mà không làm mạng phồng lên.
+     Bán kính tính bằng ĐƠN VỊ THẾ GIỚI, KHÔNG chia cho độ phóng. Chia cho độ
+     phóng nghe có lý — thứ không được đè nhau là hình trên màn hình — nhưng nó
+     tạo một vòng phản hồi: phóng to → bán kính thế giới nhỏ đi → mạng co lại →
+     khung nhìn lại phóng to hơn, chạy tới khi đụng trần phóng. Đo được: lấp
+     31% bề rộng khung và độ phóng kẹt ở trần.
+     Mà hằng số này không ảnh hưởng hình cuối: bao đóng tỉ lệ thuận với bán kính,
+     còn độ phóng tự vừa thì tỉ lệ nghịch — hai cái triệt tiêu nhau. */
+  if (n <= SD_CHINH_XAC) {
+    for (let i = 0; i < n; i++) {
+      const ri = SD.bkinh[i] + 2.5;
+      for (let j = i + 1; j < n; j++) {
+        const tt = ri + SD.bkinh[j] + 2.5;
+        let dx = SD.x[j] - SD.x[i], dy = SD.y[j] - SD.y[i];
+        const d2 = dx * dx + dy * dy;
+        if (d2 >= tt * tt || d2 < 1e-9) continue;
+        const d = Math.sqrt(d2), day = (tt - d) / d * .5;
+        dx *= day; dy *= day;
+        if (i !== SD.keo && i !== 0) { SD.x[i] -= dx; SD.y[i] -= dy; }
+        if (j !== SD.keo) { SD.x[j] += dx; SD.y[j] += dy; }
+      }
+    }
+  }
+
   /* Văn bản đang mở GHIM tại gốc toạ độ, không thả trôi.
      Bố cục lực không có toạ độ tuyệt đối — ghim một nút không làm sai cấu trúc,
      nó chỉ chọn hệ quy chiếu. Đổi lại, khung nhìn luôn biết đặt tâm ở đâu, và
@@ -1082,24 +1153,30 @@ function sdBuoc() {
      Và một bờ vực: đẩy quá yếu so với lò xo thì cả mạng sập vào bán kính 14 —
      xảy ra ở (40, .055), (12, .02) và (4, .004). */
   const veTam = (SD.toanKho ? .02 : .011) * a;
+  /* TRẦN VẬN TỐC CO THEO ALPHA — đây là chốt chính chống "nhảy loạn xạ".
+     Trần cố định 24 px/khung hình hợp lý lúc mạng còn đang giãn, nhưng ở cuối,
+     khi lẽ ra mọi thứ phải đứng yên, nó vẫn cho nút văng 24 px mỗi khi lực dư
+     dao động — và mắt đọc đúng cái đó là giật. Cuối đường trần còn 1,5 px. */
+  const tran = 1.5 + 23 * a, tran2 = tran * tran;
   for (let i = 1; i < n; i++) {
-    const g = veTam;
-    SD.vx[i] -= SD.x[i] * g; SD.vy[i] -= SD.y[i] * g;
+    SD.vx[i] -= SD.x[i] * veTam; SD.vy[i] -= SD.y[i] * veTam;
     if (i === SD.keo) { SD.vx[i] = SD.vy[i] = 0; continue; }
     SD.vx[i] *= .62; SD.vy[i] *= .62;
-    /* Trần vận tốc: chốt chặn cuối. Một cấu hình bất thường nào đó vẫn có thể
-       sinh lực lớn, và mạng bay ra ngoài khung thì không có đường quay lại —
-       khung nhìn tự vừa sẽ thu nhỏ theo nút bay xa nhất, kéo cả phần còn lại
-       thành một chấm. 24 px/khung hình đã là nhanh hơn mắt theo kịp; để 60 thì
-       mỗi bước vọt qua điểm cân bằng và hệ nảy thay vì lắng. */
     const v2 = SD.vx[i] * SD.vx[i] + SD.vy[i] * SD.vy[i];
-    if (v2 > 576) { const s = 24 / Math.sqrt(v2); SD.vx[i] *= s; SD.vy[i] *= s; }
+    if (v2 > tran2) { const s = tran / Math.sqrt(v2); SD.vx[i] *= s; SD.vy[i] *= s; }
     SD.x[i] += SD.vx[i]; SD.y[i] += SD.vy[i];
   }
   /* Mạng lớn nguội NHANH hơn: mỗi bước ở chế độ toàn kho tốn hàng chục ms, và
      300 bước là chờ hơn mười giây trước khi hình đứng yên. */
-  const nguoi = SD.toanKho ? .04 : .021;
+  const nguoi = SD.toanKho ? .045 : .021;
   SD.alpha = a > .006 ? a - (a - .0015) * nguoi : 0;
+  if (!SD.alpha && SD.toanKho) {
+    if (!S.boCucKho) S.boCucKho = new Float64Array(S.d.van_ban.length * 2);
+    for (let k = 0; k < n; k++) {
+      const g = SD.ds[k] * 2;
+      S.boCucKho[g] = SD.x[k]; S.boCucKho[g + 1] = SD.y[k];
+    }
+  }
 }
 
 function sdMau(k, mo) {
@@ -1126,16 +1203,36 @@ function sdVua() {
      khung và đẩy chính văn bản đang đọc ra rìa — đã thấy đúng như vậy.
      Trần phóng 6, không phải 2,2: mạng dày co lại thành đốm nhỏ, trần thấp khoá
      luôn nó ở đó — bố cục đúng mà khung nhìn không cho xem. */
-  const rx = Math.max(-x0, x1, 1), ry = Math.max(-y0, y1, 1);
-  const z = Math.min(6, Math.max(.05,
-    Math.min((SD.W - le * 2) / (rx * 2), (SD.H - le * 2) / (ry * 2))));
-  const cx = 0, cy = 0;
+  /* Vừa theo HỘP BAO THẬT. Bản trước đo đối xứng quanh gốc để nút được ghim
+     luôn nằm giữa — nhưng khi bố cục toàn kho được nhớ lại thì không có bước
+     lắng nào ghim nó cả, nó nằm đâu đó trong đám mây, và hộp đối xứng hoá ra
+     to gấp đôi hộp thật: mạng co lại còn nửa khung. Hộp thật thì luôn lấp đầy,
+     mà nút đang mở vẫn nằm trong khung vì hộp bao chứa mọi nút.
+     Trần phóng 40, không phải 6: thang toạ độ của bố cục lực là tuỳ ý, mọi trần
+     thấp đều có ngày thành ràng buộc và để mạng lọt thỏm giữa khung. */
+  /* Tâm khung đặt NỬA ĐƯỜNG giữa tâm hộp bao và gốc toạ độ (chỗ ghim văn bản
+     đang mở). Lấy hẳn tâm hộp thì văn bản đang đọc lệch khỏi giữa khung 91 px —
+     vẫn trong khung, nhưng "văn bản này nằm ở đâu" đọc rõ hơn khi nó ở giữa.
+     Lấy hẳn gốc thì hộp phải mở đối xứng và mạng co lại còn nửa khung.
+     Nửa đường: nửa vòng bao vẫn tính từ tâm ĐÃ CHỌN nên không nút nào bị cắt. */
+  const cxw = (x0 + x1) / 4, cyw = (y0 + y1) / 4;
+  const hx = Math.max(cxw - x0, x1 - cxw, 1), hy = Math.max(cyw - y0, y1 - cyw, 1);
+  const z = Math.min(40, Math.max(.02,
+    Math.min((SD.W - le * 2) / (hx * 2), (SD.H - le * 2) / (hy * 2))));
+  const cx = -cxw * z, cy = -cyw * z;
   /* Nội suy chứ không gán thẳng: gán thẳng thì mỗi khung hình khung nhìn giật
      một nấc theo nút bay xa nhất, nhìn như hình bị rung. */
-  const k = .12;
+  /* Bám tới cùng rồi SNAP. Nội suy 16% mỗi khung hình chỉ tiệm cận chứ không
+     bao giờ chạm đích — mà trước đây hàm này chỉ chạy khi alpha còn dương, nên
+     alpha về 0 là khung nhìn đóng băng ở chỗ còn dở, thường lệch 10–20%. Đó
+     đúng là lý do phải lăn chuột chỉnh tay sau mỗi lần mở. */
+  const k = .16;
   SD.cam.z += (z - SD.cam.z) * k;
   SD.cam.x += (cx - SD.cam.x) * k;
   SD.cam.y += (cy - SD.cam.y) * k;
+  if (Math.abs(z - SD.cam.z) < z * .004) SD.cam.z = z;
+  if (Math.abs(cx - SD.cam.x) < .5) SD.cam.x = cx;
+  if (Math.abs(cy - SD.cam.y) < .5) SD.cam.y = cy;
 }
 
 function sdVe() {
@@ -1228,7 +1325,8 @@ function sdDoc(ten) {
 
 function sdVong(id) {
   if (id !== SD.id || !SD.cv || !SD.cv.isConnected) return;
-  if (SD.alpha > 0 || SD.keo >= 0) { sdBuoc(); sdVua(); }
+  if (SD.alpha > 0 || SD.keo >= 0) sdBuoc();
+  sdVua();          /* chạy cả khi mạng đã đứng yên — xem chú thích trong sdVua */
   sdVe();
   requestAnimationFrame(() => sdVong(id));
 }
