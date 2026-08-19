@@ -207,11 +207,15 @@ def _sources(doc: Document) -> str:
     if doc.gdrive_docx_link:
         lines.append(f"- Bản .docx: <{doc.gdrive_docx_link}>")
     if not doc.gdrive_fulltext_link:
-        lines.append("- *Chưa có bản toàn văn trong kho. Hai địa chỉ dưới đây là "
-                     "nơi tra cứu, không phải nơi đọc: cổng Bộ Tư pháp trả về dữ "
-                     "liệu XML, còn Thư viện Pháp luật chặn truy cập tự động.*")
+        lines.append("- *Kho chưa có bản toàn văn của văn bản này. Các địa chỉ "
+                     "dưới đây là nơi ĐỐI CHIẾU nguồn, không phải nơi đọc.*")
     if doc.moj_url:
-        lines.append(f"- Bản ghi gốc trên hệ thống Bộ Tư pháp: <{doc.moj_url}>")
+        # Nhãn phải nói đúng thứ sẽ mở ra. `moj_url` là một ENDPOINT API: trình
+        # duyệt hiện ra một khối JSON thô. Gọi nó là "bản ghi gốc" thì người đọc
+        # bấm vào mới biết, và tưởng trang mình đang xem hỏng chứ không phải link
+        # vốn không dành cho mắt người.
+        lines.append(f"- Bản ghi gốc trên hệ thống Bộ Tư pháp "
+                     f"*(dữ liệu JSON, không phải trang đọc)*: <{doc.moj_url}>")
     if doc.tvpl_url:
         lines.append(f"- Trang Thư viện Pháp luật: <{doc.tvpl_url}>")
     if not lines:

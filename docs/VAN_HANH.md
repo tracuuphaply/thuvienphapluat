@@ -112,6 +112,37 @@ SELECT doc_num, provider, file_kinds, attempts, last_error FROM upload_queue;
 
 Đẩy lại phần còn thiếu: `python -m src.main --upload-only`.
 
+### Văn bản đã đăng mà thiếu bản toàn văn trên Drive
+
+```bash
+python -m scripts.backfill_fulltext_gdrive --dry-run
+python -m scripts.backfill_fulltext_gdrive
+```
+
+Vì sao phải có bước này: trang công khai dẫn người đọc tới `moj_url`, mà đó là
+một **endpoint API** — trình duyệt mở ra khối JSON thô, không phải thứ để đọc.
+Người dùng bấm vào không đọc được gì và tưởng trang mình đang xem hỏng.
+
+Chỗ trớ trêu, cũng là lối ra: **toàn văn nằm ngay trong khối JSON đó**, ở
+`data.documentContent.content`. Đo trên 2604/QĐ-UBND: 8.665 ký tự HTML. Script
+gọi API lấy về, lưu xuống `data/moj/`, rồi đẩy lên Drive.
+
+Đo ngày 19/08/2026, 318 văn bản đã đăng còn thiếu bản Drive:
+
+| Nhóm | Số lượng | Xử lý |
+|---|---:|---|
+| Có id Bộ Tư pháp, đã có file trên đĩa | 80 | tải thẳng lên |
+| Có id Bộ Tư pháp, chưa có file | 141 | gọi API lấy rồi tải |
+| Chỉ có link Thư viện Pháp luật | 97 | **không xử được** — chờ đợt cào TVPL |
+
+Nhóm cuối là giới hạn thật, không phải lỗi: không có id Bộ Tư pháp thì không có
+đường gọi API. Trang của chúng vẫn dẫn về Thư viện Pháp luật, và địa chỉ đó
+người thật mở bằng trình duyệt thì đọc được — chỉ máy mới bị chặn.
+
+Toàn văn lấy về phải trên 200 ký tự chữ thuần mới lưu: cổng đó có trả chuỗi rỗng
+và cả khung HTML trống, mà đẩy một file rỗng lên Drive rồi gọi là "toàn văn" thì
+tệ hơn không có gì — nó bịt mất dấu hiệu còn thiếu.
+
 ## Bao đóng dẫn chiếu
 
 Kéo về mọi văn bản mà kho đang dẫn chiếu tới nhưng chưa có, **kể cả văn bản đã

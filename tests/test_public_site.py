@@ -73,8 +73,21 @@ class TestNoiDungTrang:
         """Im lặng ở đây là để người đọc tự bấm vào rồi mới biết mình không đọc
         được gì — ba lần chuyển trang cho một kết quả rỗng."""
         page = self._render(kho, "135/2025/QH15")
-        assert "Chưa có bản toàn văn trong kho" in page
-        assert "XML" in page
+        assert "Kho chưa có bản toàn văn" in page
+
+    def test_link_bo_tu_phap_noi_ro_no_la_du_lieu_khong_phai_trang_doc(self, kho):
+        """`moj_url` là một ENDPOINT API — trình duyệt hiện ra khối JSON thô.
+
+        Người dùng báo đúng chuyện này: bấm vào "Bản ghi gốc" xong không đọc được
+        gì và tưởng trang hỏng. Nhãn phải nói trước thứ sẽ mở ra.
+        """
+        from src.storage.models import Document
+
+        doc = kho.query(Document).filter(Document.doc_num == "135/2025/QH15").first()
+        doc.moj_url = "https://vbpl-bientap-gateway.moj.gov.vn/api/qtdc/public/doc/1"
+        kho.commit()
+        page = self._render(kho, "135/2025/QH15")
+        assert "dữ liệu JSON, không phải trang đọc" in page
 
     def test_bang_tac_dong_luon_kem_cau_gioi_han(self, kho):
         """Thiếu câu này thì con số bị đọc thành chi phí kinh tế."""
