@@ -99,6 +99,7 @@ header.top{
 .nhom>button[aria-current=true]{background:rgba(255,255,255,.12);border-left-color:var(--gold);font-weight:600}
 .nhom .dem{margin-left:auto;font-size:11px;opacity:.5;font-variant-numeric:tabular-nums}
 .c1 .tach{height:1px;background:rgba(255,255,255,.1);margin:9px 14px}
+.c1 .moc{padding:14px 14px 20px;font-size:10.5px;opacity:.42;line-height:1.5}
 
 /* ── Cột 2: tab + danh sách ── */
 .tabs{display:flex;gap:1px;padding:9px 10px 0;flex:0 0 auto}
@@ -342,6 +343,7 @@ dialog small{display:block;color:var(--chu-nhat);font-size:11.5px;margin-top:4px
     <div class="tach"></div>
     <h2 id="tieu-de-nhom">Lĩnh vực</h2>
     <div id="cay"></div>
+    <div class="moc" id="moc-du-lieu">Đang nạp…</div>
   </nav>
 
   <section class="col c2" id="col2">
@@ -476,7 +478,16 @@ const pillHL = (ma, kho) =>
 
 /* ════════════════ Nạp dữ liệu ════════════════ */
 async function nap() {
-  const r = await fetch("du-lieu.json");
+  /* `cache: "no-cache"` là BẮT BUỘC, không phải tuỳ chọn tối ưu.
+     GitHub Pages trả `cache-control: max-age=600` cho du-lieu.json, mà tên file
+     thì không đổi giữa các lần đăng. Hệ quả đã gặp thật: đăng xong 105 biểu mẫu
+     mà trình duyệt vẫn hiện 41 mẫu của lần đăng trước, không có dấu hiệu nào cho
+     người dùng biết. Với một trang pháp lý, dữ liệu cũ là SAI chứ không phải
+     chậm — hiệu lực văn bản đổi mỗi ngày.
+
+     "no-cache" không phải "không cache": nó vẫn dùng bản đã lưu, chỉ bắt buộc
+     hỏi lại máy chủ trước. Không đổi thì máy chủ trả 304 vài trăm byte. */
+  const r = await fetch("du-lieu.json", { cache: "no-cache" });
   if (!r.ok) throw new Error("Không nạp được du-lieu.json (" + r.status + ")");
   S.d = await r.json();
 
@@ -496,6 +507,10 @@ async function nap() {
 
   $("#dem-vb").textContent = S.d.van_ban.length.toLocaleString("vi");
   $("#dem-bm").textContent = S.d.bieu_mau.length.toLocaleString("vi");
+  /* Ngày dựng dữ liệu hiện ngay trên giao diện: người dùng phải TỰ kiểm được
+     mình đang xem bản nào, không phải tin lời trang. */
+  $("#moc-du-lieu").textContent = "Dữ liệu dựng ngày "
+    + S.d.tao_luc.split("-").reverse().join("/");
   dungLoc(); dungCay(); veDanhSach();
 }
 
