@@ -239,6 +239,13 @@ body[data-cotd=false] .mnav button[data-cot=col3]{display:none}
    Bản trước là panel TRƯỢT ĐÈ lên chat rồi tắt đi. Nhưng trích dẫn là thứ người
    đọc đối chiếu LIÊN TỤC trong lúc đọc câu trả lời — che đi rồi mở lại từng cái
    là bắt họ mất mạch mỗi lần kiểm một nguồn. */
+/* Sơ đồ trích dẫn: cao cố định, không co giãn. Nó là phần phụ chú cho danh
+   sách thẻ bên dưới, nên không được lấn chỗ của danh sách. */
+.td-sodo{flex:0 0 auto;height:215px;margin:0 10px 9px}
+.td-sodo canvas{height:100%}
+/* Khung 324 px không đủ chỗ cho dòng hướng dẫn thao tác — nó xuống hai dòng và
+   che mất phần dưới sơ đồ. Cùng nội dung đã có ở sơ đồ nền và sơ đồ popup. */
+.td-sodo .ghi .goi{display:none}
 .td-ds{flex:1 1 auto;overflow-y:auto;padding:0 10px 14px}
 .td{
   background:var(--bg);border:1px solid var(--line);border-radius:var(--r-2);
@@ -485,6 +492,15 @@ dialog.cfg small{display:block;color:var(--fg-3);font-size:12.5px;margin-top:5px
     <div class="p-head">
       <span>Trích dẫn</span>
       <span class="dem-tong" id="dem-td"></span>
+    </div>
+    <!-- Sơ đồ quan hệ giữa CHÍNH các văn bản được trích dẫn. Danh sách thẻ nói
+         "câu trả lời dựa trên năm văn bản này"; sơ đồ nói thêm "và chúng liên
+         quan với nhau thế nào" — cái thứ hai là điều một danh sách không nói
+         được, mà lại quyết định việc đọc: năm văn bản nối thành một chuỗi thay
+         thế là một câu chuyện khác hẳn năm văn bản rời rạc. -->
+    <div class="sodo td-sodo" id="td-sodo" hidden>
+      <canvas id="td-sodo-cv"></canvas>
+      <div class="ghi"></div>
     </div>
     <div class="td-ds" id="td-ds"></div>
   </aside>
@@ -749,7 +765,7 @@ function moTaiLieu(kho, i) {
      <dialog> chưa mở thì nội dung bên trong CHƯA CÓ BỐ CỤC: getBoundingClientRect
      trả 0, canvas nhận width 0 và không vẽ được gì. Lỗi này im lặng — không có
      ngoại lệ nào, chỉ là một khung trống. */
-  if (kho === "van_ban") khoiSoDo(i, $("#sodo-cv"), false);
+  if (kho === "van_ban") { SD.tapChoSan = null; khoiSoDo(i, $("#sodo-cv"), false); }
   else { SD.id++; SD.cv = null; }   /* trang biểu mẫu không có sơ đồ — dừng cái đang chạy */
 }
 
@@ -760,7 +776,7 @@ function dongTaiLieu() {
   if (d.open) d.close();
   /* Sơ đồ nền nhận lại bộ mô phỏng — nhưng KHÔNG chạy lại hoạt ảnh: bố cục toàn
      kho đã nhớ, và đóng một popup thì không phải lúc bắt người ta chờ 6 giây. */
-  datNen();
+  datSoDo();
 }
 
 function htmlVanBan(v, i) {
@@ -850,6 +866,7 @@ const SD = {
   ca: null, cb: null, cung: null, lech: null,
   alpha: 0, cam: { x: 0, y: 0, z: 1 }, tro: -1, keo: -1, panh: null,
   toanKho: false, nhan: new Set(), tuTay: false, daDi: false, tam: null,
+  tapChoSan: null, soTrichDan: 0, soCau: 0,
 };
 
 /* NGÂN SÁCH NÚT — 90, không phải 240.
@@ -966,6 +983,18 @@ function qDay(goc, i, luc) {
    Đo trên kho này: từ một văn bản bất kỳ, bậc 2 đã chạm trung vị 604 nút và
    bậc 3 là 3.142 — nên "toàn bộ kho" không phải một lựa chọn mặc định được. */
 function sdChonNut(goc) {
+  /* Tập nút CHO SẴN — dùng cho sơ đồ trích dẫn: chỉ đúng những văn bản mà câu
+     trả lời dẫn ra, không mở rộng láng giềng. Mở rộng thì sơ đồ nói về kho chứ
+     không nói về câu trả lời nữa. */
+  if (SD.tapChoSan) {
+    const ds = SD.tapChoSan.filter(g => g !== goc);
+    ds.unshift(goc);
+    /* Bậc 0 = tâm, 1 = văn bản được trích dẫn, 2 = văn bản trung gian. Bậc quyết
+       định màu, nên trung gian phải khác hẳn — nó KHÔNG nằm trong câu trả lời,
+       nó chỉ giải thích đường nối. */
+    const sc = SD.soTrichDan || ds.length;
+    return { ds, sau: new Map(ds.map((g, k) => [g, k === 0 ? 0 : k < sc ? 1 : 2])) };
+  }
   if (SD.toanKho) {
     /* Duyệt rộng từ văn bản đang mở để lấy BẬC THẬT của mọi nút, rồi gieo vị trí
        theo bậc đó. Gieo theo xoắn ốc tuỳ tiện thì hai nút có cạnh nối nhau nằm ở
@@ -1273,18 +1302,24 @@ function sdBuoc() {
      độ nguội của alpha định, còn trần chỉ định mỗi khung hình đi được bao xa.
      Hai thứ chỉnh riêng.
      TRẦN TÍNH BẰNG PIXEL TRÊN MÀN HÌNH, không phải đơn vị thế giới — chia cho
-     độ phóng hiện thời. Đây là chỗ mà "một bộ thông số cho cả hai phạm vi" hoá
-     ra sai: cùng trần 0,6 + 7·α trong đơn vị thế giới, đo dịch chuyển thật trên
-     màn hình ra hai kết quả cách nhau 5 lần —
-        toàn kho 4.170 nút   trung bình 1,08 px/khung, đỉnh  2,5
-        lân cận     90 nút   trung bình 4,98 px/khung, đỉnh 27,4
-     Vì mạng 90 nút thưa hơn nên lực trên mỗi nút lớn hơn và nó chạm trần liên
-     tục, còn mạng 4.170 nút thì trần gần như không bao giờ chạm. Thang thế giới
-     là thang của MÔ HÌNH; thứ mắt đọc là thang MÀN HÌNH. Chốt ở thang màn hình
-     thì nó tự thích ứng theo số nút, độ phóng và cỡ khung.
-     Với 0,5 + 4·α px/khung: lân cận về 0,22 px (đỉnh 3,6), toàn kho 1,24 px
-     (đỉnh 4,4) — cùng một nhịp. */
-  const tran = (.5 + 4 * a) / Math.max(SD.cam.z, 1e-3), tran2 = tran * tran;
+     độ phóng hiện thời. Thang thế giới là thang của MÔ HÌNH; thứ mắt đọc là
+     thang MÀN HÌNH, và chốt ở thang màn hình thì nó tự thích ứng theo độ phóng
+     và cỡ khung.
+
+     ĐÍCH: 1,08 px mỗi nút mỗi khung hình, đo trên cả hai phạm vi.
+
+     Vẫn phải có HAI hằng số, và lý do đáng ghi lại: trần chỉ CHẶN chứ không đẩy.
+     Mạng 90 nút thưa nên lực trên mỗi nút lớn, nó chạm trần gần như mọi bước —
+     ở đó trần là thứ quyết định tốc độ. Mạng 4.170 nút thì lực nhỏ, trần gần
+     như không chạm tới — ở đó tốc độ do lực quyết định, và phải siết trần xuống
+     tận nơi nó mới có tác dụng. Đo được, cùng một trần cho cả hai:
+        trần 0,50 + 4,0·α   lân cận 0,22   toàn kho 1,24
+        trần 0,90 + 7,0·α   lân cận 0,91   toàn kho 2,23
+        trần 1,50 + 13·α    lân cận 3,45   toàn kho    —
+     Hai đường cong khác độ dốc, nên một hằng số không thể đưa cả hai về 1,08.
+     Chốt riêng: lân cận 0,95 + 7,4·α → 1,09; toàn kho 0,45 + 3,5·α → 1,11. */
+  const tran = (SD.toanKho ? .45 + 3.5 * a : .95 + 7.4 * a)
+    / Math.max(SD.cam.z, 1e-3), tran2 = tran * tran;
   for (let i = 1; i < n; i++) {
     SD.vx[i] -= SD.x[i] * veTam; SD.vy[i] -= SD.y[i] * veTam;
     if (i === SD.keo) { SD.vx[i] = SD.vy[i] = 0; continue; }
@@ -1576,6 +1611,11 @@ function tenNgan(v) {
    hiện thì chỗ đó nắm `SD`; `SD.id` cắt vòng lặp của chỗ cũ. */
 function khoiSoDo(goc, cv, toanKho, chayLai) {
   if (!cv) return;
+  /* Canvas nằm trong một cột ĐANG ẨN thì đo ra 0×0 — dưới 1040 px cột trích dẫn
+     bị media query tắt, và sơ đồ trích dẫn dựng trên khung 0 px là một bộ mô
+     phỏng chạy không có gì để nhìn. Bỏ qua, và `hienCot()` sẽ gọi lại khi cột
+     hiện ra. */
+  if (!cv.getBoundingClientRect().width) { SD.id++; SD.cv = null; return; }
   SD.id++; SD.cv = cv; SD.ctx = cv.getContext("2d");
   if (toanKho !== undefined) SD.toanKho = toanKho;
   SD.cGoc = sdDoc("--fg"); SD.cAccent = sdDoc("--accent"); SD.cDo = sdDoc("--t-red");
@@ -1604,12 +1644,16 @@ function capNhatGhiSoDo() {
      trông na ná nhau khi thu nhỏ, mà ý nghĩa thì khác hẳn — không ghi thì người
      xem tưởng mình đang nhìn cả kho trong khi chỉ thấy lân cận. */
   const lang = (S.ke.get(SD.ds[0]) || []).length;
-  const cat = !SD.toanKho && lang > SD.ds.length - 1;
-  if (el) el.innerHTML = (SD.toanKho
+  const cat = !SD.toanKho && !SD.tapChoSan && lang > SD.ds.length - 1;
+  if (el) el.innerHTML = (SD.tapChoSan
+      ? `${SD.soTrichDan} văn bản được trích dẫn`
+        + (SD.soCau ? ` + ${SD.soCau} văn bản trung gian` : "")
+      : SD.toanKho
       ? `Toàn kho · ${SD.ds.length.toLocaleString("vi")} văn bản`
       : `Lân cận bậc 1–2 · ${SD.ds.length.toLocaleString("vi")} nút`
         + (cat ? ` (trong ${lang.toLocaleString("vi")} quan hệ trực tiếp)` : ""))
-    + ` · ${SD.ca.length.toLocaleString("vi")} cạnh
+    + ` · ${SD.ca.length ? SD.ca.length.toLocaleString("vi") + " cạnh"
+          : "không có quan hệ trực tiếp nào giữa chúng"}
     · <span style="color:var(--accent)">●</span> dẫn chiếu tới
     · <span style="color:var(--t-red)">●</span> bị dẫn chiếu
     · <span class="goi">kéo để xoay · lăn chuột để phóng · bấm để mở</span>`;
@@ -1635,23 +1679,96 @@ function nutTrungTam() {
   return tot;
 }
 
-function coNen() {
-  return !!(S.d && !S.hoiThoai.length && !$("#dlg-doc").open);
+/* Ba chỗ có thể hiện sơ đồ và chỉ MỘT bộ mô phỏng. Hàm này là người điều phối
+   duy nhất: nó quyết định chỗ nào đang đáng hiện, rồi trao bộ mô phỏng cho chỗ
+   đó. Trước đây mỗi chỗ tự gọi khởi tạo và tự đoán mình có nên chạy hay không —
+   ba chỗ đoán độc lập là ba cơ hội để hai chỗ cùng tưởng mình đang nắm.
+     popup đang mở        → sơ đồ trong popup (khoiSoDo gọi từ moTaiLieu)
+     chưa có hội thoại    → sơ đồ toàn kho làm nền khung hỏi đáp
+     đã có hội thoại      → sơ đồ quan hệ giữa các văn bản được trích dẫn */
+function datSoDo(chayLai) {
+  if (!S.d) return;
+  const coHoiThoai = !!S.hoiThoai.length;
+
+  /* BỀ RỘNG TRƯỚC, CANVAS SAU — ràng buộc thứ tự, không phải sở thích.
+     Cột trích dẫn hiện ra hay mất đi làm cột giữa rộng hẹp khác nhau, mà canvas
+     lấy bề rộng bằng cách ĐO. Đặt hai việc này trong hai hàm rồi gọi ngược thứ
+     tự là hình bị kéo dãn theo tỉ lệ cũ — nên chúng nằm chung một hàm. */
+  document.body.dataset.cotd = String(coHoiThoai);
+  if (!coHoiThoai && innerWidth <= 1040 && $("#col3").dataset.mo === "true")
+    hienCot("col2");
+
+  const nenBat = !coHoiThoai;
+  $("#chat").dataset.nen = String(nenBat);
+
+  const nutTd = tapTrichDan();
+  const mo = nutTd.length >= 2 ? themTrungGian(nutTd) : { ds: nutTd, soCau: 0 };
+  const tdBat = coHoiThoai && mo.ds.length >= 2;
+  $("#td-sodo").hidden = !tdBat;
+
+  if ($("#dlg-doc").open) return;   /* popup đang nắm, không giành */
+
+  if (nenBat) {
+    SD.tapChoSan = null;
+    khoiSoDo(nutTrungTam(), $("#sodo-nen-cv"), true, chayLai);
+  } else if (tdBat) {
+    /* Tâm là văn bản nối nhiều nhất TRONG TẬP — nó là chỗ hội tụ của câu trả
+       lời, còn lấy cái đầu danh sách thì chỉ là ngẫu nhiên theo thứ tự trích. */
+    let tam = nutTd[0], nhieu = -1;
+    for (const g of nutTd) {
+      const d = (S.ke.get(g) || []).filter(([j]) => mo.ds.includes(j)).length;
+      if (d > nhieu) { nhieu = d; tam = g; }
+    }
+    SD.tapChoSan = mo.ds;
+    SD.soTrichDan = nutTd.length;
+    SD.soCau = mo.soCau;
+    khoiSoDo(tam, $("#td-sodo-cv"), false, true);
+  } else {
+    SD.id++; SD.cv = null; SD.tapChoSan = null;
+  }
 }
 
-/* Bật/tắt sơ đồ nền. Nó và sơ đồ trong popup dùng chung một bộ mô phỏng, nên
-   mỗi lần đổi chỗ hiển thị là một lần khởi tạo lại — rẻ, vì bố cục toàn kho đã
-   được nhớ sau lần lắng đầu. */
-function datNen(chayLai) {
-  const bat = coNen();
-  $("#chat").dataset.nen = String(bat);
-  if (!bat) { if (SD.cv === $("#sodo-nen-cv")) { SD.id++; SD.cv = null; } return; }
-  khoiSoDo(nutTrungTam(), $("#sodo-nen-cv"), true, chayLai);
+/* Chỉ số toàn cục của những văn bản đang được trích dẫn và CÓ trong kho. Trích
+   dẫn trỏ tới văn bản chưa cào được thì bỏ — vẽ một nút không có quan hệ nào và
+   không mở được là thêm nhiễu, không thêm tin. */
+function tapTrichDan() {
+  const ra = [];
+  for (const n of Object.keys(S.nguon)) {
+    const md = (S.nguon[n] || {}).metadata || {};
+    const sh = md.doc_ref || md.doc_num;
+    if (!sh) continue;
+    const j = S.d.van_ban.findIndex(v => v.n === sh);
+    if (j >= 0 && !ra.includes(j)) ra.push(j);
+  }
+  return ra;
+}
+
+const SD_TRUNG_GIAN = 8;
+
+/* Thêm VĂN BẢN TRUNG GIAN nối các văn bản được trích dẫn.
+   Đo trên câu gợi ý đầu tiên: 5 văn bản được dẫn ra và KHÔNG cặp nào nối trực
+   tiếp với nhau — sơ đồ thành năm chấm rời, không nói được gì. Nhưng chúng có
+   nối, chỉ là qua một bước: một luật mà cả hai cùng dẫn chiếu. Chính cái nút ở
+   giữa đó mới là câu trả lời cho "hai văn bản này liên quan thế nào".
+   Chỉ nhận nút nối được ÍT NHẤT HAI văn bản trong tập — nút chỉ treo vào một cái
+   thì không phải cầu nối, nó là láng giềng, và mở rộng theo láng giềng thì sơ đồ
+   quay về nói chuyện của kho chứ không nói chuyện của câu trả lời. */
+function themTrungGian(nut) {
+  const trong = new Set(nut);
+  const dem = new Map();
+  for (const g of nut)
+    for (const [j] of (S.ke.get(g) || []))
+      if (!trong.has(j)) dem.set(j, (dem.get(j) || 0) + 1);
+  const cau = [...dem.entries()]
+    .filter(([, c]) => c >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, SD_TRUNG_GIAN)
+    .map(([j]) => j);
+  return { ds: nut.concat(cau), soCau: cau.length };
 }
 
 function veHome() {
   S.hoiThoai = []; S.nguon = {}; S.tdChon = null;
-  datCotTrichDan();
   $("#chat-log").innerHTML = "";
   $("#goi-y").hidden = false;
   $("#q").value = "";
@@ -1661,7 +1778,7 @@ function veHome() {
   $$(".c1 [data-kho]").forEach(b =>
     b.setAttribute("aria-selected", String(b.dataset.kho === "van_ban")));
   hienCot("col2");
-  datNen(true);
+  datSoDo(true);
 }
 
 /* ════════════════ Chat có trích dẫn ════════════════ */
@@ -1723,20 +1840,8 @@ function veTrichDan(el, text) {
    Bản trước là panel trượt: bấm [3] thì panel đè lên chat, xem xong phải tắt rồi
    bấm [4]. Nhưng người đọc đối chiếu trích dẫn LIÊN TỤC trong lúc đọc câu trả
    lời — bắt họ mở-tắt từng cái là bắt họ mất mạch mỗi lần kiểm một nguồn. */
-/* Cột trích dẫn chỉ tồn tại khi đã có hội thoại. Trước đó nó là một cột rỗng
-   344 px nói "chưa có trích dẫn nào" — chiếm chỗ chỉ để thông báo mình đang
-   trống. Chỗ đó trả cho sơ đồ. */
-function datCotTrichDan() {
-  const co = !!(S.d && S.hoiThoai.length);
-  document.body.dataset.cotd = String(co);
-  /* Canvas phải đo lại bề rộng: cột trích dẫn hiện ra hay mất đi làm cột giữa
-     rộng hẹp khác nhau, mà canvas lấy bề rộng bằng đo. Không đo lại thì hình bị
-     kéo dãn theo tỉ lệ cũ. */
-  if (SD.cv && SD.cv.isConnected) { sdCo(); sdVuaNgay(); }
-  if (!co && innerWidth <= 1040 && $("#col3").dataset.mo === "true") hienCot("col2");
-}
-
 function veNguon() {
+  datSoDo();
   const el = $("#td-ds");
   const so = Object.keys(S.nguon).sort((a, b) => +a - +b);
   $("#dem-td").textContent = so.length ? so.length + " nguồn" : "";
@@ -1749,8 +1854,13 @@ function veNguon() {
     const c = S.nguon[n] || {}, md = c.metadata || {};
     const sh = md.doc_ref || md.doc_num || "";
     const j = sh ? S.d.van_ban.findIndex(x => x.n === sh) : -1;
+    /* Hiệu lực tra từ KHO của mình, không tin trường `hieu_luc` mà nguồn gửi
+       kèm: API bên ngoài có thể không có trường đó, hoặc có mà đã cũ. Kho này
+       tính hiệu lực từ quan hệ dẫn chiếu và cập nhật theo từng đợt cào. */
+    const hl = j >= 0 ? S.d.van_ban[j].e : null;
     return `<div class="td" data-td-the="${esc(n)}">
       <div><span class="so">${esc(n)}</span><span class="sh">${esc(sh || "—")}</span></div>
+      ${hl ? `<div style="margin-top:5px">${pillHL(hl, "van_ban")}</div>` : ""}
       ${md.title ? `<div class="tt">${esc(md.title)}</div>` : ""}
       ${md.article ? `<div class="sh">${esc(md.article)}</div>` : ""}
       ${c.content ? `<div class="doan">${esc(c.content)}</div>` : ""}
@@ -1782,12 +1892,10 @@ async function hoi(cau) {
   $("#goi-y").hidden = true;
   themTinNhan("user", cau);
   S.hoiThoai.push({ role: "user", content: cau });
-  /* Tắt sơ đồ nền và bật cột trích dẫn SAU khi đã ghi câu hỏi vào hội thoại,
-     không trước: cả hai đều xét `S.hoiThoai.length`, gọi trước thì chúng vẫn
-     thấy hội thoại rỗng. Thứ tự: cột trích dẫn TRƯỚC, vì nó đổi bề rộng cột
-     giữa mà sơ đồ nền phải đo bề rộng ĐÃ ĐỔI. */
-  datCotTrichDan();
-  datNen();
+  /* Gọi SAU khi đã ghi câu hỏi vào hội thoại, không trước: datSoDo() xét
+     `S.hoiThoai.length` để biết nên hiện sơ đồ nào, gọi trước thì nó vẫn thấy
+     hội thoại rỗng và giữ nguyên sơ đồ nền. */
+  datSoDo();
 
   const hop = document.createElement("div");
   hop.className = "tn a";
@@ -1829,6 +1937,19 @@ const TU_CHUC_NANG = new Set(("cua va la co khong duoc cho den tu voi nhu thi ma
 const TI_LE_KHOP = 0.5;
 const TOI_THIEU_KHOP = 2;
 
+/* HỆ SỐ HIỆU LỰC — nhân vào điểm khớp từ khoá.
+   Không có nó thì xếp hạng chỉ theo từ khoá, và kho này có 2.335 văn bản hết
+   hiệu lực toàn bộ so với 1.016 còn hiệu lực (kho lớn dần theo bao đóng dẫn
+   chiếu, nên nó kéo vào rất nhiều luật đã bị thay). Hệ quả đo được: câu gợi ý
+   "Doanh nghiệp mới thành lập phải nộp những gì trong 30 ngày đầu?" trả về 5/5
+   văn bản đều `het_toan_bo` — đúng từ khoá mà vô dụng trên thực tế.
+   Hạ điểm, KHÔNG loại bỏ: văn bản đã hết hiệu lực vẫn là câu trả lời đúng khi
+   người ta hỏi đúng nó, và số hiệu khớp chính xác vẫn được 100 điểm tuyệt đối. */
+const HE_SO_HL = {
+  con_hieu_luc: 1, chua_hieu_luc: .8, het_mot_phan: .65,
+  khong_ro: .45, het_toan_bo: .22,
+};
+
 async function traLoiThu(hop, noi, cau) {
   veBuoc(hop, "retrieval", "processing");
   await new Promise(r => setTimeout(r, 260));
@@ -1846,14 +1967,18 @@ async function traLoiThu(hop, noi, cau) {
      "thu" là chuỗi con của "thủ", "thuế", "thuộc", "thù"; "dong" là chuỗi con của
      "đồng", "động", "đóng", "dòng". Câu 8 từ vì vậy khớp bừa 4 từ vào một quyết
      định cấp tỉnh chẳng liên quan gì. */
-  const chamDiem = v => {
+  const chamKhop = v => {
     if (soHieu.some(sh => goDau(v.n) === sh)) return 100;
     const am = new Set(goDau(v.n + " " + v.t).split(/[^a-z0-9]+/).filter(Boolean));
     return tu.reduce((a, w) => a + (am.has(w) ? 1 : 0), 0);
   };
-  const top = S.d.van_ban.map(v => ({ v, s: chamDiem(v) }))
-    .filter(x => x.s >= (soHieu.length ? 1
-        : Math.max(TOI_THIEU_KHOP, Math.ceil(tu.length * TI_LE_KHOP))))
+  const nguong = soHieu.length ? 1
+    : Math.max(TOI_THIEU_KHOP, Math.ceil(tu.length * TI_LE_KHOP));
+  /* Ngưỡng lọc xét điểm KHỚP THÔ, còn thứ tự xét điểm ĐÃ NHÂN hiệu lực: hạ
+     ngưỡng theo điểm đã nhân thì văn bản còn hiệu lực khớp ít cũng bị loại. */
+  const top = S.d.van_ban.map(v => ({ v, k: chamKhop(v) }))
+    .filter(x => x.k >= nguong)
+    .map(x => ({ ...x, s: x.k * (HE_SO_HL[x.v.e] ?? .45) }))
     .sort((a, b) => b.s - a.s).slice(0, 5);
 
   veBuoc(hop, "retrieval", "done",
@@ -1879,9 +2004,16 @@ async function traLoiThu(hop, noi, cau) {
       + "Kho hiện chỉ có TIÊU ĐỀ và dữ kiện, chưa có toàn văn để tra nội dung "
       + "điều khoản — đó là việc của API khi bạn cấu hình.";
   } else {
-    text = dauCau + `Văn bản khớp từ khoá (${tu.join(", ")}):\n\n`
-      + top.map((x, k) => `${k + 1}. ${x.v.n} [${k + 1}]`).join("\n")
-      + "\n\nBấm số trong ngoặc để xem nguồn. Cấu hình API ở ⚙️ để có câu trả lời thật.";
+    /* Ghi TÌNH TRẠNG HIỆU LỰC ngay cạnh từng số hiệu. Với một trang pháp lý,
+       một danh sách số hiệu không kèm hiệu lực là một danh sách đọc được mà
+       dùng không được. */
+    const conHl = top.filter(x => x.v.e === "con_hieu_luc").length;
+    text = dauCau + `Văn bản khớp từ khoá (${tu.join(", ")}) — `
+      + `${conHl}/${top.length} còn hiệu lực:\n\n`
+      + top.map((x, k) =>
+          `${k + 1}. ${x.v.n} — ${nhanHL(x.v.e, "van_ban")} [${k + 1}]`).join("\n")
+      + "\n\nXếp hạng đã ưu tiên văn bản còn hiệu lực. Bấm số trong ngoặc để "
+      + "xem nguồn. Cấu hình API ở ⚙️ để có câu trả lời thật.";
   }
   veTrichDan(noi, text);
   S.hoiThoai.push({ role: "assistant", content: text });
@@ -1953,6 +2085,10 @@ function hienCot(id) {
      ở đây vẫn vô hại: quy tắc ẩn nằm trong media query. */
   $$(".cols > .col").forEach(c => c.dataset.mo = String(c.id === id));
   $$(".mnav button").forEach(b => b.setAttribute("aria-current", String(b.dataset.cot === id)));
+  /* Cột vừa hiện ra thì sơ đồ trong nó mới đo được kích thước — gọi lại người
+     điều phối. Không gọi thì trên màn hẹp sơ đồ trích dẫn không bao giờ dựng,
+     vì lúc nó được yêu cầu dựng thì cột còn đang ẩn. */
+  if (S.d) datSoDo();
 }
 
 document.addEventListener("click", e => {
@@ -2079,7 +2215,7 @@ addEventListener("keydown", e => {
 hienCot("col2");
 document.body.dataset.cotd = "false";
 veNguon();
-nap().then(() => { veGoiY(); capNhatGhiChat(); datNen(true); }).catch(e => {
+nap().then(() => { veGoiY(); capNhatGhiChat(); datSoDo(true); }).catch(e => {
   $("#ds").innerHTML = `<div class="trong">${esc(e.message)}</div>`;
 });
 
