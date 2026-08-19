@@ -52,7 +52,7 @@
   --font:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,
          "Apple Color Emoji",Arial,sans-serif;
   --mono:"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
-  --c1:296px; --c3:344px;
+  --c1:296px; --c3:344px; --le-giua:26px;
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -113,6 +113,11 @@ header.top{
 .c1{flex:0 0 var(--c1);background:var(--bg-2);border-right:1px solid var(--line)}
 .c2{flex:1 1 auto;background:var(--bg)}
 .c3{flex:0 0 var(--c3);background:var(--bg-2);border-left:1px solid var(--line)}
+/* Cột trích dẫn chỉ tồn tại khi có câu trả lời. Trước khi hỏi thì nó là một cột
+   rỗng 344 px nói "chưa có trích dẫn nào" — chiếm chỗ chỉ để thông báo mình đang
+   trống. Chỗ đó trả cho sơ đồ. */
+body[data-cotd=false] .c3{display:none}
+body[data-cotd=false] .mnav button[data-cot=col3]{display:none}
 
 .p-head{
   flex:0 0 auto;display:flex;align-items:baseline;gap:8px;
@@ -170,13 +175,18 @@ header.top{
 .chat{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
 /* Sơ đồ nền: chiếm phần trên của khung hỏi đáp, co giãn theo khung. Chiều cao
    tối thiểu 260 px — dưới mức đó thì 4.170 nút thành một vạch, thà không vẽ. */
+/* MỘT lề ngang duy nhất cho cả cột giữa — sơ đồ, ô nhập, câu gợi ý, dòng ghi
+   chú đều bám cùng hai cạnh. Trước đây sơ đồ dùng lề 26 px còn ô nhập dùng
+   `max-width:680px; margin:auto`, nên hai khối rộng khác nhau và cột giữa trông
+   như hai cột lệch nhau. */
 .sodo.nen{
-  flex:1 1 auto;min-height:260px;margin:4px 26px 8px;
+  flex:1 1 auto;min-height:260px;
+  margin:4px var(--le-giua) 10px;
 }
 .sodo.nen canvas{height:100%}
 .chat[data-nen=false] .sodo.nen{display:none}
 .chat[data-nen=true] .chat-log{flex:0 0 auto;max-height:34%}
-.chat-log{flex:1 1 auto;overflow-y:auto;padding:6px 28px 8px}
+.chat-log{flex:1 1 auto;overflow-y:auto;padding:6px var(--le-giua) 8px}
 .tn{margin:0 auto 20px;max-width:680px}
 .tn .ai{font-size:12px;color:var(--fg-3);margin-bottom:5px;font-weight:500}
 .tn .noi{white-space:pre-wrap;font-size:15px;line-height:1.65}
@@ -193,8 +203,8 @@ header.top{
   font:500 11px/16px var(--mono);text-align:center;vertical-align:2px;cursor:pointer;
 }
 .tdan:hover,.tdan.chon{background:var(--accent);color:var(--tren-accent)}
-.chat-in{flex:0 0 auto;padding:8px 28px 18px}
-.chat-in form{display:flex;gap:8px;align-items:flex-end;max-width:680px;margin:0 auto}
+.chat-in{flex:0 0 auto;padding:0 var(--le-giua) 14px}
+.chat-in form{display:flex;gap:8px;align-items:flex-end}
 .chat-in textarea{
   flex:1;resize:none;min-height:40px;max-height:150px;padding:9px 12px;
   border:1px solid var(--line);border-radius:var(--r-2);background:var(--bg);
@@ -207,10 +217,20 @@ header.top{
   font-weight:500;font-size:14px;
 }
 .chat-in button.gui:disabled{background:var(--bg-3);color:var(--fg-3);cursor:not-allowed}
-.chat-in .ghi{max-width:680px;margin:8px auto 0;font-size:12px;color:var(--fg-3);line-height:1.5}
-.goi-y{display:flex;gap:6px;flex-wrap:wrap;max-width:680px;margin:0 auto 10px}
+.chat-in .ghi{margin:8px 0 0;font-size:12px;color:var(--fg-3);line-height:1.5}
+/* Câu gợi ý thành MỘT DẢI TRƯỢT NGANG. Xuống dòng thì ba câu chiếm ba hàng, tức
+   ~90 px chiều cao lấy khỏi sơ đồ — mà sơ đồ là thứ cần chỗ, còn gợi ý chỉ là
+   lối vào. Một hàng trượt ngang giữ đủ ba câu trong 34 px.
+   Ẩn thanh cuộn: một thanh cuộn ngang trên hàng cao 34 px chiếm gần một phần ba
+   chiều cao của chính nó. */
+.goi-y{
+  display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;margin:0 0 9px;
+  scrollbar-width:none;-ms-overflow-style:none;padding-bottom:1px;
+}
+.goi-y::-webkit-scrollbar{display:none}
 .goi-y button{
-  padding:5px 11px;border:1px solid var(--line);border-radius:var(--r-2);
+  flex:0 0 auto;white-space:nowrap;
+  padding:6px 12px;border:1px solid var(--line);border-radius:var(--r-2);
   font-size:13px;color:var(--fg-2);background:var(--bg);
 }
 .goi-y button:hover{background:var(--hover);color:var(--fg)}
@@ -374,13 +394,13 @@ dialog.cfg small{display:block;color:var(--fg-3);font-size:12.5px;margin-top:5px
   /* Màn hẹp: cả ba cột đều toàn khung, chuyển bằng mnav. */
   .c3{display:flex}
   .c1,.c3{border:0}
-  .chat-log,.chat-in{padding-left:14px;padding-right:14px}
+  :root{--le-giua:14px}
   /* Câu gợi ý trong ô nhập xuống 2 dòng ở màn hẹp; giữ min-height 40px thì nó
      bị cắt mất nửa dòng dưới. */
   .chat-in textarea{min-height:58px}
   .doc-modal{width:100vw;height:100vh;max-height:none;border-radius:0}
   .doc-modal .mb{padding:20px 16px 48px}
-  .sodo.nen{margin:4px 12px 6px;min-height:200px}
+  .sodo.nen{min-height:200px}
   .brand{font-size:15px}
   .brand .ic{font-size:18px}
   .doc h1{font-size:24px}
@@ -1252,13 +1272,19 @@ function sdBuoc() {
      Chậm KHÔNG đồng nghĩa lâu, và đây là chỗ dễ trộn lẫn: thời gian lắng do tốc
      độ nguội của alpha định, còn trần chỉ định mỗi khung hình đi được bao xa.
      Hai thứ chỉnh riêng.
-     MỘT bộ thông số cho CẢ HAI phạm vi. Trước đây chia hai, vì mạng toàn kho
-     phải đi xa hơn để tự sắp lại. Nhưng chia hai nghĩa là hai chuyển động khác
-     nhau trong cùng một khung, và người xem bấm qua bấm lại giữa chúng — nhịp
-     phải giống nhau, không thì mỗi lần đổi phạm vi là một cảm giác khác.
-     Lấy bộ của toàn kho (0,6 + 7·α, nguội 0,014) vì đó là bộ đã được nghiệm thu
-     bằng mắt. */
-  const tran = .6 + 7 * a, tran2 = tran * tran;
+     TRẦN TÍNH BẰNG PIXEL TRÊN MÀN HÌNH, không phải đơn vị thế giới — chia cho
+     độ phóng hiện thời. Đây là chỗ mà "một bộ thông số cho cả hai phạm vi" hoá
+     ra sai: cùng trần 0,6 + 7·α trong đơn vị thế giới, đo dịch chuyển thật trên
+     màn hình ra hai kết quả cách nhau 5 lần —
+        toàn kho 4.170 nút   trung bình 1,08 px/khung, đỉnh  2,5
+        lân cận     90 nút   trung bình 4,98 px/khung, đỉnh 27,4
+     Vì mạng 90 nút thưa hơn nên lực trên mỗi nút lớn hơn và nó chạm trần liên
+     tục, còn mạng 4.170 nút thì trần gần như không bao giờ chạm. Thang thế giới
+     là thang của MÔ HÌNH; thứ mắt đọc là thang MÀN HÌNH. Chốt ở thang màn hình
+     thì nó tự thích ứng theo số nút, độ phóng và cỡ khung.
+     Với 0,5 + 4·α px/khung: lân cận về 0,22 px (đỉnh 3,6), toàn kho 1,24 px
+     (đỉnh 4,4) — cùng một nhịp. */
+  const tran = (.5 + 4 * a) / Math.max(SD.cam.z, 1e-3), tran2 = tran * tran;
   for (let i = 1; i < n; i++) {
     SD.vx[i] -= SD.x[i] * veTam; SD.vy[i] -= SD.y[i] * veTam;
     if (i === SD.keo) { SD.vx[i] = SD.vy[i] = 0; continue; }
@@ -1625,6 +1651,7 @@ function datNen(chayLai) {
 
 function veHome() {
   S.hoiThoai = []; S.nguon = {}; S.tdChon = null;
+  datCotTrichDan();
   $("#chat-log").innerHTML = "";
   $("#goi-y").hidden = false;
   $("#q").value = "";
@@ -1696,6 +1723,19 @@ function veTrichDan(el, text) {
    Bản trước là panel trượt: bấm [3] thì panel đè lên chat, xem xong phải tắt rồi
    bấm [4]. Nhưng người đọc đối chiếu trích dẫn LIÊN TỤC trong lúc đọc câu trả
    lời — bắt họ mở-tắt từng cái là bắt họ mất mạch mỗi lần kiểm một nguồn. */
+/* Cột trích dẫn chỉ tồn tại khi đã có hội thoại. Trước đó nó là một cột rỗng
+   344 px nói "chưa có trích dẫn nào" — chiếm chỗ chỉ để thông báo mình đang
+   trống. Chỗ đó trả cho sơ đồ. */
+function datCotTrichDan() {
+  const co = !!(S.d && S.hoiThoai.length);
+  document.body.dataset.cotd = String(co);
+  /* Canvas phải đo lại bề rộng: cột trích dẫn hiện ra hay mất đi làm cột giữa
+     rộng hẹp khác nhau, mà canvas lấy bề rộng bằng đo. Không đo lại thì hình bị
+     kéo dãn theo tỉ lệ cũ. */
+  if (SD.cv && SD.cv.isConnected) { sdCo(); sdVuaNgay(); }
+  if (!co && innerWidth <= 1040 && $("#col3").dataset.mo === "true") hienCot("col2");
+}
+
 function veNguon() {
   const el = $("#td-ds");
   const so = Object.keys(S.nguon).sort((a, b) => +a - +b);
@@ -1742,9 +1782,11 @@ async function hoi(cau) {
   $("#goi-y").hidden = true;
   themTinNhan("user", cau);
   S.hoiThoai.push({ role: "user", content: cau });
-  /* Tắt sơ đồ nền SAU khi đã ghi câu hỏi vào hội thoại, không trước:
-     `coNen()` xét `S.hoiThoai.length`, gọi trước thì nó vẫn thấy hội thoại rỗng
-     và giữ sơ đồ lại. */
+  /* Tắt sơ đồ nền và bật cột trích dẫn SAU khi đã ghi câu hỏi vào hội thoại,
+     không trước: cả hai đều xét `S.hoiThoai.length`, gọi trước thì chúng vẫn
+     thấy hội thoại rỗng. Thứ tự: cột trích dẫn TRƯỚC, vì nó đổi bề rộng cột
+     giữa mà sơ đồ nền phải đo bề rộng ĐÃ ĐỔI. */
+  datCotTrichDan();
   datNen();
 
   const hop = document.createElement("div");
@@ -2035,6 +2077,7 @@ addEventListener("keydown", e => {
 
 /* ── Khởi động ── */
 hienCot("col2");
+document.body.dataset.cotd = "false";
 veNguon();
 nap().then(() => { veGoiY(); capNhatGhiChat(); datNen(true); }).catch(e => {
   $("#ds").innerHTML = `<div class="trong">${esc(e.message)}</div>`;
