@@ -14,6 +14,10 @@
    một trang mà việc chính là ĐỌC văn bản dài và đối chiếu trích dẫn, nền phải lùi
    hẳn ra sau.
 
+   MỘT giao diện tối, không có công tắc sáng/tối. Hai bảng màu là hai bảng phải
+   soát mỗi lần đổi kiểu dáng, và bảng ít dùng luôn là bảng lặng lẽ hỏng — chính
+   nó đã để lọt vụ nút sơ đồ đen thui khi mấy biến màu bị đổi tên.
+
    Notion làm điều đó bằng bốn nguyên tắc, chép nguyên ở đây:
      · nền gần như trắng, chữ xám ấm #37352f — không phải đen tuyền
      · viền mảnh gần như vô hình, phân tách bằng KHOẢNG TRỐNG chứ không bằng nét
@@ -21,47 +25,34 @@
      · trạng thái hover là một lớp xám mờ, không phải đổi màu
    ───────────────────────────────────────────────────────────── */
 :root{
-  --bg:#fff; --bg-2:#f7f7f5; --bg-3:#f1f1ef;
-  --fg:#37352f; --fg-2:#787774; --fg-3:#9b9a97;
-  --line:#e9e9e7; --line-2:rgba(55,53,47,.09);
-  --accent:#2383e2; --accent-bg:rgba(35,131,226,.12);
-  --hover:rgba(55,53,47,.06); --hover-2:rgba(55,53,47,.11);
-  --mark:#fdecc8;
-
-  /* Nhãn trạng thái — đúng bộ pastel của Notion. Nền nhạt, chữ cùng tông đậm,
-     không viền: đủ để phân biệt mà không hút mắt khỏi chữ chính. */
-  --t-red-bg:#fbe4e4;    --t-red:#8a3a37;
-  --t-green-bg:#dbeddb;  --t-green:#28553a;
-  --t-yellow-bg:#fbf3db; --t-yellow:#6b5518;
-  --t-orange-bg:#faebdd; --t-orange:#7a4318;
-  --t-blue-bg:#d3e5ef;   --t-blue:#28556f;
-  --t-gray-bg:#e3e2e0;   --t-gray:#5d5b57;
-
-  --sh-1:rgba(15,15,15,.05) 0 0 0 1px, rgba(15,15,15,.1) 0 3px 6px,
-         rgba(15,15,15,.2) 0 9px 24px;
-  --sh-2:rgba(15,15,15,.04) 0 0 0 1px, rgba(15,15,15,.06) 0 2px 4px;
-  --r:4px; --r-2:8px;
-  --font:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,
-         "Apple Color Emoji",Arial,sans-serif;
-  --mono:"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
-  --c1:296px; --c3:344px;
-}
-:root[data-theme=dark]{
+  color-scheme:dark;
   --bg:#191919; --bg-2:#202020; --bg-3:#2c2c2c;
   --fg:#d4d4d4; --fg-2:#9b9b9b; --fg-3:#6f6f6f;
   --line:#2f2f2f; --line-2:rgba(255,255,255,.094);
   --accent:#529cca; --accent-bg:rgba(82,156,202,.16);
+  /* Chữ đặt TRÊN mảng accent đặc. Không dùng #fff: #529cca là xanh nhạt, chữ
+     trắng trên nó chỉ được 2,5:1 — dưới ngưỡng đọc được. Chữ gần đen được 8:1. */
+  --tren-accent:#0b1116;
   --hover:rgba(255,255,255,.055); --hover-2:rgba(255,255,255,.09);
   --mark:#59563b;
+
+  /* Nhãn trạng thái — bộ pastel tối của Notion. Nền trầm, chữ cùng tông sáng,
+     không viền: đủ để phân biệt mà không hút mắt khỏi chữ chính. */
   --t-red-bg:#522e2a;    --t-red:#ff7369;
   --t-green-bg:#2d3d33;  --t-green:#4dab9a;
   --t-yellow-bg:#59563b; --t-yellow:#ffdc49;
   --t-orange-bg:#5c3b23; --t-orange:#ffa344;
   --t-blue-bg:#2b4661;   --t-blue:#5aa9e6;
   --t-gray-bg:#373737;   --t-gray:#9b9b9b;
+
   --sh-1:rgba(0,0,0,.3) 0 0 0 1px, rgba(0,0,0,.4) 0 5px 10px,
          rgba(0,0,0,.5) 0 15px 40px;
   --sh-2:rgba(255,255,255,.05) 0 0 0 1px, rgba(0,0,0,.3) 0 2px 4px;
+  --r:4px; --r-2:8px;
+  --font:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,
+         "Apple Color Emoji",Arial,sans-serif;
+  --mono:"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
+  --c1:296px; --c3:344px;
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -76,8 +67,7 @@ button{cursor:pointer;background:none;border:0;padding:0}
 a{color:inherit;text-decoration:none;border-bottom:1px solid var(--line-2)}
 a:hover{border-bottom-color:var(--fg-3)}
 code,kbd{font-family:var(--mono);font-size:.86em;
-  background:var(--hover);border-radius:3px;padding:1px 4px;color:#eb5757}
-:root[data-theme=dark] code{color:#ff7369}
+  background:var(--hover);border-radius:3px;padding:1px 4px;color:#ff7369}
 ::selection{background:var(--accent-bg)}
 ::-webkit-scrollbar{width:10px;height:10px}
 ::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:6px;
@@ -190,7 +180,7 @@ header.top{
   border-radius:3px;background:var(--accent-bg);color:var(--accent);
   font:500 11px/16px var(--mono);text-align:center;vertical-align:2px;cursor:pointer;
 }
-.tdan:hover,.tdan.chon{background:var(--accent);color:#fff}
+.tdan:hover,.tdan.chon{background:var(--accent);color:var(--tren-accent)}
 .chat-in{flex:0 0 auto;padding:8px 28px 18px}
 .chat-in form{display:flex;gap:8px;align-items:flex-end;max-width:680px;margin:0 auto}
 .chat-in textarea{
@@ -200,7 +190,8 @@ header.top{
 }
 .chat-in textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-bg)}
 .chat-in button.gui{
-  padding:9px 16px;border-radius:var(--r-2);background:var(--accent);color:#fff;
+  padding:9px 16px;border-radius:var(--r-2);background:var(--accent);
+  color:var(--tren-accent);
   font-weight:500;font-size:14px;
 }
 .chat-in button.gui:disabled{background:var(--bg-3);color:var(--fg-3);cursor:not-allowed}
@@ -238,6 +229,63 @@ header.top{
 .td.chon .doan{-webkit-line-clamp:unset}
 .td .mo{margin-top:8px;font-size:12px;color:var(--accent)}
 
+
+/* ── Popup tài liệu ──
+   <dialog> chứ không phải div tự dựng: nó cho sẵn backdrop, phím Esc, bẫy tiêu
+   điểm và inert cho phần nền. Tự làm lại ba thứ đó bằng tay là ba chỗ để sai. */
+dialog.doc-modal{
+  border:0;padding:0;background:var(--bg);color:var(--fg);
+  width:min(880px,94vw);max-width:none;height:min(86vh,940px);max-height:86vh;
+  border-radius:var(--r-2);box-shadow:var(--sh-1);overflow:hidden;
+}
+dialog.doc-modal::backdrop{background:rgba(15,15,15,.6);backdrop-filter:blur(2px)}
+.doc-modal .mh{
+  display:flex;align-items:center;gap:8px;padding:10px 14px;
+  border-bottom:1px solid var(--line);
+}
+.doc-modal .mh .nhan{
+  flex:1;min-width:0;font-size:12.5px;color:var(--fg-3);font-family:var(--mono);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.doc-modal .mh button{padding:4px 9px;border-radius:var(--r);font-size:13px;color:var(--fg-2)}
+.doc-modal .mh button:hover{background:var(--hover);color:var(--fg)}
+.doc-modal .mb{height:calc(100% - 45px);overflow-y:auto;padding:30px 46px 60px}
+
+.doc{max-width:640px;margin:0 auto}
+.doc .sh-lon{font-family:var(--mono);color:var(--fg-3);font-size:13px}
+.doc h1{font-size:30px;line-height:1.25;font-weight:700;margin:4px 0 10px;letter-spacing:-.01em}
+.doc .nhan-hang{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 20px}
+.doc table{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px}
+.doc th,.doc td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+.doc th{background:var(--bg-2);font-weight:500;width:32%;color:var(--fg-2)}
+.doc h3{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--fg-3);
+  margin:28px 0 10px;font-weight:500}
+.doc ul{margin:6px 0;padding-left:20px}
+.doc li{margin:4px 0}
+/* Biểu tượng đặt TUYỆT ĐỐI, thân là khối thường.
+   Bản flex có ba phần tử con (::before, <b>, chữ thân) và mọi cách xếp chúng đều
+   vỡ theo một kiểu: hoặc tiêu đề thành cột hẹp ba dòng, hoặc biểu tượng rơi
+   xuống dòng riêng. Một `position:absolute` bỏ hẳn cuộc thương lượng đó. */
+.canh-bao{
+  position:relative;background:var(--bg-2);border-radius:var(--r);
+  padding:12px 14px 12px 40px;margin:14px 0;font-size:14px;line-height:1.55;
+}
+.canh-bao::before{content:"💡";position:absolute;left:14px;top:11px;font-size:15px}
+.canh-bao.bad{background:var(--t-red-bg);color:var(--t-red)}
+.canh-bao.bad::before{content:"⛔"}
+.canh-bao.warn{background:var(--t-yellow-bg);color:var(--t-yellow)}
+.canh-bao.warn::before{content:"⚠️"}
+.canh-bao.ok{background:var(--t-green-bg);color:var(--t-green)}
+.canh-bao.ok::before{content:"✅"}
+.canh-bao b{display:block;margin-bottom:2px;font-weight:600}
+.tai-ve{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}
+.tai-ve a{
+  display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--r);
+  background:var(--fg);color:var(--bg);font-size:14px;font-weight:500;border:0;
+}
+.tai-ve a:hover{opacity:.85}
+.tai-ve a.phu{background:var(--bg);color:var(--fg);border:1px solid var(--line);box-shadow:var(--sh-2)}
+
 /* ── Sơ đồ láng giềng ── */
 .sodo{border:1px solid var(--line);border-radius:var(--r-2);background:var(--bg-2);
   margin:12px 0;position:relative;overflow:hidden}
@@ -261,7 +309,7 @@ dialog.cfg input:focus{background:var(--bg);border-color:var(--accent);
   box-shadow:0 0 0 2px var(--accent-bg)}
 dialog.cfg .df{padding:16px 20px 18px;display:flex;gap:8px;justify-content:flex-end}
 dialog.cfg .df button{padding:6px 14px;border-radius:var(--r);font-weight:500;font-size:14px}
-dialog.cfg .df .chinh{background:var(--accent);color:#fff}
+dialog.cfg .df .chinh{background:var(--accent);color:var(--tren-accent)}
 dialog.cfg .df .phu{color:var(--fg-2)}
 dialog.cfg .df .phu:hover{background:var(--hover)}
 dialog.cfg small{display:block;color:var(--fg-3);font-size:12.5px;margin-top:5px;line-height:1.5}
@@ -321,7 +369,6 @@ dialog.cfg small{display:block;color:var(--fg-3);font-size:12.5px;margin-top:5px
     <input id="q" type="search" placeholder="Tra số hiệu, tên văn bản, tên biểu mẫu…" autocomplete="off">
   </div>
   <div class="top-actions">
-    <button id="btn-theme" title="Sáng / tối">🌙</button>
     <button id="btn-cfg" title="Cấu hình API">⚙️</button>
   </div>
 </header>
@@ -1006,8 +1053,8 @@ function hienCot(id) {
 document.addEventListener("click", e => {
   const t = e.target;
 
-  const kho = t.closest("[data-kho]");
-  if (kho && kho.closest(".c1")) {
+  const kho = t.closest(".kho-chon [data-kho]");
+  if (kho) {
     S.kho = kho.dataset.kho; S.linhVuc = null;
     $$(".c1 [data-kho]").forEach(b =>
       b.setAttribute("aria-selected", String(b === kho)));
@@ -1052,13 +1099,6 @@ document.addEventListener("click", e => {
     if (!S.mo) return;
     const v = (S.mo.kho === "van_ban" ? S.d.van_ban : S.d.bieu_mau)[S.mo.i];
     open(`${GOC}/${S.mo.kho === "van_ban" ? "van-ban" : "bieu-mau"}/${v.s}`, "_blank");
-    return;
-  }
-  if (t.closest("#btn-theme")) {
-    const toi = document.documentElement.dataset.theme === "dark";
-    document.documentElement.dataset.theme = toi ? "light" : "dark";
-    localStorage.setItem("troly.theme", toi ? "light" : "dark");
-    $("#btn-theme").textContent = toi ? "🌙" : "☀️";
     return;
   }
   if (t.closest("#btn-cfg")) {
@@ -1112,10 +1152,6 @@ addEventListener("keydown", e => {
 });
 
 /* ── Khởi động ── */
-if (localStorage.getItem("troly.theme") === "dark") {
-  document.documentElement.dataset.theme = "dark";
-  $("#btn-theme").textContent = "☀️";
-}
 hienCot("col2");
 veNguon();
 nap().then(() => { veGoiY(); capNhatGhiChat(); }).catch(e => {
