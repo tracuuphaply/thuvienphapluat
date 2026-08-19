@@ -95,6 +95,30 @@ class TestTrangBieuMau:
         assert "văn bản gốc" in page
         assert form_da_dung.url in page
 
+    def test_ban_kho_giu_dung_truoc_trang_TVPL(self, master_session, form_da_dung):
+        """Trang gốc vẫn ghi — ghi nguồn là việc phải làm — nhưng nó KHÔNG còn là
+        đường duy nhất lấy biểu mẫu. Trỏ người đọc về Thư viện Pháp luật là đẩy
+        họ ra khỏi kho của mình, tới một trang có tường Cloudflare và có thể gỡ
+        mẫu bất cứ lúc nào."""
+        form_da_dung.gdrive_docx_link = "https://drive.google.com/file/d/1AbC_dEf-2345/view"
+        master_session.commit()
+        page = form_exporter.render_form_page(master_session, form_da_dung, {})
+        assert page.index(form_da_dung.gdrive_docx_link) < page.index(form_da_dung.url)
+
+    def test_ban_word_lay_tu_drive_khi_da_tai_len(self, master_session, form_da_dung):
+        """Bản Word là bản ĐIỀN ĐƯỢC. Drive xem trước và tải về được ngay trên
+        trình duyệt, còn file trong repo thì tuỳ trình duyệt mà mở hay tải."""
+        form_da_dung.gdrive_docx_link = "https://drive.google.com/file/d/1AbC_dEf-2345/view"
+        master_session.commit()
+        khoi = form_exporter._khoi_tai_ve(form_da_dung)
+        assert "drive.google.com/file/d/1AbC_dEf-2345" in khoi
+        assert "hopdong-46696.docx" not in khoi     # không nhân đôi cùng một bản
+        assert "hopdong-46696.pdf" in khoi          # PDF vẫn lấy từ repo
+
+    def test_chua_tai_len_drive_thi_van_dung_ban_trong_repo(self, master_session, form_da_dung):
+        khoi = form_exporter._khoi_tai_ve(form_da_dung)
+        assert "hopdong-46696.docx" in khoi
+
     def test_docx_dung_truoc_pdf_trong_khoi_tai_ve(self, master_session, form_da_dung):
         page = form_exporter.render_form_page(master_session, form_da_dung, {})
         vt_docx = page.index("hopdong-46696.docx")

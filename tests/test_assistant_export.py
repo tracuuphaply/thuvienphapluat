@@ -33,6 +33,7 @@ def kho(master_session):
             hierarchy_level=kw.get("cap", 5),
             territorial_scope=kw.get("scope", "trung_uong"),
             issue_date=kw.get("ngay", date(2024, 7, 24)),
+            gdrive_fulltext_link=kw.get("drive"),
         )
         master_session.add(d)
         master_session.commit()
@@ -51,7 +52,7 @@ def kho(master_session):
             nghiep_vu=json.dumps(kw.get("nv", ["hop_dong"])),
             eff_state=kw.get("eff", "con_hieu_luc"),
             docx_path=kw.get("docx"), pdf_path=kw.get("pdf"),
-            delisted_at=kw.get("go"),
+            delisted_at=kw.get("go"), gdrive_docx_link=kw.get("drive"),
         )
         master_session.add(f)
         for n in can_cu:
@@ -138,6 +139,48 @@ class TestBieuMau:
     def test_co_co_da_bi_go(self, master_session, kho, tmp_path):
         kho.bm("hopdong-1", "bm-hopdong-1", go=date(2026, 8, 19))
         assert doc_goi(master_session, tmp_path)["bieu_mau"][0]["g"] == 1
+
+
+class TestLienKetDrive:
+    """Bản toàn văn trên Drive là thứ DUY NHẤT trong bộ này mở ra nội dung thật.
+
+    Hai địa chỉ nguồn còn lại đều là ngõ cụt với người đọc: cổng Bộ Tư pháp trả
+    về XML thô, Thư viện Pháp luật chặn truy cập tự động. Đo ngày 19/08/2026:
+    3.883/4.201 văn bản đã có bản Drive.
+    """
+
+    def test_ship_ID_chu_khong_ship_URL(self, master_session, kho, tmp_path):
+        """Tiền tố URL dài 32 ký tự, lặp y hệt ở 3.883 văn bản — ~124 KB rỗng."""
+        kho.vb("1/2024/NĐ-CP", "1-2024-ndd-cp",
+               drive="https://drive.google.com/file/d/1AbC_dEf-23456789/view?usp=drivesdk")
+        (v,) = doc_goi(master_session, tmp_path)["van_ban"]
+        assert v["g"] == "1AbC_dEf-23456789"
+
+    def test_van_ban_chua_co_ban_drive_thi_vang_truong(self, master_session, kho, tmp_path):
+        """Vắng trường, KHÔNG phải chuỗi rỗng: bên đọc phân biệt bằng `if (v.g)`,
+        mà chuỗi rỗng thì cũng falsy nhưng vẫn tốn 6 byte × 318 văn bản."""
+        kho.vb("1/2024/NĐ-CP", "1-2024-ndd-cp")
+        (v,) = doc_goi(master_session, tmp_path)["van_ban"]
+        assert "g" not in v
+
+    def test_bieu_mau_cung_ship_ID(self, master_session, kho, tmp_path):
+        kho.bm("hopdong-1", "bm-hopdong-1",
+               drive="https://drive.google.com/file/d/1XyZ_uvw-987654321/view")
+        (b,) = doc_goi(master_session, tmp_path)["bieu_mau"]
+        assert b["g"] == "1XyZ_uvw-987654321"
+
+    def test_url_la_thu_khong_nhan_ra_thi_bo_qua(self, master_session, kho, tmp_path):
+        """Provider đổi dạng URL là chuyện xảy ra. Ship ID sai còn tệ hơn không
+        ship: nó dựng ra một link chết mà trông y như link sống."""
+        kho.vb("1/2024/NĐ-CP", "1-2024-ndd-cp", drive="https://example.com/khong-phai-drive")
+        (v,) = doc_goi(master_session, tmp_path)["van_ban"]
+        assert v.get("g", "") == ""
+
+    def test_bang_giai_nghia_noi_ro_cach_ghep_URL(self, master_session, tmp_path):
+        """Ship ID tiết kiệm chỗ nhưng chỉ dùng được nếu bên đọc biết ghép."""
+        g = doc_goi(master_session, tmp_path)
+        assert "drive.google.com/file/d/" in g["_truong"]["van_ban"]["g"]
+        assert "drive.google.com/file/d/" in g["_truong"]["bieu_mau"]["g"]
 
 
 class TestGoiDuLieu:

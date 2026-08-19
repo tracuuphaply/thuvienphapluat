@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -49,6 +50,8 @@ GIAI_NGHIA_TRUONG = {
         "d": "ngày ban hành",
         "c": "cấp hiệu lực pháp lý 1-9",
         "p": "phạm vi: tw | tinh",
+        "g": "ID file toàn văn trên Google Drive — ghép "
+             "https://drive.google.com/file/d/{g}/view (vắng nếu chưa có)",
     },
     "bieu_mau": {
         "s": "slug trang công khai",
@@ -60,6 +63,8 @@ GIAI_NGHIA_TRUONG = {
         "w": "tên file .docx",
         "p": "tên file .pdf",
         "c": "số hiệu căn cứ",
+        "g": "ID file .docx trên Google Drive — ghép "
+             "https://drive.google.com/file/d/{g}/view (vắng nếu chưa tải lên)",
     },
     "do_thi": {
         "nut": "chỉ số trỏ vào mảng van_ban",
@@ -80,11 +85,25 @@ class ThongKeXuat:
         return dict(self.__dict__)
 
 
+_RE_ID_DRIVE = re.compile(r"/d/([A-Za-z0-9_-]{10,})")
+
+
+def _id_drive(link: str) -> str:
+    """Rút ID file từ URL Drive; trả về chuỗi rỗng nếu không nhận ra dạng.
+
+    Ship ID chứ không ship URL: tiền tố "https://drive.google.com/file/d/" dài 32
+    ký tự và lặp lại y hệt ở 3.883 văn bản — ~124 KB không mang thông tin nào.
+    """
+    m = _RE_ID_DRIVE.search(link or "")
+    return m.group(1) if m else ""
+
+
 def _van_ban(session) -> tuple[list[dict], dict[str, int]]:
     """Metadata mọi văn bản đã đăng, kèm bảng tra slug → chỉ số."""
     rows = session.execute(text("""
         SELECT public_slug, doc_num, title, doc_type, tvpl_field_code,
-               eff_state, issue_date, hierarchy_level, territorial_scope
+               eff_state, issue_date, hierarchy_level, territorial_scope,
+               gdrive_fulltext_link
         FROM documents
         WHERE public_slug IS NOT NULL AND is_vbqppl = 1
         ORDER BY public_slug
@@ -93,7 +112,7 @@ def _van_ban(session) -> tuple[list[dict], dict[str, int]]:
     ds, chi_so = [], {}
     for i, r in enumerate(rows):
         chi_so[r[0]] = i
-        ds.append({
+        muc = {
             "s": r[0],
             "n": r[1],
             "t": (r[2] or "")[:190],
@@ -103,7 +122,13 @@ def _van_ban(session) -> tuple[list[dict], dict[str, int]]:
             "d": str(r[6]) if r[6] else "",
             "c": r[7] or 99,
             "p": "tw" if r[8] == "trung_uong" else "tinh",
-        })
+        }
+        # Chỉ ship ID, không ship cả URL: 3.883 link × 39 ký tự tiền tố giống hệt
+        # nhau là ~150 KB lặp lại. Bên đọc tự ghép — quy tắc ghép nằm ngay trong
+        # bảng giải nghĩa trường.
+        if r[9]:
+            muc["g"] = _id_drive(r[9])
+        ds.append(muc)
     return ds, chi_so
 
 
@@ -136,6 +161,8 @@ def _bieu_mau(session) -> list[dict]:
             muc["w"] = Path(f.docx_path).name
         if f.pdf_path:
             muc["p"] = Path(f.pdf_path).name
+        if f.gdrive_docx_link:
+            muc["g"] = _id_drive(f.gdrive_docx_link)
         ds.append(muc)
     return ds
 

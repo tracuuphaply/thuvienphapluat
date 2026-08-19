@@ -522,6 +522,25 @@ def _m014_form_effectivity(conn: Connection) -> None:
     ))
 
 
+def _m015_form_gdrive(conn: Connection) -> None:
+    """Liên kết Google Drive cho bản .docx của biểu mẫu.
+
+    Trang công khai vốn trỏ người dùng về Thư viện Pháp luật để lấy bản gốc —
+    nghĩa là đẩy họ ra khỏi kho của mình, tới một trang có tường Cloudflare và
+    có thể đổi hoặc gỡ mẫu bất cứ lúc nào. Bản .docx do mình dựng lại thì nằm
+    trên đĩa máy chạy, không ai ngoài mở được. Drive là chỗ duy nhất vừa của
+    mình vừa mở được bằng link.
+
+    CHỈ .docx, không .pdf: bản Word là bản ĐIỀN ĐƯỢC — thứ người ta thật sự cần
+    ở một biểu mẫu. Bản PDF vẫn tải từ trang công khai như cũ.
+    """
+    _add_columns(conn, "legal_forms", [
+        ("gdrive_docx_link", "TEXT"),
+        ("gdrive_folder_id", "VARCHAR(100)"),
+        ("gdrive_uploaded_at", "DATE"),
+    ])
+
+
 MIGRATIONS: list[Migration] = [
     Migration("001_legacy_document_columns",
               "Các cột documents từng thêm bằng vòng lặp hardcode",
@@ -565,6 +584,9 @@ MIGRATIONS: list[Migration] = [
     Migration("014_form_effectivity",
               "Hiệu lực biểu mẫu suy từ căn cứ, và dấu vết mẫu bị TVPL gỡ",
               _m014_form_effectivity),
+    Migration("015_form_gdrive",
+              "Liên kết Google Drive cho bản .docx của biểu mẫu",
+              _m015_form_gdrive),
 ]
 
 

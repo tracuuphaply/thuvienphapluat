@@ -190,7 +190,26 @@ def _bieu_mau_kem_theo(session, doc: Document) -> str:
 
 
 def _sources(doc: Document) -> str:
+    """Nơi lấy TOÀN VĂN đứng trước, địa chỉ tra cứu đứng sau.
+
+    Thứ tự này không phải hình thức. Trước đây mục này chỉ có hai dòng và cả hai
+    đều dẫn tới ngõ cụt với người đọc: `moj_url` trỏ vào cổng API của Bộ Tư pháp
+    và trả về XML thô, còn trang TVPL thì có tường Cloudflare. Người bấm vào để
+    đọc văn bản không đọc được gì — mà mục này tồn tại đúng để họ đọc được.
+
+    Bản toàn văn trên Drive là bản kho tự giữ, mở được bằng link, không phụ thuộc
+    ai. 3.883/4.201 văn bản đã có; số còn lại vẫn chỉ có hai dòng cũ và phải nói
+    rõ là chưa có, chứ không im lặng.
+    """
     lines = []
+    if doc.gdrive_fulltext_link:
+        lines.append(f"- **Toàn văn (bản kho giữ):** <{doc.gdrive_fulltext_link}>")
+    if doc.gdrive_docx_link:
+        lines.append(f"- Bản .docx: <{doc.gdrive_docx_link}>")
+    if not doc.gdrive_fulltext_link:
+        lines.append("- *Chưa có bản toàn văn trong kho. Hai địa chỉ dưới đây là "
+                     "nơi tra cứu, không phải nơi đọc: cổng Bộ Tư pháp trả về dữ "
+                     "liệu XML, còn Thư viện Pháp luật chặn truy cập tự động.*")
     if doc.moj_url:
         lines.append(f"- Bản ghi gốc trên hệ thống Bộ Tư pháp: <{doc.moj_url}>")
     if doc.tvpl_url:

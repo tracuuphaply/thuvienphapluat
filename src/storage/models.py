@@ -548,6 +548,15 @@ class LegalForm(Base):
     last_seen_at = Column(Date, comment="Lần cuối còn thấy trên trang liệt kê TVPL")
     delisted_at = Column(Date, comment="Lần đầu phát hiện đã biến mất khỏi TVPL")
 
+    # ── Bản .docx trên Google Drive ──
+    # Chỉ .docx: bản Word là bản ĐIỀN ĐƯỢC, thứ người ta thật sự cần ở một biểu
+    # mẫu. Đây là chỗ duy nhất vừa của mình vừa mở được bằng link — bản trên đĩa
+    # máy chạy thì không ai ngoài mở được, còn trỏ về TVPL là đẩy người dùng ra
+    # khỏi kho của mình tới một trang có thể đổi hoặc gỡ mẫu bất cứ lúc nào.
+    gdrive_docx_link = Column(Text)
+    gdrive_folder_id = Column(String(100))
+    gdrive_uploaded_at = Column(Date)
+
     # Trang công khai
     public_slug = Column(String(180), unique=True, nullable=True)
     published_hash = Column(

@@ -71,7 +71,7 @@ tags: {tags}
 
 ## Nguồn
 
-- Trang gốc trên Thư viện Pháp luật: <{url}>
+{khoi_nguon}
 """
 
 
@@ -172,15 +172,43 @@ def _khoi_meta(form: LegalForm, nghiep_vu: list[str]) -> str:
 
 
 def _khoi_tai_ve(form: LegalForm) -> str:
-    """Link tải. DOCX đứng trước: biểu mẫu là để ĐIỀN, PDF không điền được."""
+    """Link tải. DOCX đứng trước: biểu mẫu là để ĐIỀN, PDF không điền được.
+
+    Bản Word ưu tiên GOOGLE DRIVE khi đã tải lên. Bản kèm trong repo vẫn giữ
+    nguyên làm đường dự phòng — Drive xem trước được ngay trên trình duyệt và
+    tải về được, còn file trong repo thì tuỳ trình duyệt mà mở hay tải.
+    """
     dong = []
-    for nhan, duong_dan in (("Bản Word (.docx) — điền được", form.docx_path),
-                            ("Bản PDF — để in", form.pdf_path)):
-        if duong_dan and Path(duong_dan).exists():
+    if form.gdrive_docx_link:
+        dong.append(f"- [Bản Word (.docx) — điền được]({form.gdrive_docx_link}) "
+                    "*(Google Drive)*")
+    for nhan, duong_dan in (
+            (None if form.gdrive_docx_link else "Bản Word (.docx) — điền được",
+             form.docx_path),
+            ("Bản PDF — để in", form.pdf_path)):
+        if nhan and duong_dan and Path(duong_dan).exists():
             dong.append(f"- [{nhan}](./{Path(duong_dan).name})")
     if not dong:
         return ("*Chưa dựng được file tải về cho biểu mẫu này. "
                 "Nội dung đầy đủ vẫn ở phần dưới.*")
+    return "\n".join(dong)
+
+
+def _khoi_nguon(form: LegalForm) -> str:
+    """Bản kho tự giữ đứng trước, trang gốc đứng sau.
+
+    Trước đây mục này chỉ có một dòng trỏ về Thư viện Pháp luật — tức đẩy người
+    đọc ra khỏi kho của mình, tới một trang có tường Cloudflare và có thể đổi
+    hoặc gỡ mẫu bất cứ lúc nào. Trang gốc vẫn giữ, vì ghi nguồn là việc phải làm;
+    nhưng nó không còn là đường DUY NHẤT để lấy biểu mẫu.
+    """
+    dong = []
+    if form.gdrive_docx_link:
+        dong.append(f"- **Bản kho giữ (Google Drive):** <{form.gdrive_docx_link}>")
+    if form.url:
+        dong.append(f"- Trang gốc trên Thư viện Pháp luật: <{form.url}>")
+    if not dong:
+        dong.append("- *Chưa ghi nhận được địa chỉ nguồn cho biểu mẫu này.*")
     return "\n".join(dong)
 
 
@@ -253,7 +281,7 @@ def render_form_page(session, form: LegalForm,
         khoi_tai_ve=_khoi_tai_ve(form),
         khoi_can_cu=_khoi_can_cu(session, form, slug_by_num),
         noi_dung=_noi_dung(form) or "*Chưa dựng được nội dung cho biểu mẫu này.*",
-        url=form.url or "",
+        khoi_nguon=_khoi_nguon(form),
     )
 
 

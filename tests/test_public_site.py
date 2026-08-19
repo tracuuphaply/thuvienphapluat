@@ -53,6 +53,29 @@ class TestNoiDungTrang:
         page = self._render(kho, "135/2025/QH15")
         assert "## Nguồn gốc" in page
 
+    def test_toan_van_drive_dung_TRUOC_cong_bo_tu_phap(self, kho):
+        """Người bấm vào mục Nguồn gốc là để ĐỌC văn bản.
+
+        Hai địa chỉ vốn có đều là ngõ cụt với việc đó: `moj_url` trỏ vào cổng API
+        của Bộ Tư pháp và trả về XML thô, còn trang TVPL có tường Cloudflare.
+        Bản Drive là bản kho tự giữ và mở thẳng ra nội dung, nên nó phải đứng đầu.
+        """
+        from src.storage.models import Document
+
+        doc = kho.query(Document).filter(Document.doc_num == "135/2025/QH15").first()
+        doc.gdrive_fulltext_link = "https://drive.google.com/file/d/1AbC/view"
+        doc.moj_url = "https://vbpl-bientap-gateway.moj.gov.vn/api/qtdc/public/doc/1"
+        kho.commit()
+        page = self._render(kho, "135/2025/QH15")
+        assert page.index("drive.google.com/file/d/1AbC") < page.index("moj.gov.vn")
+
+    def test_chua_co_ban_toan_van_thi_noi_ro_hai_link_kia_la_ngo_cut(self, kho):
+        """Im lặng ở đây là để người đọc tự bấm vào rồi mới biết mình không đọc
+        được gì — ba lần chuyển trang cho một kết quả rỗng."""
+        page = self._render(kho, "135/2025/QH15")
+        assert "Chưa có bản toàn văn trong kho" in page
+        assert "XML" in page
+
     def test_bang_tac_dong_luon_kem_cau_gioi_han(self, kho):
         """Thiếu câu này thì con số bị đọc thành chi phí kinh tế."""
         page = self._render(kho, "135/2025/QH15", impacts=[

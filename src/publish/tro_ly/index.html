@@ -24,6 +24,13 @@
      · màu chỉ dùng cho nhãn trạng thái, dạng pastel nền nhạt chữ đậm
      · trạng thái hover là một lớp xám mờ, không phải đổi màu
    ───────────────────────────────────────────────────────────── */
+/* HAI BẢNG MÀU, và bảng TỐI là mặc định — `:root` mang trực tiếp bộ tối, còn bộ
+   sáng nằm trong `[data-theme=light]`. Viết ngược lại (sáng ở `:root`) thì mọi
+   biến quên khai báo lại sẽ rơi về màu sáng trên nền tối — hỏng thành không đọc
+   được chữ, mà lại chỉ hỏng ở một bảng nên dễ lọt.
+   Bài học cũ vẫn đúng: bảng ít dùng là bảng lặng lẽ hỏng. Nên mọi biến màu đều
+   phải có mặt ở CẢ HAI khối dưới đây — thiếu một biến ở khối sáng là một chỗ
+   dùng màu tối trên nền sáng. */
 :root{
   color-scheme:dark;
   --bg:#191919; --bg-2:#202020; --bg-3:#2c2c2c;
@@ -54,6 +61,31 @@
   --mono:"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
   --c1:296px; --c3:344px; --le-giua:26px;
 }
+
+:root[data-theme=light]{
+  color-scheme:light;
+  --bg:#fff; --bg-2:#f7f7f5; --bg-3:#f1f1ef;
+  --fg:#37352f; --fg-2:#787774; --fg-3:#9b9a97;
+  --line:#e9e9e7; --line-2:rgba(55,53,47,.09);
+  /* #1868b7 chứ không phải #2383e2 của Notion. Đo tương phản trên nền trắng:
+     xanh Notion được 3,5 — dưới ngưỡng 4,5 cho chữ nhỏ, mà biến này dùng cho
+     liên kết, số trích dẫn và chữ trên nút Gửi. #1868b7 được 5,3. Nền nhạt
+     (--accent-bg) giữ nguyên tông sáng nên nhãn vẫn nhẹ như cũ. */
+  --accent:#1868b7; --accent-bg:rgba(35,131,226,.13);
+  --tren-accent:#fff;
+  --hover:rgba(55,53,47,.06); --hover-2:rgba(55,53,47,.11);
+  --mark:#fdecc8;
+  --t-red-bg:#fbe4e4;    --t-red:#8a3a37;
+  --t-green-bg:#dbeddb;  --t-green:#28553a;
+  --t-yellow-bg:#fbf3db; --t-yellow:#6b5518;
+  --t-orange-bg:#faebdd; --t-orange:#7a4318;
+  --t-blue-bg:#d3e5ef;   --t-blue:#28556f;
+  --t-gray-bg:#e3e2e0;   --t-gray:#5d5b57;
+  --sh-1:rgba(15,15,15,.05) 0 0 0 1px, rgba(15,15,15,.1) 0 3px 6px,
+         rgba(15,15,15,.2) 0 9px 24px;
+  --sh-2:rgba(15,15,15,.04) 0 0 0 1px, rgba(15,15,15,.06) 0 2px 4px;
+}
+:root[data-theme=light] code{color:#eb5757}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{margin:0;height:100%}
@@ -371,6 +403,24 @@ dialog.cfg .df .chinh{background:var(--accent);color:var(--tren-accent)}
 dialog.cfg .df .phu{color:var(--fg-2)}
 dialog.cfg .df .phu:hover{background:var(--hover)}
 dialog.cfg small{display:block;color:var(--fg-3);font-size:12.5px;margin-top:5px;line-height:1.5}
+dialog.cfg .hang{
+  display:flex;align-items:flex-start;gap:16px;padding:13px 0;
+  border-bottom:1px solid var(--line);
+}
+dialog.cfg .hang:last-child{border-bottom:0}
+dialog.cfg .hang > div{flex:1;min-width:0}
+dialog.cfg .hang b{font-size:14px;font-weight:500}
+dialog.cfg .hang small{margin-top:2px}
+.cong-tac{
+  flex:0 0 auto;width:38px;height:22px;border-radius:11px;background:var(--bg-3);
+  border:1px solid var(--line);position:relative;transition:background .14s;
+}
+.cong-tac .num{
+  position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;
+  background:var(--fg-3);transition:transform .14s,background .14s;
+}
+.cong-tac[aria-checked=true]{background:var(--accent);border-color:var(--accent)}
+.cong-tac[aria-checked=true] .num{transform:translateX(16px);background:#fff}
 
 .mnav{display:none}
 @media(max-width:1240px){:root{--c1:250px;--c3:300px}}
@@ -430,7 +480,7 @@ dialog.cfg small{display:block;color:var(--fg-3);font-size:12.5px;margin-top:5px
     <input id="q" type="search" placeholder="Tra số hiệu, tên văn bản, tên biểu mẫu…" autocomplete="off">
   </div>
   <div class="top-actions">
-    <button id="btn-cfg" title="Cấu hình API">⚙️</button>
+    <button id="btn-cfg" title="Tuỳ chỉnh hiển thị">⚙️</button>
   </div>
 </header>
 
@@ -484,7 +534,6 @@ dialog.cfg small{display:block;color:var(--fg-3);font-size:12.5px;margin-top:5px
           <textarea id="chat-q" rows="1" placeholder="Hỏi về nghĩa vụ, thời hạn, mức phạt, biểu mẫu phải nộp…"></textarea>
           <button class="gui" type="submit" id="chat-gui">Gửi</button>
         </form>
-        <div class="ghi" id="chat-ghi"></div>
       </div>
     </div>
   </main>
@@ -528,21 +577,28 @@ dialog.cfg small{display:block;color:var(--fg-3);font-size:12.5px;margin-top:5px
 </dialog>
 
 <dialog class="cfg" id="dlg-cfg">
-  <div class="dh">Cấu hình API trợ lý</div>
+  <div class="dh">Tuỳ chỉnh hiển thị</div>
   <div class="db">
-    <p style="margin:0">Trang này tra cứu hoàn toàn phía máy bạn. Chỉ phần <b>hỏi đáp</b> cần một API
-    tương thích hợp đồng <code>POST /chat</code> (SSE).</p>
-    <label for="cfg-url">Địa chỉ API</label>
-    <input id="cfg-url" type="url" placeholder="https://…/chat" spellcheck="false">
-    <small>Để trống thì phần hỏi đáp chạy ở <b>chế độ thử</b>: nó tra tiêu đề trong kho
-    rồi trả về các tài liệu khớp, không gọi mô hình nào.</small>
-    <label for="cfg-key">Khoá (tuỳ chọn)</label>
-    <input id="cfg-key" type="password" placeholder="Bearer token, nếu API yêu cầu" spellcheck="false">
-    <small>Lưu trong <code>localStorage</code> của chính trình duyệt này, không gửi đi đâu khác.</small>
+    <div class="hang">
+      <div>
+        <b>Giao diện tối</b>
+        <small>Nền tối, chữ nhạt. Tắt để dùng nền sáng.</small>
+      </div>
+      <button class="cong-tac" id="ct-toi" role="switch" aria-checked="true">
+        <span class="num"></span></button>
+    </div>
+    <div class="hang">
+      <div>
+        <b>Sơ đồ quan hệ</b>
+        <small>Mạng lưới dẫn chiếu ở khung hỏi đáp, trong trang văn bản và cạnh
+        phần trích dẫn. Tắt nếu máy chậm.</small>
+      </div>
+      <button class="cong-tac" id="ct-sodo" role="switch" aria-checked="true">
+        <span class="num"></span></button>
+    </div>
   </div>
   <div class="df">
-    <button class="phu" id="cfg-huy">Huỷ</button>
-    <button class="chinh" id="cfg-luu">Lưu</button>
+    <button class="chinh" id="cfg-dong">Xong</button>
   </div>
 </dialog>
 
@@ -578,11 +634,44 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
 const goDau = s => String(s ?? "").replace(/Đ/g, "D").replace(/đ/g, "d")
   .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
-const CH = {                       /* cấu hình lưu trong localStorage */
-  get url() { return localStorage.getItem("troly.url") || ""; },
-  get key() { return localStorage.getItem("troly.key") || ""; },
-  set(u, k) { localStorage.setItem("troly.url", u || ""); localStorage.setItem("troly.key", k || ""); },
+/* ══════════════ CẤU HÌNH API — SỬA Ở ĐÂY ══════════════
+   Đặt trong mã nguồn, KHÔNG phải trong một hộp thoại cho người dùng nhập. Đây
+   là trang hướng tới người tra cứu pháp luật, không phải người vận hành: bắt họ
+   tự dán địa chỉ API và khoá là bắt họ làm việc của người dựng trang, và tệ hơn
+   là dạy họ dán khoá vào một ô mà bất kỳ trang nào cũng có thể bắt chước.
+
+   Để trống thì phần hỏi đáp chạy ở chế độ tra kho: nó tìm theo tiêu đề, xếp hạng
+   ưu tiên văn bản còn hiệu lực, và KHÔNG gọi mô hình nào.
+
+   Hợp đồng API: POST tới `URL` với body {messages, stream:true}, trả về SSE theo
+   thứ tự sub_queries → retrieval → context_ready → tool_call → answer. Xem
+   goiAPI() bên dưới để biết đúng những trường nào được đọc. */
+const API = {
+  URL: "",          // ví dụ: "https://api.example.com/chat"
+  KHOA: "",         // gửi kèm dạng "Authorization: Bearer <khoá>" nếu có
 };
+
+/* Tuỳ chỉnh hiển thị, nhớ trong localStorage của chính trình duyệt này. */
+const TC = {
+  get toi() { return localStorage.getItem("troly.theme") !== "light"; },
+  get sodo() { return localStorage.getItem("troly.sodo") !== "0"; },
+};
+
+function datTheme(toi) {
+  document.documentElement.dataset.theme = toi ? "dark" : "light";
+  localStorage.setItem("troly.theme", toi ? "dark" : "light");
+  $("#ct-toi")?.setAttribute("aria-checked", String(toi));
+  /* Màu nút và cạnh sơ đồ đọc từ biến CSS MỘT LẦN lúc khởi tạo — đổi bảng màu
+     thì phải nạp lại chúng, không thì sơ đồ giữ nguyên màu của bảng cũ và thành
+     chữ tối trên nền tối. Đây đúng lỗi đã gặp khi đổi tên biến màu lần trước. */
+  if (SD.cv && SD.cv.isConnected) { sdMauLai(); }
+}
+
+function datVeSoDo(bat) {
+  localStorage.setItem("troly.sodo", bat ? "1" : "0");
+  $("#ct-sodo")?.setAttribute("aria-checked", String(bat));
+  if (S.d) datSoDo();
+}
 
 const S = {                        /* trạng thái ứng dụng */
   d: null, kho: "van_ban", linhVuc: null,
@@ -753,6 +842,11 @@ function tra(cau) {
 /* ════════════════ Mở tài liệu ════════════════ */
 const GOC = "..";   /* trang Quartz nằm ở thư mục cha của /tro-ly/ */
 
+/* Bộ dữ liệu chỉ ship ID file, không ship URL: tiền tố dài 32 ký tự và lặp y hệt
+   ở 3.883 văn bản — ~124 KB không mang thông tin nào. Quy tắc ghép nằm ở đây và
+   trong bảng `_truong` của chính file dữ liệu. */
+const urlDrive = id => `https://drive.google.com/file/d/${id}/view`;
+
 /* Tài liệu mở thành POPUP, không chiếm chỗ của khung hỏi đáp.
    Bản trước chia đôi cột 3 và người dùng nói đúng: tài liệu chèn mất không gian
    chat. Dùng <dialog> chứ không tự dựng div — nó cho sẵn backdrop, phím Esc, bẫy
@@ -761,6 +855,12 @@ function moTaiLieu(kho, i) {
   S.mo = { kho, i };
   const v = (kho === "van_ban" ? S.d.van_ban : S.d.bieu_mau)[i];
   $("#doc-nhan").textContent = kho === "van_ban" ? v.n : v.k;
+  /* Nhãn nút phải nói đúng nó sẽ mở ra cái gì. "Trang gốc" khi nó dẫn tới một
+     trang chỉ có dữ kiện là hứa hẹn sai. */
+  $("#doc-goc").textContent = v.g ? "↗ Toàn văn" : "↗ Trang dữ kiện";
+  $("#doc-goc").title = v.g
+    ? "Mở bản toàn văn kho đang giữ (Google Drive)"
+    : "Mở trang dữ kiện — kho chưa có bản toàn văn của văn bản này";
   $("#doc-noi").innerHTML = kho === "van_ban" ? htmlVanBan(v, i) : htmlBieuMau(v);
   $("#doc-noi").scrollTop = 0;
   veDanhSach(undefined);          // giữ nguyên danh sách đang xem
@@ -770,7 +870,7 @@ function moTaiLieu(kho, i) {
      <dialog> chưa mở thì nội dung bên trong CHƯA CÓ BỐ CỤC: getBoundingClientRect
      trả 0, canvas nhận width 0 và không vẽ được gì. Lỗi này im lặng — không có
      ngoại lệ nào, chỉ là một khung trống. */
-  if (kho === "van_ban") { SD.tapChoSan = null; khoiSoDo(i, $("#sodo-cv"), false); }
+  if (kho === "van_ban" && TC.sodo) { SD.tapChoSan = null; khoiSoDo(i, $("#sodo-cv"), false); }
   else { SD.id++; SD.cv = null; }   /* trang biểu mẫu không có sơ đồ — dừng cái đang chạy */
 }
 
@@ -801,7 +901,9 @@ function htmlVanBan(v, i) {
     </tbody></table>
     <div class="canh-bao"><b>Bản trích dữ kiện</b>Trang này chỉ hiện dữ kiện và quan hệ
       dẫn chiếu. Toàn văn và phụ lục nằm ở trang đầy đủ — bấm “Trang gốc”.</div>
-    ${ke.length ? `<h3>Vị trí trong mạng lưới (${ke.length} quan hệ trực tiếp)</h3>${htmlSoDo()}` : ""}
+    ${ke.length && TC.sodo
+      ? `<h3>Vị trí trong mạng lưới (${ke.length} quan hệ trực tiếp)</h3>${htmlSoDo()}`
+      : ""}
     ${htmlBieuMauKemTheo(v.n)}
   </div>`;
 }
@@ -827,7 +929,8 @@ function htmlBieuMau(v) {
       Biểu mẫu là phụ lục kèm theo văn bản quy phạm nên hiệu lực của nó theo hiệu
       lực của văn bản đó. Nguồn KHÔNG công bố dữ kiện này — nó được suy từ căn cứ.</div>
     <div class="tai-ve">
-      ${v.w ? `<a href="${GOC}/bieu-mau/${esc(v.w)}" download>⬇ Bản Word (điền được)</a>` : ""}
+      ${v.g ? `<a href="${urlDrive(esc(v.g))}" target="_blank" rel="noopener">⬇ Bản Word (điền được)</a>`
+             : v.w ? `<a href="${GOC}/bieu-mau/${esc(v.w)}" download>⬇ Bản Word (điền được)</a>` : ""}
       ${v.p ? `<a class="phu" href="${GOC}/bieu-mau/${esc(v.p)}" download>⬇ Bản PDF (để in)</a>` : ""}
     </div>
     <table><tbody>
@@ -1022,18 +1125,21 @@ function sdChonNut(goc) {
       if (S.ke.has(i) || i === goc) { ds.push(i); if (!sau.has(i)) sau.set(i, 99); }
     return { ds, sau };
   }
+  /* CHỈ BẬC 1 — đúng những văn bản dẫn chiếu tới hoặc bị văn bản này dẫn chiếu.
+     Bản trước lấy hết bậc 1 rồi đệm thêm bậc 2 cho đủ 90 nút, và phần đệm ấy
+     chọn theo BẬC GIẢM DẦN nên nó toàn kéo về các đầu mối lớn của kho. Kết quả:
+     96/2024/NĐ-CP có 14 quan hệ trực tiếp mà sơ đồ vẽ 90 nút, trong đó 76 nút
+     không liên quan gì tới nó — chúng chỉ là hàng xóm của hàng xóm, được chọn
+     vì to. Sơ đồ nói về kho chứ không nói về văn bản đang mở.
+     Muốn thấy vùng rộng hơn thì có nút "Xem toàn kho" ngay cạnh. */
   const sau = new Map([[goc, 0]]), ds = [goc];
-  let vien = [goc];
-  for (let d = 1; d <= 2 && ds.length < SD_TRAN; d++) {
-    const ung = [];
-    for (const u of vien)
-      for (const [v] of (S.ke.get(u) || []))
-        if (!sau.has(v)) { sau.set(v, d); ung.push(v); }
-    if (d === 2) ung.sort((a, b) => (S.ke.get(b) || []).length - (S.ke.get(a) || []).length);
-    const lay = ung.slice(0, Math.max(0, SD_TRAN - ds.length));
-    for (const v of ung) if (!lay.includes(v)) sau.delete(v);
-    ds.push(...lay); vien = lay;
-  }
+  const lang = [...new Set((S.ke.get(goc) || []).map(([v]) => v))];
+  /* Vẫn chặn trần: văn bản trung tâm có tới 889 quan hệ trực tiếp, và 889 nút
+     trong khung 638×360 là một vành đặc không đọc được. Cắt thì cắt theo bậc
+     giảm dần — giữ lại các văn bản có sức nặng trong kho. */
+  if (lang.length > SD_TRAN)
+    lang.sort((a, b) => (S.ke.get(b) || []).length - (S.ke.get(a) || []).length);
+  for (const v of lang.slice(0, SD_TRAN)) { sau.set(v, 1); ds.push(v); }
   return { ds, sau };
 }
 
@@ -1621,6 +1727,12 @@ function tenNgan(v) {
    khung hỏi đáp. Chúng không bao giờ cùng nhìn thấy được — popup che hết khung
    phía sau — nên dùng chung một `SD` thay vì nhân đôi cả bộ máy. Chỗ nào đang
    hiện thì chỗ đó nắm `SD`; `SD.id` cắt vòng lặp của chỗ cũ. */
+function sdMauLai() {
+  SD.cGoc = sdDoc("--fg"); SD.cAccent = sdDoc("--accent"); SD.cDo = sdDoc("--t-red");
+  SD.cMo = sdDoc("--fg-3"); SD.cCanh = sdDoc("--fg-3"); SD.cNen = sdDoc("--bg-2");
+  SD.cChu = sdDoc("--fg-3");
+}
+
 function khoiSoDo(goc, cv, toanKho, chayLai) {
   if (!cv) return;
   /* Canvas nằm trong một cột ĐANG ẨN thì đo ra 0×0 — dưới 1040 px cột trích dẫn
@@ -1630,9 +1742,7 @@ function khoiSoDo(goc, cv, toanKho, chayLai) {
   if (!cv.getBoundingClientRect().width) { SD.id++; SD.cv = null; return; }
   SD.id++; SD.cv = cv; SD.ctx = cv.getContext("2d");
   if (toanKho !== undefined) SD.toanKho = toanKho;
-  SD.cGoc = sdDoc("--fg"); SD.cAccent = sdDoc("--accent"); SD.cDo = sdDoc("--t-red");
-  SD.cMo = sdDoc("--fg-3"); SD.cCanh = sdDoc("--fg-3"); SD.cNen = sdDoc("--bg-2");
-  SD.cChu = sdDoc("--fg-3");
+  sdMauLai();
   sdCo();
   sdDung(goc, chayLai);
   /* Khớp khung NGAY, không nội suy, trước khung hình đầu. Nội suy 7% mỗi khung
@@ -1662,8 +1772,8 @@ function capNhatGhiSoDo() {
         + (SD.soCau ? ` + ${SD.soCau} văn bản trung gian` : "")
       : SD.toanKho
       ? `Toàn kho · ${SD.ds.length.toLocaleString("vi")} văn bản`
-      : `Lân cận bậc 1–2 · ${SD.ds.length.toLocaleString("vi")} nút`
-        + (cat ? ` (trong ${lang.toLocaleString("vi")} quan hệ trực tiếp)` : ""))
+      : `Quan hệ trực tiếp · ${(SD.ds.length - 1).toLocaleString("vi")} văn bản`
+        + (cat ? ` (cắt từ ${lang.toLocaleString("vi")}, giữ nút nhiều quan hệ nhất)` : ""))
     + ` · ${SD.ca.length ? SD.ca.length.toLocaleString("vi") + " cạnh"
           : "không có quan hệ trực tiếp nào giữa chúng"}
     · <span style="color:var(--accent)">●</span> dẫn chiếu tới
@@ -1700,6 +1810,7 @@ function nutTrungTam() {
      đã có hội thoại      → sơ đồ quan hệ giữa các văn bản được trích dẫn */
 function datSoDo(chayLai) {
   if (!S.d) return;
+  const veSoDo = TC.sodo;
   const coHoiThoai = !!S.hoiThoai.length;
 
   /* BỀ RỘNG TRƯỚC, CANVAS SAU — ràng buộc thứ tự, không phải sở thích.
@@ -1710,10 +1821,10 @@ function datSoDo(chayLai) {
   if (!coHoiThoai && innerWidth <= 1040 && $("#col3").dataset.mo === "true")
     hienCot("col2");
 
-  const nenBat = !coHoiThoai;
+  const nenBat = !coHoiThoai && veSoDo;
   $("#chat").dataset.nen = String(nenBat);
 
-  const nutTd = tapTrichDan();
+  const nutTd = veSoDo ? tapTrichDan() : [];
   const mo = nutTd.length >= 2 ? themTrungGian(nutTd) : { ds: nutTd, soCau: 0 };
   const tdBat = coHoiThoai && mo.ds.length >= 2;
   $("#td-sodo").hidden = !tdBat;
@@ -1799,13 +1910,10 @@ const NHAN_BUOC = {
   context_ready: "Dựng ngữ cảnh", tool_call: "Tra chéo văn bản", answer: "Soạn câu trả lời",
 };
 
-function capNhatGhiChat() {
-  $("#chat-ghi").innerHTML = CH.url
-    ? `Đang gọi <code>${esc(CH.url)}</code>. Mỗi số <span class="tdan">1</span>
-       trong câu trả lời bấm được để xem đúng đoạn nguồn.`
-    : `<b>Chế độ thử</b> — chưa cấu hình API nên phần hỏi đáp chỉ tra trong kho và
-       trả về các tài liệu khớp, KHÔNG gọi mô hình nào. Bấm ⚙️ để thêm API.`;
-}
+/* Dòng ghi chú dưới ô nhập đã BỎ. Nó nói chuyện cấu hình — chuyện của người
+   dựng trang — với người đang đi tra cứu pháp luật. Việc phải nói với người đọc
+   là mỗi câu trả lời dựa trên nguồn nào, và điều đó cột trích dẫn nói rõ hơn
+   một dòng chữ. */
 
 function veGoiY() {
   const gy = ["Doanh nghiệp mới thành lập phải nộp những gì trong 30 ngày đầu?",
@@ -1917,7 +2025,7 @@ async function hoi(cau) {
   $("#chat-log").append(hop);
 
   try {
-    if (!CH.url) { await traLoiThu(hop, noi, cau); }
+    if (!API.URL) { await traLoiThu(hop, noi, cau); }
     else { await goiAPI(hop, noi, cau); }
   } catch (e) {
     veBuoc(hop, "answer", "error", String(e.message || e).slice(0, 120));
@@ -2005,16 +2113,19 @@ async function traLoiThu(hop, noi, cau) {
   veNguon();
   hop.append(noi);
 
-  const dauCau = "Chế độ thử — chưa cấu hình API nên đây KHÔNG phải câu trả lời "
-    + "pháp lý, chỉ là tra tiêu đề trong kho.\n\n";
+  /* Câu mở đầu phải nói ĐÚNG cái nó đang làm, và không nhắc tới ⚙️ nữa: nút đó
+     giờ là tuỳ chỉnh hiển thị, không phải chỗ thêm API. Việc thêm API là việc
+     sửa mã nguồn (hằng số `API` ở đầu tệp) — chuyện của người dựng trang. */
+  const dauCau = "Đây KHÔNG phải câu trả lời pháp lý. Trang đang tra theo tiêu đề "
+    + "trong kho và xếp hạng ưu tiên văn bản còn hiệu lực, không gọi mô hình nào.\n\n";
   let text;
   if (!tu.length && !soHieu.length) {
     text = dauCau + "Câu hỏi không có từ khoá nào tra được. Thử gõ số hiệu văn bản "
       + "hoặc một cụm cụ thể như “hợp đồng thuê đất”, “tờ khai thuế”.";
   } else if (!top.length) {
     text = dauCau + `Không có văn bản nào trong kho khớp từ khoá: ${tu.join(", ")}.\n\n`
-      + "Kho hiện chỉ có TIÊU ĐỀ và dữ kiện, chưa có toàn văn để tra nội dung "
-      + "điều khoản — đó là việc của API khi bạn cấu hình.";
+      + "Phần tra này chỉ đọc TIÊU ĐỀ và dữ kiện, chưa đọc nội dung điều khoản. "
+      + "Thử một cụm khác, hoặc duyệt trực tiếp ở cột Nguồn.";
   } else {
     /* Ghi TÌNH TRẠNG HIỆU LỰC ngay cạnh từng số hiệu. Với một trang pháp lý,
        một danh sách số hiệu không kèm hiệu lực là một danh sách đọc được mà
@@ -2024,8 +2135,8 @@ async function traLoiThu(hop, noi, cau) {
       + `${conHl}/${top.length} còn hiệu lực:\n\n`
       + top.map((x, k) =>
           `${k + 1}. ${x.v.n} — ${nhanHL(x.v.e, "van_ban")} [${k + 1}]`).join("\n")
-      + "\n\nXếp hạng đã ưu tiên văn bản còn hiệu lực. Bấm số trong ngoặc để "
-      + "xem nguồn. Cấu hình API ở ⚙️ để có câu trả lời thật.";
+      + "\n\nBấm số trong ngoặc để xem nguồn, hoặc bấm tên văn bản ở cột phải "
+      + "để mở toàn văn.";
   }
   veTrichDan(noi, text);
   S.hoiThoai.push({ role: "assistant", content: text });
@@ -2038,9 +2149,9 @@ async function traLoiThu(hop, noi, cau) {
 async function goiAPI(hop, noi, cau) {
   veBuoc(hop, "sub_queries", "processing");
   const h = { "Content-Type": "application/json" };
-  if (CH.key) h.Authorization = "Bearer " + CH.key;
+  if (API.KHOA) h.Authorization = "Bearer " + API.KHOA;
 
-  const r = await fetch(CH.url, {
+  const r = await fetch(API.URL, {
     method: "POST", headers: h,
     body: JSON.stringify({ messages: S.hoiThoai, stream: true }),
   });
@@ -2161,20 +2272,25 @@ document.addEventListener("click", e => {
   if (t.closest("#doc-goc")) {
     if (!S.mo) return;
     const v = (S.mo.kho === "van_ban" ? S.d.van_ban : S.d.bieu_mau)[S.mo.i];
-    open(`${GOC}/${S.mo.kho === "van_ban" ? "van-ban" : "bieu-mau"}/${v.s}`, "_blank");
+    /* Bản TOÀN VĂN trên Drive đứng trước trang Quartz.
+       Nút này tên "Trang gốc" và người bấm vào để ĐỌC văn bản. Trang Quartz thì
+       chỉ có dữ kiện và quan hệ dẫn chiếu — nó nói rõ điều đó, nhưng ai bấm vào
+       cũng đã mất một lần chuyển trang để biết. Đi tiếp từ đó thì gặp cổng API
+       Bộ Tư pháp trả về XML thô. Ba lần bấm, không đọc được chữ nào của văn bản.
+       Drive là bản kho tự giữ, mở thẳng ra nội dung. */
+    open(v.g ? urlDrive(v.g)
+             : `${GOC}/${S.mo.kho === "van_ban" ? "van-ban" : "bieu-mau"}/${v.s}`,
+         "_blank");
     return;
   }
   if (t.closest("#btn-home")) { veHome(); return; }
   if (t.closest("#btn-cfg")) {
-    $("#cfg-url").value = CH.url; $("#cfg-key").value = CH.key; $("#dlg-cfg").showModal();
+    $("#dlg-cfg").showModal();
     return;
   }
-  if (t.closest("#cfg-huy")) { $("#dlg-cfg").close(); return; }
-  if (t.closest("#cfg-luu")) {
-    CH.set($("#cfg-url").value.trim(), $("#cfg-key").value.trim());
-    $("#dlg-cfg").close(); capNhatGhiChat();
-    return;
-  }
+  if (t.closest("#cfg-dong")) { $("#dlg-cfg").close(); return; }
+  if (t.closest("#ct-toi")) { datTheme(document.documentElement.dataset.theme !== "dark"); return; }
+  if (t.closest("#ct-sodo")) { datVeSoDo(!TC.sodo); return; }
 });
 
 let henCo;
@@ -2224,10 +2340,12 @@ addEventListener("keydown", e => {
 });
 
 /* ── Khởi động ── */
+datTheme(TC.toi);
+$("#ct-sodo").setAttribute("aria-checked", String(TC.sodo));
 hienCot("col2");
 document.body.dataset.cotd = "false";
 veNguon();
-nap().then(() => { veGoiY(); capNhatGhiChat(); datSoDo(true); }).catch(e => {
+nap().then(() => { veGoiY(); datSoDo(true); }).catch(e => {
   $("#ds").innerHTML = `<div class="trong">${esc(e.message)}</div>`;
 });
 
