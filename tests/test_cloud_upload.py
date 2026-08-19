@@ -33,7 +33,7 @@ class TestLienKetDangCongKhai:
     """Liên kết Drive được ĐĂNG LÊN TRANG CÔNG KHAI, nên nó là dữ liệu rời tay.
 
     Đã lọt thật: 7 trang văn bản trên repo công khai mang chuỗi
-    `?usp=drivesdk&ouid=103518860918943299966` — `ouid` là mã tài khoản Google
+    `?usp=drivesdk&ouid=<mã tài khoản>` — `ouid` là mã tài khoản Google
     của người tải lên. Bắt được trước khi đẩy, nhưng chỉ vì soát tay; nhóm test
     này để lần sau máy bắt.
     """
