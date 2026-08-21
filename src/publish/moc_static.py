@@ -52,8 +52,24 @@ def _index_page(title: str, intro: str, docs: list[Document]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def export_indexes(session, out_dir: Path, version: str) -> int:
-    """Sinh trang chỉ mục theo ngành, cơ quan, địa bàn và năm."""
+def export_indexes(session, out_dir: Path, version: str,
+                   trang_tong_quan: str | None = None) -> int:
+    """Sinh trang chỉ mục theo ngành, cơ quan, địa bàn và năm.
+
+    `trang_tong_quan` — tên file cho trang tổng quan (thống kê kho, mục lục
+    ngành/địa bàn/năm, ghi chú cách tính điểm tác động). MẶC ĐỊNH KHÔNG SINH.
+
+    Trước đây nó luôn được ghi ra `index.md`, tức trang chủ. Nay trang chủ là
+    ứng dụng tra cứu ở `tro-ly/`, chép thẳng vào gốc bản dựng — xem bước "Chép
+    trang trợ lý" trong `.github/workflows/build.yml` của repo công khai. Vẫn
+    sinh `index.md` thì Quartz phát ra `public/index.html` rồi bị bản chép đè
+    lên: dựng một file chỉ để bị ghi đè, và là chỗ để hai bên lệch nhau về sau.
+
+    Tham số vẫn còn chứ không xoá hẳn, vì trang tổng quan là lối vào duy nhất
+    tới 21 trang ngành, 31 trang địa bàn và 33 trang năm. Muốn có lại thì
+    truyền tên khác, ví dụ `"tong-quan.md"` — nó sẽ nằm ở /tong-quan chứ không
+    chiếm trang chủ nữa.
+    """
     written = 0
     # Chỉ mục liệt kê văn bản NGHIỆP VỤ. Văn bản kéo về theo dẫn chiếu vẫn có
     # trang riêng và vẫn tới được bằng wikilink từ văn bản dẫn tới nó — đó đúng
@@ -143,10 +159,12 @@ def export_indexes(session, out_dir: Path, version: str) -> int:
         )
         written += 1
 
-    (out_dir / "index.md").write_text(
-        _home_page(session, docs, by_industry, by_province, by_year), encoding="utf-8"
-    )
-    written += 1
+    if trang_tong_quan:
+        (out_dir / trang_tong_quan).write_text(
+            _home_page(session, docs, by_industry, by_province, by_year),
+            encoding="utf-8",
+        )
+        written += 1
     return written
 
 

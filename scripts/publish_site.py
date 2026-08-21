@@ -118,6 +118,14 @@ def main() -> None:
     print("  cp -r %s ~/Downloads/legal-vault-public/" % (out_dir.parent / "tro-ly"))
     print("  cd ~/Downloads/legal-vault-public && git add -A "
           "&& git commit -m 'Cập nhật nội dung' && git push")
+    # tro-ly/ vẫn chép vào thư mục cùng tên ở repo công khai — chính CI mới là
+    # bên đặt nó vào GỐC bản dựng (trang chủ). Đừng chép thẳng vào gốc repo:
+    # index.html sẽ nằm cạnh README.md và package.json, còn du-lieu.json thì
+    # lẫn với package-lock.json.
+    print("\nTrang chủ là ứng dụng tra cứu: CI chép tro-ly/ vào gốc bản dựng.")
+    print("Nếu thấy content/index.md xuất hiện lại thì có ai đó đã truyền")
+    print("trang_tong_quan= cho moc_static.export_indexes — bỏ đi, không thì")
+    print("Quartz dựng ra public/index.html rồi CI dừng với lỗi.")
     print("\nGitHub Actions tự dựng lại trang. Xem docs/VIEC_CAN_BAN_LAM.md "
           "nếu cần dựng repo từ đầu.")
 

@@ -711,10 +711,7 @@ async function nap() {
      serve-handler với cleanUrls, phục vụ `/tro-ly` bằng 200 mà KHÔNG chuyển
      hướng thêm dấu gạch — khác GitHub Pages và python http.server, cả hai đều
      chuyển hướng. Nên trang chạy được khi đăng mà hỏng khi dựng tại chỗ. */
-  const thuMuc = location.pathname.endsWith("/")
-    ? location.pathname
-    : location.pathname + "/";
-  const r = await fetch(thuMuc + "du-lieu.json", { cache: "no-cache" });
+  const r = await fetch(GOC + "du-lieu.json", { cache: "no-cache" });
   if (!r.ok) throw new Error("Không nạp được du-lieu.json (" + r.status + ")");
   S.d = await r.json();
 
@@ -853,7 +850,24 @@ function tra(cau) {
 }
 
 /* ════════════════ Mở tài liệu ════════════════ */
-const GOC = "..";   /* trang Quartz nằm ở thư mục cha của /tro-ly/ */
+/* GỐC SITE, suy từ URL đang mở — dùng chung cho cả du-lieu.json lẫn mọi liên kết
+   sang trang Quartz (/van-ban/*, /bieu-mau/*).
+
+   Trang này giờ là TRANG CHỦ, nằm ngay tại gốc site chứ không còn ở /tro-ly/,
+   nên "gốc" chính là thư mục chứa nó. Không viết cứng "." hay "/" được:
+
+     · "."  — đường dẫn tương đối phân giải theo URL TÀI LIỆU, nên mở ở
+              `/legal-vault-public` (thiếu dấu gạch cuối) sẽ ra `/van-ban/...`
+              thay vì `/legal-vault-public/van-ban/...`. Đây đúng lỗi đã làm
+              du-lieu.json trả 404 khi dựng tại chỗ.
+     · "/"  — đúng với tên miền riêng, sai với GitHub Pages dạng dự án, nơi
+              site nằm dưới `/legal-vault-public/`.
+
+   Ba dạng URL phải cùng ra một gốc:
+     /legal-vault-public/            → /legal-vault-public/
+     /legal-vault-public             → /legal-vault-public/
+     /legal-vault-public/index.html  → /legal-vault-public/ */
+const GOC = location.pathname.replace(/index\.html$/, "").replace(/\/?$/, "/");
 
 /* Bộ dữ liệu chỉ ship ID file, không ship URL: tiền tố dài 32 ký tự và lặp y hệt
    ở 3.883 văn bản — ~124 KB không mang thông tin nào. Quy tắc ghép nằm ở đây và
@@ -966,8 +980,8 @@ function htmlBieuMau(v) {
       lực của văn bản đó. Nguồn KHÔNG công bố dữ kiện này — nó được suy từ căn cứ.</div>
     <div class="tai-ve">
       ${v.g ? `<a href="${urlDrive(esc(v.g))}" target="_blank" rel="noopener">⬇ Bản Word (điền được)</a>`
-             : v.w ? `<a href="${GOC}/bieu-mau/${esc(v.w)}" download>⬇ Bản Word (điền được)</a>` : ""}
-      ${v.p ? `<a class="phu" href="${GOC}/bieu-mau/${esc(v.p)}" download>⬇ Bản PDF (để in)</a>` : ""}
+             : v.w ? `<a href="${GOC}bieu-mau/${esc(v.w)}" download>⬇ Bản Word (điền được)</a>` : ""}
+      ${v.p ? `<a class="phu" href="${GOC}bieu-mau/${esc(v.p)}" download>⬇ Bản PDF (để in)</a>` : ""}
     </div>
     <table><tbody>
       <tr><th>Nghiệp vụ</th><td>${(v.v || []).map(nv =>
@@ -2324,7 +2338,7 @@ document.addEventListener("click", e => {
        cùng một chỗ và không còn đường sang trang dữ kiện. */
     open(S.mo.kho === "van_ban" && v.g
            ? urlDrive(v.g)
-           : `${GOC}/${S.mo.kho === "van_ban" ? "van-ban" : "bieu-mau"}/${v.s}`,
+           : `${GOC}${S.mo.kho === "van_ban" ? "van-ban" : "bieu-mau"}/${v.s}`,
          "_blank");
     return;
   }
