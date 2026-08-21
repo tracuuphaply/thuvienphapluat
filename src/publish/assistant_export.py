@@ -50,16 +50,25 @@ GIAI_NGHIA_TRUONG = {
         "d": "ngày ban hành",
         "c": "cấp hiệu lực pháp lý 1-9",
         "p": "phạm vi: tw | tinh",
+        "a": "cơ quan ban hành (vắng nếu kho chưa xác định)",
+        "h": "ngày có hiệu lực (vắng nếu nguồn không công bố)",
         "g": "ID file toàn văn trên Google Drive — ghép "
              "https://drive.google.com/file/d/{g}/view (vắng nếu chưa có)",
     },
+    # `x` tách RIÊNG khỏi `g`, và đây là lỗi đã xảy ra thật chứ không phải dọn dẹp
+    # cho gọn: cả cờ đã-gỡ lẫn ID Drive từng cùng viết vào `g`, dòng ghi ID chạy
+    # sau nên đè mất cờ. Hệ quả đo trên bản đang chạy: 653/653 biểu mẫu có ID Drive
+    # → `g` truthy → trang trợ lý hiện cảnh báo đỏ "Nguồn đã gỡ biểu mẫu này,
+    # không nên dùng để nộp" cho TOÀN BỘ kho, còn mẫu bị gỡ thật thì không phân
+    # biệt được nữa. Bảng giải nghĩa ngay dưới đây cũng đã khai `g` hai lần —
+    # Python lặng lẽ lấy khai báo sau, nên chính bảng tự mô tả cũng nói sai.
     "bieu_mau": {
         "s": "slug trang công khai",
         "k": "form_key",
         "t": "tiêu đề",
         "v": "nhóm nghiệp vụ",
         "e": "cờ hiệu lực biểu mẫu",
-        "g": "đã bị nguồn gỡ (1) hay không",
+        "x": "đã bị nguồn gỡ khỏi trang liệt kê (1) — vắng nghĩa là chưa gỡ",
         "w": "tên file .docx",
         "p": "tên file .pdf",
         "c": "số hiệu căn cứ",
@@ -103,7 +112,7 @@ def _van_ban(session) -> tuple[list[dict], dict[str, int]]:
     rows = session.execute(text("""
         SELECT public_slug, doc_num, title, doc_type, tvpl_field_code,
                eff_state, issue_date, hierarchy_level, territorial_scope,
-               gdrive_fulltext_link
+               gdrive_fulltext_link, agency_name, eff_from
         FROM documents
         WHERE public_slug IS NOT NULL AND is_vbqppl = 1
         ORDER BY public_slug
@@ -123,6 +132,14 @@ def _van_ban(session) -> tuple[list[dict], dict[str, int]]:
             "c": r[7] or 99,
             "p": "tw" if r[8] == "trung_uong" else "tinh",
         }
+        # Cơ quan ban hành và ngày có hiệu lực: trang Quartz vẫn hiện hai dữ kiện
+        # này, trang trợ lý thì không — vì bộ xuất không lấy chúng. Với người tra
+        # cứu pháp luật, "ai ban hành" là dữ kiện đọc đầu tiên. Chỉ ghi khi có
+        # giá trị, để không phình bộ dữ liệu bằng chuỗi rỗng.
+        if r[10]:
+            muc["a"] = r[10]
+        if r[11]:
+            muc["h"] = str(r[11])
         # Chỉ ship ID, không ship cả URL: 3.883 link × 39 ký tự tiền tố giống hệt
         # nhau là ~150 KB lặp lại. Bên đọc tự ghép — quy tắc ghép nằm ngay trong
         # bảng giải nghĩa trường.
@@ -156,7 +173,7 @@ def _bieu_mau(session) -> list[dict]:
             "c": can_cu.get(f.form_key, [])[:4],
         }
         if f.delisted_at:
-            muc["g"] = 1
+            muc["x"] = 1
         if f.docx_path:
             muc["w"] = Path(f.docx_path).name
         if f.pdf_path:

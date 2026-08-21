@@ -570,7 +570,9 @@ dialog.cfg .hang small{margin-top:2px}
   <div class="mh">
     <span class="nhan" id="doc-nhan"></span>
     <button id="doc-sodo" title="Cuộn tới sơ đồ">🕸 Sơ đồ</button>
-    <button id="doc-goc" title="Mở trang đầy đủ">↗ Trang gốc</button>
+    <!-- Nhãn thật do moTaiLieu() đặt lại theo từng tài liệu; đây chỉ là mặc định
+         trước khi popup mở lần đầu. -->
+    <button id="doc-goc" title="Mở trang dữ kiện">↗ Trang dữ kiện</button>
     <button id="doc-dong" title="Đóng (Esc)">✕</button>
   </div>
   <div class="mb" id="doc-noi"></div>
@@ -701,7 +703,18 @@ async function nap() {
 
      "no-cache" không phải "không cache": nó vẫn dùng bản đã lưu, chỉ bắt buộc
      hỏi lại máy chủ trước. Không đổi thì máy chủ trả 304 vài trăm byte. */
-  const r = await fetch("du-lieu.json", { cache: "no-cache" });
+  /* Neo theo THƯ MỤC của trang, không để trình duyệt tự phân giải tương đối.
+     Đường dẫn tương đối phân giải theo URL TÀI LIỆU: "du-lieu.json" mở ở
+     `/tro-ly/` ra `/tro-ly/du-lieu.json`, nhưng mở ở `/tro-ly` (thiếu dấu gạch
+     cuối) lại ra `/du-lieu.json` → 404, và lỗi hiện ra trông y hệt mất sạch dữ
+     liệu. Không phải chuyện lý thuyết: `npx quartz build --serve` dùng
+     serve-handler với cleanUrls, phục vụ `/tro-ly` bằng 200 mà KHÔNG chuyển
+     hướng thêm dấu gạch — khác GitHub Pages và python http.server, cả hai đều
+     chuyển hướng. Nên trang chạy được khi đăng mà hỏng khi dựng tại chỗ. */
+  const thuMuc = location.pathname.endsWith("/")
+    ? location.pathname
+    : location.pathname + "/";
+  const r = await fetch(thuMuc + "du-lieu.json", { cache: "no-cache" });
   if (!r.ok) throw new Error("Không nạp được du-lieu.json (" + r.status + ")");
   S.d = await r.json();
 
@@ -821,7 +834,7 @@ function veDanhSach(ds) {
          <div class="sh">${esc(v.k)}</div>
          <div class="tt">${esc(v.t.length > 105 ? v.t.slice(0, 103) + "…" : v.t)}</div>
          <div class="meta">${pillHL(v.e, "bieu_mau")}
-           ${v.g ? '<span class="pill bad">Nguồn đã gỡ</span>' : ""}</div></button>`
+           ${v.x ? '<span class="pill bad">Nguồn đã gỡ</span>' : ""}</div></button>`
   ).join("") + (items.length > TRAN_DS
     ? `<div class="trong">Còn ${items.length - TRAN_DS} tài liệu nữa —
        thu hẹp bằng ô tra cứu hoặc bộ lọc.</div>` : "");
@@ -856,11 +869,19 @@ function moTaiLieu(kho, i) {
   const v = (kho === "van_ban" ? S.d.van_ban : S.d.bieu_mau)[i];
   $("#doc-nhan").textContent = kho === "van_ban" ? v.n : v.k;
   /* Nhãn nút phải nói đúng nó sẽ mở ra cái gì. "Trang gốc" khi nó dẫn tới một
-     trang chỉ có dữ kiện là hứa hẹn sai. */
-  $("#doc-goc").textContent = v.g ? "↗ Toàn văn" : "↗ Trang dữ kiện";
-  $("#doc-goc").title = v.g
+     trang chỉ có dữ kiện là hứa hẹn sai.
+
+     `g` chỉ có nghĩa "toàn văn" ở kho VĂN BẢN. Ở kho BIỂU MẪU, `g` là ID file
+     .docx — mà file đó đã có link tải ngay trong popup, nên đưa nút này về đó
+     nữa là hai đường dẫn tới cùng một chỗ và không còn lối nào sang trang dữ
+     kiện của biểu mẫu. */
+  const coToanVan = kho === "van_ban" && !!v.g;
+  $("#doc-goc").textContent = coToanVan ? "↗ Toàn văn" : "↗ Trang dữ kiện";
+  $("#doc-goc").title = coToanVan
     ? "Mở bản toàn văn kho đang giữ (Google Drive)"
-    : "Mở trang dữ kiện — kho chưa có bản toàn văn của văn bản này";
+    : kho === "van_ban"
+      ? "Mở trang dữ kiện — kho chưa có bản toàn văn của văn bản này"
+      : "Mở trang dữ kiện của biểu mẫu";
   $("#doc-noi").innerHTML = kho === "van_ban" ? htmlVanBan(v, i) : htmlBieuMau(v);
   $("#doc-noi").scrollTop = 0;
   veDanhSach(undefined);          // giữ nguyên danh sách đang xem
@@ -895,12 +916,23 @@ function htmlVanBan(v, i) {
     <table><tbody>
       <tr><th>Số hiệu</th><td><code>${esc(v.n)}</code></td></tr>
       <tr><th>Loại văn bản</th><td>${esc(v.l || "—")}</td></tr>
+      ${v.a ? `<tr><th>Cơ quan ban hành</th><td>${esc(v.a)}</td></tr>` : ""}
       <tr><th>Ngày ban hành</th><td>${esc(v.d || "—")}</td></tr>
+      ${v.h ? `<tr><th>Ngày có hiệu lực</th><td>${esc(v.h)}</td></tr>` : ""}
       <tr><th>Lĩnh vực</th><td>${esc((S.d.linh_vuc.find(x => x.ma === v.f) || {}).ten || "—")}</td></tr>
       <tr><th>Tình trạng hiệu lực</th><td>${esc(nhanHL(v.e, "van_ban"))}</td></tr>
     </tbody></table>
+    ${/* Câu này phải nói đúng nơi ĐỌC ĐƯỢC văn bản, và nơi đó phụ thuộc v.g.
+          Bản trước viết cứng "Toàn văn và phụ lục nằm ở trang đầy đủ — bấm
+          'Trang gốc'", sai hai lần: nút đã đổi tên (xem moTaiLieu), và trang
+          Quartz cũng KHÔNG có toàn văn — nó chỉ có dữ kiện cộng link Drive.
+          Chỉ sai chỗ đọc được văn bản là bắt người tra cứu bấm vòng rồi kết
+          luận kho mất dữ liệu. */""}
     <div class="canh-bao"><b>Bản trích dữ kiện</b>Trang này chỉ hiện dữ kiện và quan hệ
-      dẫn chiếu. Toàn văn và phụ lục nằm ở trang đầy đủ — bấm “Trang gốc”.</div>
+      dẫn chiếu. ${v.g
+        ? "Toàn văn nằm ở bản kho đang giữ trên Google Drive — bấm “↗ Toàn văn” ở trên."
+        : "Kho chưa có bản toàn văn của văn bản này; bấm “↗ Trang dữ kiện” để mở trang " +
+          "đầy đủ kèm link về nguồn gốc."}</div>
     ${ke.length && TC.sodo
       ? `<h3>Vị trí trong mạng lưới (${ke.length} quan hệ trực tiếp)</h3>${htmlSoDo()}`
       : ""}
@@ -921,7 +953,11 @@ function htmlBieuMau(v) {
   return `<div class="doc">
     <div class="sh-lon">${esc(v.k)}</div>
     <h1>${esc(v.t)}</h1>
-    ${v.g ? `<div class="canh-bao bad"><b>Nguồn đã gỡ biểu mẫu này</b>
+    ${/* Đọc `x`, KHÔNG đọc `g`. `g` là ID file .docx trên Drive và 653/653 biểu
+          mẫu đều có, nên bản trước bật cảnh báo đỏ này cho TOÀN BỘ kho — nói với
+          người dùng rằng không mẫu nào nên dùng để nộp. Xem chú thích ở
+          GIAI_NGHIA_TRUONG trong assistant_export.py. */""}
+    ${v.x ? `<div class="canh-bao bad"><b>Nguồn đã gỡ biểu mẫu này</b>
       Thư viện Pháp luật không còn liệt kê nó — thường vì văn bản kèm theo đã bị
       thay thế. Bản lưu chỉ còn giá trị tra cứu, không nên dùng để nộp.</div>` : ""}
     <div class="canh-bao ${kieu === "ok" ? "ok" : kieu === "bad" ? "bad" : ""}">
@@ -942,8 +978,12 @@ function htmlBieuMau(v) {
                       : `<code>${esc(n)}</code> <em>(chưa có trong kho)</em>`;
       }).join("<br>") || "—"}</td></tr>
     </tbody></table>
-    <div class="canh-bao"><b>Bản dựng lại</b>Nội dung đầy đủ và bản in nằm ở trang
-      đầy đủ — bấm “Trang gốc”.</div>
+    ${/* Bản .docx và .pdf nằm ngay phía trên trong khối "tai-ve", nên câu cũ
+          ("Nội dung đầy đủ và bản in nằm ở trang đầy đủ — bấm 'Trang gốc'") vừa
+          chỉ sai chỗ vừa gọi sai tên nút. */""}
+    <div class="canh-bao"><b>Bản dựng lại</b>Ruột biểu mẫu ở đây được dựng lại theo
+      mẫu nhà để tiện đọc. Bản để điền và bản để in là hai file tải về ở trên; trang
+      dữ kiện của biểu mẫu mở bằng nút “↗ Trang dữ kiện”.</div>
   </div>`;
 }
 
@@ -2272,14 +2312,19 @@ document.addEventListener("click", e => {
   if (t.closest("#doc-goc")) {
     if (!S.mo) return;
     const v = (S.mo.kho === "van_ban" ? S.d.van_ban : S.d.bieu_mau)[S.mo.i];
-    /* Bản TOÀN VĂN trên Drive đứng trước trang Quartz.
-       Nút này tên "Trang gốc" và người bấm vào để ĐỌC văn bản. Trang Quartz thì
-       chỉ có dữ kiện và quan hệ dẫn chiếu — nó nói rõ điều đó, nhưng ai bấm vào
-       cũng đã mất một lần chuyển trang để biết. Đi tiếp từ đó thì gặp cổng API
-       Bộ Tư pháp trả về XML thô. Ba lần bấm, không đọc được chữ nào của văn bản.
-       Drive là bản kho tự giữ, mở thẳng ra nội dung. */
-    open(v.g ? urlDrive(v.g)
-             : `${GOC}/${S.mo.kho === "van_ban" ? "van-ban" : "bieu-mau"}/${v.s}`,
+    /* VĂN BẢN: bản toàn văn trên Drive đứng trước trang Quartz, vì người bấm
+       vào đây là để ĐỌC. Trang Quartz chỉ có dữ kiện và quan hệ dẫn chiếu — nó
+       nói rõ điều đó, nhưng ai bấm vào cũng đã mất một lần chuyển trang để biết.
+       Đi tiếp từ đó thì gặp cổng API Bộ Tư pháp trả về XML thô. Ba lần bấm,
+       không đọc được chữ nào của văn bản. Drive là bản kho tự giữ, mở thẳng ra
+       nội dung.
+
+       BIỂU MẪU: luôn về trang dữ kiện. `g` của biểu mẫu là file .docx, mà file
+       đó đã có link tải ngay trong popup — trỏ nút này về đó nữa thì hai lối đi
+       cùng một chỗ và không còn đường sang trang dữ kiện. */
+    open(S.mo.kho === "van_ban" && v.g
+           ? urlDrive(v.g)
+           : `${GOC}/${S.mo.kho === "van_ban" ? "van-ban" : "bieu-mau"}/${v.s}`,
          "_blank");
     return;
   }
