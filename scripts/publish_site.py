@@ -21,7 +21,8 @@ import logging
 from pathlib import Path
 
 from src.config import PROJECT_ROOT
-from src.publish import assistant_export, form_exporter, moc_static, site_exporter
+from src.publish import (assistant_export, form_exporter, html_site, moc_static,
+                         site_exporter)
 from src.storage.database import get_session, init_db
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,10 @@ def main() -> None:
                     help="Đếm và in mẫu, không ghi file")
     ap.add_argument("--all", action="store_true",
                     help="Đăng cả văn bản không phải QPPL (mặc định: chỉ QPPL)")
+    ap.add_argument("--html", action="store_true",
+                    help="Dựng THẲNG ra HTML (không Quartz, không markdown trung gian)")
+    ap.add_argument("--goc-url", default="",
+                    help="URL gốc của site, để sinh sitemap.xml")
     args = ap.parse_args()
 
     from src.config import impact_scorer_version
@@ -72,6 +77,25 @@ def main() -> None:
             return
 
         out_dir.mkdir(parents=True, exist_ok=True)
+        if args.html:
+            # ĐƯỜNG MỚI: DB → HTML, một bước. Không markdown trung gian, không
+            # Node. `out_dir` ở đây là GỐC BẢN DỰNG (không phải content/), vì
+            # không còn tầng nào đọc lại nó nữa.
+            tro_ly_dir = out_dir.parent / TRO_LY_DIR
+            tk_troly = assistant_export.xuat_du_lieu(session, tro_ly_dir)
+            assistant_export.chep_ung_dung(tro_ly_dir)
+            tk = html_site.xuat_site(session, out_dir, version,
+                                     goc_url=args.goc_url, tro_ly_dir=tro_ly_dir)
+            session.commit()
+            print("\n=== Kết quả (HTML thẳng) ===")
+            for k, v in tk.as_dict().items():
+                print(f"  {k:12} {v}")
+            for k, v in tk_troly.as_dict().items():
+                print(f"  troly.{k:6} {v}")
+            print(f"\nBản dựng sẵn ở: {out_dir}")
+            print("Không cần npm, không cần Quartz.")
+            return
+
 
         # BIỂU MẪU ĐĂNG TRƯỚC VĂN BẢN — thứ tự này quan trọng, không phải tuỳ ý.
         # `export_forms()` là nơi gán `LegalForm.public_slug`, mà mục "Biểu mẫu

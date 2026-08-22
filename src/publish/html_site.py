@@ -577,8 +577,12 @@ def xuat_site(session, out_dir: Path, version: str,
     tk = ThongKeHtml()
 
     xuat_tai_nguyen(out_dir)
-    tk.van_ban, dd_vb = xuat_van_ban(session, out_dir, version)
+    # SLUG BIỂU MẪU TRƯỚC TIÊN. Mục "Biểu mẫu kèm theo" trên trang văn bản chỉ
+    # liệt kê mẫu đã có slug, nên đảo thứ tự là mọi trang văn bản ghi "chưa ghi
+    # nhận biểu mẫu nào" dù quan hệ đã có trong kho.
+    gan_slug_bieu_mau(session)
     tk.bieu_mau, dd_bm = xuat_bieu_mau(session, out_dir)
+    tk.van_ban, dd_vb = xuat_van_ban(session, out_dir, version)
     tk.chi_muc, dd_cm = xuat_chi_muc(session, out_dir, version)
     xuat_404(out_dir)
 
@@ -751,6 +755,30 @@ kèm theo văn bản gốc — xem mục <i>Nguồn</i>.</div>
 <h2>Nội dung biểu mẫu</h2>
 {than_mau or '<p class="trong">Chưa dựng lại được nội dung biểu mẫu này.</p>'}"""
     return _vo(site_exporter._short(form.title or form.form_key, 60), than, sau=1)
+
+
+def gan_slug_bieu_mau(session) -> int:
+    """Gán `public_slug` cho biểu mẫu doanh nghiệp. PHẢI chạy trước mọi bước ghi.
+
+    Trước đây việc này nằm lẫn trong `form_exporter.export_forms()` — bộ sinh
+    markdown. Bỏ nhánh markdown mà quên tách nó ra thì KHÔNG có gì gán slug nữa,
+    và hỏng theo kiểu im lặng nhất có thể: mục "Biểu mẫu kèm theo" trên trang văn
+    bản chỉ liệt kê mẫu ĐÃ có slug, nên mọi trang sẽ ghi "chưa ghi nhận biểu mẫu
+    nào" — một câu hoàn toàn hợp lệ, không ai phát hiện ra.
+    """
+    from src.publish.form_exporter import public_slug_bieu_mau
+
+    forms = (session.query(LegalForm)
+             .filter(LegalForm.is_business.is_(True))
+             .order_by(LegalForm.form_key).all())
+    n = 0
+    for f in forms:
+        slug = public_slug_bieu_mau(f)
+        if f.public_slug != slug:
+            f.public_slug = slug
+            n += 1
+    session.flush()
+    return n
 
 
 def xuat_bieu_mau(session, out_dir: Path) -> tuple[int, list[str]]:

@@ -146,3 +146,31 @@ class TestBieuMau:
         html_site.xuat_site(master_session, tmp_path / "out", "v-test")
         t = (tmp_path / "out" / "bieu-mau" / "bm-hopdong-1.html").read_text(encoding="utf-8")
         assert "<table>" in t and "Họ và tên" in t
+
+
+class TestThuTuGanSlug:
+    def test_bieu_mau_kem_theo_hien_ra_du_chay_mot_luot(self, master_session, tmp_path):
+        """Lỗi im lặng nhất trong cả bộ: đảo thứ tự thì trang văn bản ghi "chưa
+        ghi nhận biểu mẫu nào" — câu hoàn toàn hợp lệ nên không ai phát hiện."""
+        import datetime
+
+        from src.storage.models import LegalForm, LegalFormRef
+
+        upsert_document(master_session, {"doc_num": "96/2024/NĐ-CP",
+                                         "title": "Nghị định", "moj_id": "5"})
+        master_session.commit()
+        doc = master_session.query(Document).filter_by(doc_num="96/2024/NĐ-CP").first()
+        master_session.add(LegalForm(
+            form_key="hopdong-7", source="hopdong", external_id="7",
+            title="MẪU KÈM THEO", is_business=True, crawl_status="OK",
+            nghiep_vu='["hop_dong"]', updated_on=datetime.date(2024, 1, 1)))
+        master_session.add(LegalFormRef(form_key="hopdong-7",
+                                        doc_num="96/2024/NĐ-CP",
+                                        doc_key=doc.doc_key,
+                                        source="truong_can_cu"))
+        master_session.commit()
+
+        html_site.xuat_site(master_session, tmp_path, "v-test")
+        trang = (tmp_path / "van-ban" / f"{doc.public_slug}.html").read_text(encoding="utf-8")
+        assert "MẪU KÈM THEO" in trang
+        assert "Chưa ghi nhận biểu mẫu nào" not in trang

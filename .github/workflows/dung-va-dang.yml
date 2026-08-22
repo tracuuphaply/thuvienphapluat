@@ -1,0 +1,94 @@
+name: Dựng và đăng trang tra cứu
+
+# Repo này PRIVATE và phải giữ nguyên như vậy — nó chứa .env, credentials/ và
+# data/chrome_profile/ với cookie đăng nhập TVPL. Commit a3dd597 đã từng phải gỡ
+# một profile Chrome 160 MiB kèm Cookies khỏi lịch sử nhánh; công khai repo là
+# công khai toàn bộ lịch sử.
+#
+# Nên workflow này KHÔNG bật Pages ở đây. Nó dựng site rồi đẩy PHẦN ĐÃ DỰNG sang
+# repo công khai, nơi Pages phục vụ. Repo công khai từ đó chỉ còn HTML — không
+# mã nguồn, không Quartz, không markdown trung gian, không npm.
+#
+# NẾU tài khoản có GitHub Pro/Team: bật được Pages thẳng trên repo private này,
+# lúc đó bỏ hẳn job `dang` và dùng actions/deploy-pages như thường. Xem README.
+
+on:
+  workflow_dispatch:
+    inputs:
+      chi_dung:
+        description: "Chỉ dựng, không đẩy đi"
+        type: boolean
+        default: false
+  schedule:
+    # 01:00 UTC = 08:00 giờ Việt Nam, sau khi cào đêm đã xong.
+    - cron: "0 1 * * *"
+
+concurrency:
+  group: dung-va-dang
+  cancel-in-progress: false
+
+jobs:
+  dung:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Cài phụ thuộc
+        run: pip install -e .
+
+      - name: Kiểm nhanh phần sinh trang
+        # Chạy trước khi dựng: một lỗi ở bộ sinh mà vẫn đẩy đi thì trang công
+        # khai hỏng, và đó là trang người ta dùng để kiểm chứng căn cứ pháp lý.
+        run: python -m pytest tests/test_html_site.py tests/test_md_toi_gian.py -q
+
+      - name: Dựng site
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python -m scripts.publish_site --html \
+            --out build/site \
+            --goc-url "${{ vars.GOC_URL }}"
+
+      - name: Kiểm bản dựng trước khi đẩy
+        # Đẩy một bản dựng rỗng sẽ XOÁ SẠCH trang đang chạy. Thà dừng ở đây.
+        run: |
+          so_vb=$(find build/site/van-ban -name '*.html' 2>/dev/null | wc -l)
+          echo "trang văn bản: $so_vb"
+          if [ ! -f build/site/index.html ]; then
+            echo "::error::Thiếu index.html — trang chủ không có, dừng."; exit 1
+          fi
+          if [ "$so_vb" -lt 100 ]; then
+            echo "::error::Chỉ $so_vb trang văn bản, nghi bản dựng hỏng. Dừng."; exit 1
+          fi
+
+      - name: Đẩy sang repo công khai
+        if: ${{ !inputs.chi_dung }}
+        env:
+          KHOA: ${{ secrets.KHOA_DAY_TRANG }}
+        run: |
+          if [ -z "$KHOA" ]; then
+            echo "::error::Thiếu secret KHOA_DAY_TRANG — xem README mục Đăng trang."
+            exit 1
+          fi
+          cd build/site
+          git init -q
+          git config user.name "Bộ dựng trang"
+          git config user.email "noreply@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Bản dựng $(date -u +%Y-%m-%d\ %H:%M) UTC"
+          # force-push: nhánh này CHỈ chứa bản dựng, không có lịch sử cần giữ.
+          git push -q --force \
+            "https://x-access-token:${KHOA}@github.com/${{ vars.REPO_TRANG }}.git" \
+            HEAD:gh-pages
+
+      - name: Lưu bản dựng làm artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: build/site
+          retention-days: 7
