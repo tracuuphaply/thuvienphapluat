@@ -592,6 +592,17 @@ def xuat_site(session, out_dir: Path, version: str,
             nguon = tro_ly_dir / ten
             if nguon.exists():
                 _ghi(out_dir / ten, nguon.read_text(encoding="utf-8"))
+        # Giữ /tro-ly/ sống bằng một trang chuyển hướng. Địa chỉ đó đã được chia
+        # sẻ khi trợ lý còn nằm ở thư mục con; để nó 404 là làm chết link người
+        # khác đang giữ, mà thay bằng 3 dòng thì không tốn gì. KHÔNG chép lại
+        # du-lieu.json 1,9 MB lần hai — chỉ chuyển hướng.
+        _ghi(out_dir / "tro-ly" / "index.html",
+             '<!doctype html><html lang="vi"><head><meta charset="utf-8">'
+             "<title>Đã chuyển về trang chủ</title>"
+             '<link rel="canonical" href="../">'
+             '<meta http-equiv="refresh" content="0; url=../"></head>'
+             "<body><p>Trang trợ lý nay là trang chủ — "
+             '<a href="../">mở tại đây</a>.</p></body></html>\n')
 
     if goc_url:
         xuat_sitemap(out_dir, goc_url, [""] + dd_vb + dd_bm + dd_cm)

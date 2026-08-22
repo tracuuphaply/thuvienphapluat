@@ -174,3 +174,22 @@ class TestThuTuGanSlug:
         trang = (tmp_path / "van-ban" / f"{doc.public_slug}.html").read_text(encoding="utf-8")
         assert "MẪU KÈM THEO" in trang
         assert "Chưa ghi nhận biểu mẫu nào" not in trang
+
+
+class TestGiuUrlCu:
+    def test_tro_ly_chuyen_huong_ve_trang_chu(self, master_session, tmp_path):
+        """/tro-ly/ đã được chia sẻ khi trợ lý còn ở thư mục con — để nó 404 là
+        làm chết link người khác đang giữ."""
+        troly = tmp_path / "troly"
+        troly.mkdir()
+        (troly / "index.html").write_text("<html>app</html>", encoding="utf-8")
+        (troly / "du-lieu.json").write_text("{}", encoding="utf-8")
+
+        out = tmp_path / "site"
+        html_site.xuat_site(master_session, out, "v-test", tro_ly_dir=troly)
+
+        assert (out / "index.html").read_text(encoding="utf-8") == "<html>app</html>"
+        chuyen = (out / "tro-ly" / "index.html").read_text(encoding="utf-8")
+        assert 'url=../' in chuyen
+        # KHÔNG nhân đôi bộ dữ liệu 1,9 MB
+        assert not (out / "tro-ly" / "du-lieu.json").exists()
