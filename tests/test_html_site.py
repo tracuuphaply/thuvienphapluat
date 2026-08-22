@@ -90,3 +90,59 @@ class TestAnToan:
         out = _xuat(kho, tmp_path)
         for f in (out / "van-ban").glob("*.html"):
             assert "Bản sao không chính thức" in f.read_text(encoding="utf-8"), f
+
+
+class TestBieuMau:
+    def _mau(self, session, **kw):
+        from src.storage.models import LegalForm
+        f = LegalForm(form_key="hopdong-1", source="hopdong", external_id="1",
+                      title="HỢP ĐỒNG THỬ", public_slug="bm-hopdong-1",
+                      is_business=True, crawl_status="OK", nghiep_vu='["hop_dong"]',
+                      **kw)
+        session.add(f); session.commit()
+        return f
+
+    def test_sinh_trang_va_muc_luc(self, master_session, tmp_path):
+        self._mau(master_session)
+        html_site.xuat_site(master_session, tmp_path, "v-test")
+        assert (tmp_path / "bieu-mau" / "bm-hopdong-1.html").is_file()
+        assert (tmp_path / "bieu-mau" / "index.html").is_file()
+
+    def test_canh_bao_da_go_chi_hien_khi_that_su_bi_go(self, master_session, tmp_path):
+        """Cùng lớp lỗi đã gặp ở du-lieu.json: cờ đã-gỡ bị lẫn với ID Drive nên
+        653/653 mẫu đều bị dán nhãn đỏ."""
+        self._mau(master_session,
+                  gdrive_docx_link="https://drive.google.com/file/d/A/view")
+        html_site.xuat_site(master_session, tmp_path, "v-test")
+        t = (tmp_path / "bieu-mau" / "bm-hopdong-1.html").read_text(encoding="utf-8")
+        assert "Nguồn đã gỡ" not in t
+
+    def test_docx_dung_truoc_pdf(self, master_session, tmp_path):
+        """Biểu mẫu sinh ra để ĐIỀN; PDF không điền được."""
+        self._mau(master_session, docx_path="/x/a.docx", pdf_path="/x/a.pdf")
+        html_site.xuat_site(master_session, tmp_path, "v-test")
+        t = (tmp_path / "bieu-mau" / "bm-hopdong-1.html").read_text(encoding="utf-8")
+        assert t.index("a.docx") < t.index("a.pdf")
+
+    def test_khong_bao_gio_doc_html_goc_cua_tvpl(self, master_session, tmp_path):
+        """body_html_path là HTML gốc TVPL — nguyên liệu nội bộ, không được đăng.
+
+        Kiểm TRUY CẬP THUỘC TÍNH chứ không kiểm chuỗi: bản trước bắt nhầm chính
+        dòng chú thích dặn đừng đọc nó.
+        """
+        import inspect
+        import re
+        ma = inspect.getsource(html_site.trang_bieu_mau)
+        # bỏ chú thích và docstring trước khi soi
+        ma = re.sub(r"#.*", "", ma)
+        ma = re.sub(r'""".*?"""', "", ma, flags=re.S)
+        assert "body_html_path" not in ma
+
+    def test_than_mau_that_su_thanh_html(self, master_session, tmp_path):
+        md = tmp_path / "than.md"
+        md.write_text("Họ và tên:......\n\n| a | b |\n|---|---|\n| 1 | 2 |",
+                      encoding="utf-8")
+        self._mau(master_session, body_md_path=str(md))
+        html_site.xuat_site(master_session, tmp_path / "out", "v-test")
+        t = (tmp_path / "out" / "bieu-mau" / "bm-hopdong-1.html").read_text(encoding="utf-8")
+        assert "<table>" in t and "Họ và tên" in t

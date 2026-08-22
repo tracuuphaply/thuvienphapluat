@@ -578,6 +578,7 @@ def xuat_site(session, out_dir: Path, version: str,
 
     xuat_tai_nguyen(out_dir)
     tk.van_ban, dd_vb = xuat_van_ban(session, out_dir, version)
+    tk.bieu_mau, dd_bm = xuat_bieu_mau(session, out_dir)
     tk.chi_muc, dd_cm = xuat_chi_muc(session, out_dir, version)
     xuat_404(out_dir)
 
@@ -589,6 +590,214 @@ def xuat_site(session, out_dir: Path, version: str,
                 _ghi(out_dir / ten, nguon.read_text(encoding="utf-8"))
 
     if goc_url:
-        xuat_sitemap(out_dir, goc_url, [""] + dd_vb + dd_cm)
+        xuat_sitemap(out_dir, goc_url, [""] + dd_vb + dd_bm + dd_cm)
     tk.tinh = 2
     return tk
+
+
+# ── Trang biểu mẫu ──────────────────────────────────────────────────────────
+
+_KIEU_BM = {
+    "con_hieu_luc": "ok", "co_ban_thay_the": "canh", "can_kiem_tra": "canh",
+    "het_hieu_luc": "xau", "khong_ro": "xam",
+}
+
+
+def trang_bieu_mau(session, form: LegalForm, slug_theo_so: dict[str, str]) -> str:
+    """Một biểu mẫu. Khối hiệu lực đặt NGAY DƯỚI tiêu đề, trước cả link tải.
+
+    Một biểu mẫu hết hiệu lực trông y hệt một biểu mẫu còn dùng được, và người
+    tải về không có cách nào tự biết. Đặt cảnh báo dưới phần nội dung nghĩa là
+    phần lớn người đọc tải file xong mới thấy — tức không thấy.
+    """
+    import json
+
+    from src.forms import effectivity as bm_eff
+    from src.legal.form_taxonomy import NGHIEP_VU, ten_nhom_hop_dong
+    from src.publish.form_exporter import public_slug_bieu_mau
+    from src.publish.md_toi_gian import sang_html
+    from src.sources.tvpl_forms_parse import SOURCE_HOP_DONG
+
+    tt = form.eff_state or bm_eff.KHONG_RO
+    kieu = _KIEU_BM.get(tt, "xam")
+
+    go = ""
+    if form.delisted_at:
+        go = (f'<div class="luu canh"><b>Nguồn đã gỡ biểu mẫu này</b>'
+              f'Thư viện Pháp luật không còn liệt kê biểu mẫu này (phát hiện ngày '
+              f'{form.delisted_at:%d/%m/%Y}). Thường là vì văn bản kèm theo đã bị '
+              f'thay thế. Bản dưới đây giữ lại để tra cứu, KHÔNG nên dùng để nộp.</div>')
+
+    hl = [f'<div class="luu"><b>{e(bm_eff.NHAN.get(tt, bm_eff.NHAN[bm_eff.KHONG_RO]))}</b>']
+    if form.eff_note:
+        hl.append(f"{e(form.eff_note)}<br>")
+    try:
+        thay = json.loads(form.eff_replaced_by or "[]")
+    except ValueError:
+        thay = []
+    if thay:
+        hl.append(f"<b>Tìm biểu mẫu mới ở:</b> {e(', '.join(thay))}<br>")
+    hl.append("Biểu mẫu là phụ lục kèm theo văn bản quy phạm nên hiệu lực của nó "
+              "theo hiệu lực của văn bản đó — nguồn KHÔNG công bố dữ kiện này, "
+              "nó được suy từ căn cứ.")
+    if form.eff_state_as_of:
+        hl.append(f' <span class="trong">(tính đến {form.eff_state_as_of:%d/%m/%Y})</span>')
+    hl.append("</div>")
+
+    # Tải về: DOCX trước, vì biểu mẫu là để ĐIỀN và PDF không điền được.
+    tai = []
+    if form.gdrive_docx_link:
+        tai.append(f'<li><b><a href="{e(form.gdrive_docx_link)}" rel="noopener">'
+                   f'Bản Word (.docx) — điền được</a></b> <span class="trong">'
+                   f'(Google Drive)</span></li>')
+    elif form.docx_path:
+        tai.append(f'<li><b><a href="{e(Path(form.docx_path).name)}" download>'
+                   f'Bản Word (.docx) — điền được</a></b></li>')
+    if form.pdf_path:
+        tai.append(f'<li><a href="{e(Path(form.pdf_path).name)}" download>'
+                   f'Bản PDF — để in</a></li>')
+    if form.gdrive_docx_link and form.docx_path:
+        tai.append(f'<li class="trong">Bản lưu trong kho trang: '
+                   f'<a href="{e(Path(form.docx_path).name)}" download>'
+                   f'{e(Path(form.docx_path).name)}</a> — dùng khi link Drive '
+                   f'ở trên không mở được.</li>')
+    khoi_tai = ("<ul>" + "".join(tai) + "</ul>" if tai else
+                '<p class="trong">Chưa dựng được file tải về cho biểu mẫu này. '
+                'Nội dung đầy đủ vẫn ở phần dưới.</p>')
+
+    # Phân loại
+    meta = []
+    if form.source == SOURCE_HOP_DONG and form.form_type_code:
+        meta.append(f"<li><b>Nhóm hợp đồng:</b> {e(ten_nhom_hop_dong(form.form_type_code))}</li>")
+    else:
+        if form.field_name:
+            meta.append(f"<li><b>Lĩnh vực:</b> {e(form.field_name)}</li>")
+        if form.form_type_name:
+            meta.append(f"<li><b>Loại mẫu:</b> {e(form.form_type_name)}</li>")
+    try:
+        nv = json.loads(form.nghiep_vu or "[]")
+    except ValueError:
+        nv = []
+    if nv:
+        meta.append("<li><b>Nghiệp vụ:</b> "
+                    + e(", ".join(NGHIEP_VU.get(m, m) for m in nv)) + "</li>")
+    if form.updated_on:
+        meta.append(f"<li><b>Cập nhật:</b> {form.updated_on:%d/%m/%Y}</li>")
+    khoi_meta = ("<ul>" + "".join(meta) + "</ul>" if meta
+                 else '<p class="trong">Chưa có thông tin phân loại.</p>')
+
+    # Căn cứ — hiện cả căn cứ chưa có trong kho, kèm ghi chú
+    refs = session.query(LegalFormRef).filter_by(form_key=form.form_key).all()
+    if refs:
+        muc = []
+        for r in refs:
+            slug = slug_theo_so.get(r.doc_num)
+            muc.append(f'<li><a href="../van-ban/{e(slug)}">{e(r.doc_num)}</a></li>'
+                       if slug else
+                       f'<li><code>{e(r.doc_num)}</code> '
+                       f'<span class="trong">(chưa có trong kho)</span></li>')
+        khoi_cc = "<ul>" + "".join(muc) + "</ul>"
+    else:
+        khoi_cc = '<p class="trong">Nguồn không ghi căn cứ cho biểu mẫu này.</p>'
+
+    # Nguồn
+    ng = []
+    if form.gdrive_docx_link:
+        ng.append(f'<li><b>Bản kho giữ (Google Drive):</b> '
+                  f'<a href="{e(form.gdrive_docx_link)}" rel="noopener">mở</a></li>')
+    if form.url:
+        ng.append(f'<li>Trang gốc trên Thư viện Pháp luật: '
+                  f'<a href="{e(form.url)}" rel="noopener">{e(form.url)}</a></li>')
+    khoi_ng = ("<ul>" + "".join(ng) + "</ul>" if ng else
+               '<p class="trong">Chưa ghi nhận được địa chỉ nguồn.</p>')
+
+    # Thân mẫu: Markdown đã dựng lại → HTML. TUYỆT ĐỐI không đọc body_html_path,
+    # đó là HTML gốc của TVPL, chỉ dùng làm nguyên liệu nội bộ.
+    than_mau = ""
+    if form.body_md_path:
+        p = Path(form.body_md_path)
+        if p.exists():
+            md = p.read_text(encoding="utf-8")
+            dau = md.find("\n> Bản dựng lại")
+            if dau >= 0:
+                cuoi = md.find("\n\n", dau + 1)
+                if cuoi > 0:
+                    md = md[cuoi:]
+            than_mau = sang_html(md.strip())
+
+    than = f"""<div class="duong"><a href="../">Trang chủ</a> ›
+  <a href="./">Biểu mẫu</a> › {e(form.form_key)}</div>
+<div class="sh">{e(form.form_key)}</div>
+<h1>{e(form.title or form.form_key)}</h1>
+<div><span class="the {kieu}">{e(bm_eff.NHAN.get(tt, bm_eff.NHAN[bm_eff.KHONG_RO]))}</span></div>
+{go}{"".join(hl)}
+<div class="luu"><b>Bản dựng lại</b>
+Ruột biểu mẫu ở đây được dựng lại theo mẫu nhà để tiện đọc, điền và in. Nội dung
+biểu mẫu là phụ lục của văn bản quy phạm pháp luật. Bản có giá trị pháp lý là bản
+kèm theo văn bản gốc — xem mục <i>Nguồn</i>.</div>
+
+<h2>Tải về</h2>
+{khoi_tai}
+
+<h2>Phân loại</h2>
+{khoi_meta}
+
+<h2>Căn cứ pháp lý</h2>
+{khoi_cc}
+
+<h2>Nguồn</h2>
+{khoi_ng}
+
+<h2>Nội dung biểu mẫu</h2>
+{than_mau or '<p class="trong">Chưa dựng lại được nội dung biểu mẫu này.</p>'}"""
+    return _vo(site_exporter._short(form.title or form.form_key, 60), than, sau=1)
+
+
+def xuat_bieu_mau(session, out_dir: Path) -> tuple[int, list[str]]:
+    """Ghi trang cho từng biểu mẫu doanh nghiệp đã đăng, kèm mục lục theo nghiệp vụ."""
+    import json
+
+    from src.legal.form_taxonomy import NGHIEP_VU
+    from src.publish.form_exporter import public_slug_bieu_mau
+
+    slug_theo_so = site_exporter.build_slug_index(session)
+    forms = (session.query(LegalForm)
+             .filter(LegalForm.is_business.is_(True))
+             .filter(LegalForm.public_slug.isnot(None))
+             .order_by(LegalForm.form_key).all())
+
+    duong_dan = []
+    for f in forms:
+        _ghi(out_dir / "bieu-mau" / f"{f.public_slug}.html",
+             trang_bieu_mau(session, f, slug_theo_so))
+        duong_dan.append(f"bieu-mau/{f.public_slug}")
+
+    theo_nhom: dict[str, list] = {}
+    for f in forms:
+        try:
+            nv = json.loads(f.nghiep_vu or "[]")
+        except ValueError:
+            nv = []
+        for ma in nv:
+            theo_nhom.setdefault(ma, []).append(f)
+
+    phan = []
+    for ma, ten in NGHIEP_VU.items():
+        nhom = theo_nhom.get(ma)
+        if not nhom:
+            continue
+        muc = "".join(
+            f'<li><a href="{e(public_slug_bieu_mau(f))}">'
+            f'{e(site_exporter._short(f.title or f.form_key, 90))}</a></li>'
+            for f in sorted(nhom, key=lambda x: (x.title or ""))
+        )
+        phan.append(f"<h2>{e(ten)} ({len(nhom)})</h2><ul>{muc}</ul>")
+
+    than = (f'<div class="duong"><a href="../">Trang chủ</a> › Biểu mẫu</div>'
+            f"<h1>Biểu mẫu cho doanh nghiệp</h1>"
+            f"<p><b>{len(forms)}</b> biểu mẫu, xếp theo nghiệp vụ. Mỗi trang có "
+            f"bản Word điền được và bản PDF để in.</p>"
+            + ("".join(phan) or '<p class="trong">Chưa có biểu mẫu nào.</p>'))
+    _ghi(out_dir / "bieu-mau" / "index.html", _vo("Biểu mẫu cho doanh nghiệp", than, sau=1))
+    duong_dan.append("bieu-mau/")
+    return len(forms), duong_dan
