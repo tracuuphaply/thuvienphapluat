@@ -22,7 +22,7 @@ from pathlib import Path
 
 from src.config import PROJECT_ROOT
 from src.publish import (assistant_export, form_exporter, html_site, moc_static,
-                         site_exporter)
+                         noi_dung, site_exporter)
 from src.storage.database import get_session, init_db
 
 logger = logging.getLogger(__name__)
@@ -87,7 +87,16 @@ def main() -> None:
             # có 0 biểu mẫu — trang chủ hiện "Biểu mẫu 0" trong khi kho có đủ.
             # Cùng lớp lỗi thứ tự với mục "Biểu mẫu kèm theo" trên trang văn bản.
             html_site.gan_slug_bieu_mau(session)
-            tk_troly = assistant_export.xuat_du_lieu(session, tro_ly_dir)
+            # RUỘT TRƯỚC BỘ DỮ LIỆU, cùng một lớp ràng buộc thứ tự với dòng trên:
+            # `xuat_du_lieu()` gắn cờ "có ruột" theo tập slug mà bước này trả về,
+            # nên đảo lại là mọi tài liệu đều thiếu cờ và trang trợ lý không mở
+            # nội dung nào — im lặng, vì "không có ruột" cũng là trạng thái hợp lệ.
+            # Ruột ghi thẳng vào GỐC BẢN DỰNG, không vào thư mục dựng trợ lý:
+            # bước chép sang site chỉ mang đúng index.html và du-lieu.json, nên
+            # để ở đó là cả cây noi-dung/ nằm lại và mọi lượt tải ruột thành 404.
+            tk_ruot, ruot_vb, ruot_bm = noi_dung.xuat_noi_dung(session, out_dir)
+            tk_troly = assistant_export.xuat_du_lieu(
+                session, tro_ly_dir, ruot_vb=ruot_vb, ruot_bm=ruot_bm)
             assistant_export.chep_ung_dung(tro_ly_dir)
             tk = html_site.xuat_site(session, out_dir, version,
                                      goc_url=args.goc_url, tro_ly_dir=tro_ly_dir)
@@ -97,6 +106,15 @@ def main() -> None:
                 print(f"  {k:12} {v}")
             for k, v in tk_troly.as_dict().items():
                 print(f"  troly.{k:6} {v}")
+            for k, v in vars(tk_ruot).items():
+                print(f"  ruot.{k:7} {v}")
+            if tk_ruot.thieu_van_ban or tk_ruot.thieu_bieu_mau:
+                # Nói ra, vì triệu chứng phía người dùng chỉ là "bấm vào không
+                # thấy nội dung" — không phân biệt được với hỏng.
+                print(f"\n  ⚠ {tk_ruot.thieu_van_ban} văn bản và "
+                      f"{tk_ruot.thieu_bieu_mau} biểu mẫu KHÔNG có ruột: kho chưa "
+                      f"có file nguồn (clean_text_path / body_md_path) trên máy này.")
+                print("    Trang vẫn chạy, các mục đó chỉ hiện dữ kiện như trước.")
             print(f"\nBản dựng sẵn ở: {out_dir}")
             print("Không cần npm, không cần Quartz.")
             return

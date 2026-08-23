@@ -98,3 +98,71 @@ class TestRong:
 
     def test_toan_dong_trong(self):
         assert sang_html("\n\n\n") == ""
+
+
+class TestKieuVanBan:
+    """Chế độ `kieu="van_ban"` — nguồn là html_to_clean_text, không phải renderer."""
+
+    def test_giu_nguyen_so_khoan_khong_giao_cho_trinh_duyet_danh_lai(self):
+        """Đây là bất biến QUAN TRỌNG NHẤT của chế độ này.
+
+        "2. Đối tượng áp dụng…" là KHOẢN 2 của một điều luật. Dựng thành
+        <ol><li> là giao số thứ tự cho trình duyệt đánh lại, mà html_to_clean_text
+        đặt mỗi khoản vào một khối riêng nên mỗi khoản thành một <ol> mới bắt đầu
+        từ 1 — Khoản 2 hiện ra thành "1.". Trên một trang tra cứu pháp luật, hiện
+        sai số khoản là nói sai nội dung luật.
+        """
+        md = "1. Khoản một.\n\n2. Khoản hai.\n\n3. Khoản ba."
+        ra = sang_html(md, kieu="van_ban")
+        assert "<ol" not in ra and "<li" not in ra
+        for n in ("1.", "2.", "3."):
+            assert f"<p>{n} Khoản" in ra
+
+    def test_bieu_mau_van_dung_danh_sach_nhu_cu(self):
+        """Chế độ mặc định KHÔNG đổi: ở biểu mẫu danh sách là danh sách thật."""
+        ra = sang_html("1. Một\n2. Hai")
+        assert "<ol>" in ra and ra.count("<li>") == 2
+
+    def test_gop_cac_khoi_hang_bang_lien_nhau_thanh_mot_bang(self):
+        """`</tr>` bị thay bằng hai dòng xuống, nên một bảng ra thành nhiều khối.
+
+        Không gộp thì mọi bảng phụ lục vỡ thành chuỗi bảng một hàng xếp chồng.
+        """
+        md = "| A | B\n\n| 1 | 2\n\n| 3 | 4"
+        ra = sang_html(md, kieu="van_ban")
+        assert ra.count("<table") == 1
+        assert ra.count("<tr>") == 3
+
+    def test_thoi_gop_khi_het_bang(self):
+        """Gộp phải DỪNG ở đoạn văn, không nuốt luôn bảng ở cuối trang."""
+        md = "| A | B\n\nMột đoạn văn.\n\n| 1 | 2"
+        ra = sang_html(md, kieu="van_ban")
+        assert ra.count("<table") == 2
+        assert "<p>Một đoạn văn.</p>" in ra
+
+    def test_ba_gach_thanh_duong_ke_chu_khong_phai_chu(self):
+        ra = sang_html("Trên\n\n---\n\nDưới", kieu="van_ban")
+        assert "<hr>" in ra and "---" not in ra
+
+    def test_ba_gach_o_bieu_mau_van_la_chu(self):
+        """Chế độ biểu mẫu không đổi — `<hr>` không nằm trong tập cú pháp của nó."""
+        assert "<hr>" not in sang_html("Trên\n\n---\n\nDưới")
+
+    def test_van_thoat_html_nhu_moi_khi(self):
+        """An toàn là điều kiện, không phải tính năng — chế độ mới không mở lối."""
+        ra = sang_html("<script>alert(1)</script>\n\n| <b>x</b> | y", kieu="van_ban")
+        assert "<script" not in ra.lower()
+        assert "&lt;b&gt;x&lt;/b&gt;" in ra
+
+    def test_luon_tien_duoc_du_nhanh_co_lech_nhau(self):
+        """Hàm phải KẾT THÚC với mọi đầu vào, kể cả khi các nhánh lệch nhau.
+
+        Nhánh đoạn văn là nhánh cuối; nếu điều kiện của nó và của một nhánh phía
+        trên không khớp thì có dòng bị mọi nhánh từ chối và `i` đứng yên. Dựng
+        lại được bằng cách sửa một dòng ở nhánh đường kẻ ngang: bản dựng treo,
+        không lỗi, không đầu ra — trong trình duyệt là một thẻ đứng máy.
+        """
+        for md in ("---", "-----", "---\n---", "|", "| \n\n---\n\n| a",
+                   "\n\n---\n\ncuối"):
+            for kieu in ("van_ban", "bieu_mau"):
+                sang_html(md, kieu=kieu)   # treo là test không bao giờ về

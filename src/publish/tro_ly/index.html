@@ -337,6 +337,22 @@ dialog.doc-modal::backdrop{background:rgba(15,15,15,.6);backdrop-filter:blur(2px
 .doc h3{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--fg-3);
   margin:28px 0 10px;font-weight:500}
 .doc ul{margin:6px 0;padding-left:20px}
+/* RUỘT tài liệu. Đây là chữ để ĐỌC LIỀN MẠCH, không phải bảng dữ kiện, nên nó
+   cần cỡ chữ và giãn dòng riêng — bảng dữ kiện ở trên cố ý gọn để liếc, còn một
+   nghị định dài vài nghìn chữ mà bày cùng mật độ ấy thì không ai đọc hết nổi. */
+.ruot{margin-top:10px;font-size:15px;line-height:1.75;color:var(--fg-2)}
+.ruot p{margin:0 0 12px}
+.ruot hr{border:0;border-top:1px solid var(--line);margin:18px 0}
+.ruot ul,.ruot ol{margin:8px 0;padding-left:22px}
+/* Bảng trong ruột KHÁC bảng dữ kiện: cột đầu ở đây là dữ liệu, không phải nhãn,
+   nên không được ăn 32% bề ngang như `.doc th`. */
+.ruot table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}
+.ruot th,.ruot td{border:1px solid var(--line);padding:6px 9px;
+  text-align:left;vertical-align:top;width:auto;background:none;color:inherit}
+.ruot th{font-weight:600}
+/* Bảng phụ lục nhiều cột hơn bề ngang popup thì CUỘN RIÊNG nó, không đẩy cả
+   popup trượt ngang — trượt ngang cả trang là mất luôn chỗ đang đọc. */
+.ruot .cuon{overflow-x:auto;max-width:100%}
 .doc li{margin:4px 0}
 /* Biểu tượng đặt TUYỆT ĐỐI, thân là khối thường.
    Bản flex có ba phần tử con (::before, <b>, chữ thân) và mọi cách xếp chúng đều
@@ -926,6 +942,10 @@ function moTaiLieu(kho, i) {
      ngoại lệ nào, chỉ là một khung trống. */
   if (kho === "van_ban" && TC.sodo) { SD.tapChoSan = null; khoiSoDo(i, $("#sodo-cv"), false); }
   else { SD.id++; SD.cv = null; }   /* trang biểu mẫu không có sơ đồ — dừng cái đang chạy */
+  /* KHÔNG chờ: popup phải hiện dữ kiện ngay. Ruột là phần nặng nhất và cũng là
+     phần duy nhất phải đi qua mạng — bắt cả popup đợi nó là đổi một trang mở
+     tức thì lấy một trang trắng vài trăm mili giây. */
+  napRuot();
 }
 
 function dongTaiLieu() {
@@ -955,6 +975,59 @@ $("#dlg-doc").addEventListener("close", () => {
   datSoDo();
 });
 
+/* ── RUỘT TÀI LIỆU ───────────────────────────────────────────────────────────
+   Ruột nằm ở file riêng `noi-dung/{kho}/{slug}.html`, KHÔNG nằm trong
+   du-lieu.json: bộ dữ liệu tải đủ một lần lúc mở trang, còn ruột thì riêng 653
+   thân biểu mẫu đã là 8,4 triệu ký tự — nhét vào là bắt mọi người tải cả kho
+   chữ chỉ để xem danh sách. Tải đúng cái đang mở.
+
+   Chỉ tải khi `v.r` có, tức bản dựng đã ghi ra mảnh cho tài liệu này. Đoán rồi
+   tải thử là mỗi tài liệu không có ruột thành một lượt 404 và một dòng đỏ trong
+   bảng điều khiển, mà người dùng vẫn phải chờ hết lượt mới biết là không có gì.
+
+   Mảnh đã là HTML dựng sẵn từ Python (md_toi_gian), không phải Markdown: trang
+   này là file tĩnh không có bước build, gửi Markdown sang là phải nuôi thêm một
+   bộ đọc Markdown bằng JavaScript và giữ cho hai bộ khớp nhau. */
+function htmlKhoangRuot(kho, slug) {
+  /* THƯ MỤC dùng gạch NGANG, khoá kho trong bộ dữ liệu dùng gạch DƯỚI:
+     `van_ban` ↔ `van-ban/`. Ghép thẳng tên kho vào đường dẫn là 404 cho mọi tài
+     liệu — đã xảy ra, và nó không lộ ra ở test nào của bộ xuất vì phía Python
+     ghi đúng thư mục; chỗ lệch nằm gọn trong một dòng JavaScript. Đường dẫn phải
+     khớp noi_dung.THU_MUC bên Python. */
+  const thu_muc = kho === "van_ban" ? "van-ban" : "bieu-mau";
+  return `<h3>Nội dung</h3>
+    <div class="ruot" data-ruot="${thu_muc}/${esc(slug)}">
+      <p class="trong">Đang tải nội dung…</p></div>`;
+}
+
+/* Số thứ tự lượt tải, để bỏ kết quả về muộn. Mở nhanh hai tài liệu liên tiếp
+   thì lượt đầu có thể về SAU lượt sau và ghi đè ruột của tài liệu đang mở —
+   người dùng đọc nội dung của một văn bản khác dưới tiêu đề văn bản này. Ở một
+   trang tra cứu pháp luật thì đó là lỗi nặng nhất có thể có. */
+let RUOT_LUOT = 0;
+
+async function napRuot() {
+  const el = $("#doc-noi").querySelector("[data-ruot]");
+  if (!el) return;
+  const luot = ++RUOT_LUOT;
+  try {
+    const r = await fetch(GOC + "noi-dung/" + el.dataset.ruot + ".html",
+                          { cache: "no-cache" });
+    if (luot !== RUOT_LUOT) return;         /* tài liệu khác đã mở đè lên */
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    /* Mảnh do bản dựng của chính kho này sinh ra và đã thoát HTML từ phía
+       Python, nên gán thẳng. Đây KHÔNG phải chữ từ người dùng hay từ một tên
+       miền khác — cùng gốc, cùng bản dựng. */
+    el.innerHTML = await r.text();
+  } catch (e) {
+    if (luot !== RUOT_LUOT) return;
+    /* Nói ra lỗi thay vì để khối "Đang tải…" đứng mãi: treo im lặng là thứ
+       người dùng không phân biệt được với mạng chậm. */
+    el.innerHTML = `<p class="trong">Không tải được nội dung (${esc(e.message)}).
+      Bản gốc vẫn mở được bằng nút ở trên.</p>`;
+  }
+}
+
 function htmlVanBan(v, i) {
   const ke = (S.ke.get(i) || []);
   return `<div class="doc">
@@ -972,17 +1045,19 @@ function htmlVanBan(v, i) {
       <tr><th>Lĩnh vực</th><td>${esc((S.d.linh_vuc.find(x => x.ma === v.f) || {}).ten || "—")}</td></tr>
       <tr><th>Tình trạng hiệu lực</th><td>${esc(nhanHL(v.e, "van_ban"))}</td></tr>
     </tbody></table>
-    ${/* Câu này phải nói đúng nơi ĐỌC ĐƯỢC văn bản, và nơi đó phụ thuộc v.g.
-          Bản trước viết cứng "Toàn văn và phụ lục nằm ở trang đầy đủ — bấm
-          'Trang gốc'", sai hai lần: nút đã đổi tên (xem moTaiLieu), và trang
-          Quartz cũng KHÔNG có toàn văn — nó chỉ có dữ kiện cộng link Drive.
-          Chỉ sai chỗ đọc được văn bản là bắt người tra cứu bấm vòng rồi kết
-          luận kho mất dữ liệu. */""}
-    <div class="canh-bao"><b>Bản trích dữ kiện</b>Trang này chỉ hiện dữ kiện và quan hệ
-      dẫn chiếu. ${v.g
-        ? "Toàn văn nằm ở bản kho đang giữ trên Google Drive — bấm “↗ Toàn văn” ở trên."
-        : "Kho chưa có bản toàn văn của văn bản này; bấm “↗ Trang dữ kiện” để mở trang " +
-          "đầy đủ kèm link về nguồn gốc."}</div>
+    ${/* Câu này phải nói đúng nơi ĐỌC ĐƯỢC văn bản, và nơi đó đổi theo `r`/`v.g`.
+          Đã sai hai lần trước đây vì viết cứng một chỗ đọc; chỉ sai chỗ là bắt
+          người tra cứu bấm vòng rồi kết luận kho mất dữ liệu. */""}
+    ${v.r
+      ? `<div class="canh-bao"><b>Bản dựng lại từ nguồn Bộ Tư pháp</b>Nội dung dưới đây
+          được dựng lại để đọc trực tiếp. Bản có giá trị pháp lý là bản công bố trên hệ
+          thống của cơ quan nhà nước${v.g
+            ? " — bấm “↗ Toàn văn” ở trên để mở bản gốc kho đang giữ." : "."}</div>`
+      : `<div class="canh-bao"><b>Bản trích dữ kiện</b>Kho chưa dựng được nội dung của
+          văn bản này, nên trang chỉ hiện dữ kiện và quan hệ dẫn chiếu. ${v.g
+            ? "Bản gốc nằm trên Google Drive — bấm “↗ Toàn văn” ở trên."
+            : "Bấm “↗ Trang dữ kiện” để mở trang đầy đủ kèm link về nguồn gốc."}</div>`}
+    ${v.r ? htmlKhoangRuot("van_ban", v.s) : ""}
     ${ke.length && TC.sodo
       ? `<h3>Vị trí trong mạng lưới (${ke.length} quan hệ trực tiếp)</h3>${htmlSoDo()}`
       : ""}
@@ -1028,12 +1103,15 @@ function htmlBieuMau(v) {
                       : `<code>${esc(n)}</code> <em>(chưa có trong kho)</em>`;
       }).join("<br>") || "—"}</td></tr>
     </tbody></table>
-    ${/* Bản .docx và .pdf nằm ngay phía trên trong khối "tai-ve", nên câu cũ
-          ("Nội dung đầy đủ và bản in nằm ở trang đầy đủ — bấm 'Trang gốc'") vừa
-          chỉ sai chỗ vừa gọi sai tên nút. */""}
-    <div class="canh-bao"><b>Bản dựng lại</b>Ruột biểu mẫu ở đây được dựng lại theo
-      mẫu nhà để tiện đọc. Bản để điền và bản để in là hai file tải về ở trên; trang
-      dữ kiện của biểu mẫu mở bằng nút “↗ Trang dữ kiện”.</div>
+    ${/* Câu này từng nói "Ruột biểu mẫu Ở ĐÂY được dựng lại theo mẫu nhà" trong
+          khi popup KHÔNG hề có ruột — nó bị chép nguyên từ trang tĩnh, nơi ruột
+          thật sự có mặt. Người đọc tìm cái được hứa mà không thấy. Giờ ruột có
+          thật, và câu chữ chỉ nói đúng thứ đang hiện ra. */""}
+    <div class="canh-bao"><b>Bản dựng lại</b>${v.r
+      ? "Ruột biểu mẫu dưới đây được dựng lại theo mẫu nhà để tiện đọc. "
+      : "Kho chưa dựng được ruột của biểu mẫu này. "}Bản để điền và bản để in là hai
+      file tải về ở trên; trang dữ kiện mở bằng nút “↗ Trang dữ kiện”.</div>
+    ${v.r ? htmlKhoangRuot("bieu_mau", v.s) : ""}
   </div>`;
 }
 

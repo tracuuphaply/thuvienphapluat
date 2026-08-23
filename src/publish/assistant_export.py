@@ -50,6 +50,7 @@ GIAI_NGHIA_TRUONG = {
         "d": "ngày ban hành",
         "c": "cấp hiệu lực pháp lý 1-9",
         "p": "phạm vi: tw | tinh",
+        "r": "có mảnh ruột ở noi-dung/van-ban/{s}.html (vắng nghĩa là không có)",
         "a": "cơ quan ban hành (vắng nếu kho chưa xác định)",
         "h": "ngày có hiệu lực (vắng nếu nguồn không công bố)",
         "g": "ID file toàn văn trên Google Drive — ghép "
@@ -72,6 +73,7 @@ GIAI_NGHIA_TRUONG = {
         "w": "tên file .docx",
         "p": "tên file .pdf",
         "c": "số hiệu căn cứ",
+        "r": "có mảnh ruột ở noi-dung/bieu-mau/{s}.html (vắng nghĩa là không có)",
         "g": "ID file .docx trên Google Drive — ghép "
              "https://drive.google.com/file/d/{g}/view (vắng nếu chưa tải lên)",
     },
@@ -107,7 +109,7 @@ def _id_drive(link: str) -> str:
     return m.group(1) if m else ""
 
 
-def _van_ban(session) -> tuple[list[dict], dict[str, int]]:
+def _van_ban(session, co_ruot: set[str] | None = None) -> tuple[list[dict], dict[str, int]]:
     """Metadata mọi văn bản đã đăng, kèm bảng tra slug → chỉ số."""
     rows = session.execute(text("""
         SELECT public_slug, doc_num, title, doc_type, tvpl_field_code,
@@ -132,6 +134,12 @@ def _van_ban(session) -> tuple[list[dict], dict[str, int]]:
             "c": r[7] or 99,
             "p": "tw" if r[8] == "trung_uong" else "tinh",
         }
+        # Cờ CÓ RUỘT. Trang trợ lý phải biết TRƯỚC khi bấm là tài liệu này có
+        # nội dung để tải hay không: đoán rồi tải thử thì mỗi tài liệu không có
+        # ruột là một lượt 404 và một dòng đỏ trong bảng điều khiển, mà người
+        # dùng vẫn phải chờ hết lượt tải mới biết là không có gì.
+        if co_ruot is not None and r[0] in co_ruot:
+            muc["r"] = 1
         # Cơ quan ban hành và ngày có hiệu lực: trang Quartz vẫn hiện hai dữ kiện
         # này, trang trợ lý thì không — vì bộ xuất không lấy chúng. Với người tra
         # cứu pháp luật, "ai ban hành" là dữ kiện đọc đầu tiên. Chỉ ghi khi có
@@ -149,7 +157,7 @@ def _van_ban(session) -> tuple[list[dict], dict[str, int]]:
     return ds, chi_so
 
 
-def _bieu_mau(session) -> list[dict]:
+def _bieu_mau(session, co_ruot: set[str] | None = None) -> list[dict]:
     """Biểu mẫu doanh nghiệp đã đăng, kèm tên file tải về và số hiệu căn cứ."""
     forms = (
         session.query(LegalForm)
@@ -172,6 +180,8 @@ def _bieu_mau(session) -> list[dict]:
             "e": f.eff_state or bm_eff.KHONG_RO,
             "c": can_cu.get(f.form_key, [])[:4],
         }
+        if co_ruot is not None and f.public_slug in co_ruot:
+            muc["r"] = 1
         if f.delisted_at:
             muc["x"] = 1
         if f.docx_path:
@@ -220,14 +230,16 @@ def _do_thi(session, chi_so: dict[str, int]) -> dict:
     return {"quan_he": loai, "canh": sorted(canh)}
 
 
-def xuat_du_lieu(session, out_dir: Path) -> ThongKeXuat:
+def xuat_du_lieu(session, out_dir: Path,
+                 ruot_vb: set[str] | None = None,
+                 ruot_bm: set[str] | None = None) -> ThongKeXuat:
     """Ghi bộ dữ liệu cho trang trợ lý. Trả về thống kê.
 
     Ghi MỘT file: trang trợ lý là trang tĩnh trên GitHub Pages, mỗi file thêm là
     một lượt tải thêm và một chỗ để hai bên lệch phiên bản.
     """
-    van_ban, chi_so = _van_ban(session)
-    bieu_mau = _bieu_mau(session)
+    van_ban, chi_so = _van_ban(session, ruot_vb)
+    bieu_mau = _bieu_mau(session, ruot_bm)
     do_thi = _do_thi(session, chi_so)
 
     goi = {
