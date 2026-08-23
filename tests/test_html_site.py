@@ -193,3 +193,34 @@ class TestGiuUrlCu:
         assert 'url=../' in chuyen
         # KHÔNG nhân đôi bộ dữ liệu 1,9 MB
         assert not (out / "tro-ly" / "du-lieu.json").exists()
+
+
+class TestThuTuXuatTroLy:
+    def test_du_lieu_tro_ly_co_bieu_mau_khi_gan_slug_truoc(self, master_session, tmp_path):
+        """assistant_export._bieu_mau() chỉ lấy mẫu ĐÃ có public_slug.
+
+        publish_site --html từng gọi xuat_du_lieu() trước gan_slug_bieu_mau(),
+        nên du-lieu.json ra 0 biểu mẫu trong khi kho có đủ — trang chủ hiện
+        "Biểu mẫu 0". Cùng lớp lỗi thứ tự với mục "Biểu mẫu kèm theo".
+        """
+        import json as _json
+
+        from src.publish import assistant_export
+        from src.storage.models import LegalForm
+
+        master_session.add(LegalForm(
+            form_key="hopdong-9", source="hopdong", external_id="9",
+            title="MẪU X", is_business=True, crawl_status="OK",
+            nghiep_vu='["hop_dong"]'))
+        master_session.commit()
+
+        # Sai thứ tự: xuất trước khi gán slug
+        assistant_export.xuat_du_lieu(master_session, tmp_path / "truoc")
+        goi = _json.loads((tmp_path / "truoc" / "du-lieu.json").read_text(encoding="utf-8"))
+        assert goi["bieu_mau"] == [], "chưa gán slug thì phải rỗng"
+
+        # Đúng thứ tự
+        html_site.gan_slug_bieu_mau(master_session)
+        assistant_export.xuat_du_lieu(master_session, tmp_path / "sau")
+        goi = _json.loads((tmp_path / "sau" / "du-lieu.json").read_text(encoding="utf-8"))
+        assert [b["k"] for b in goi["bieu_mau"]] == ["hopdong-9"]

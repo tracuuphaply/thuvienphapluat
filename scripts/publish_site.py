@@ -82,6 +82,11 @@ def main() -> None:
             # Node. `out_dir` ở đây là GỐC BẢN DỰNG (không phải content/), vì
             # không còn tầng nào đọc lại nó nữa.
             tro_ly_dir = out_dir.parent / TRO_LY_DIR
+            # GÁN SLUG BIỂU MẪU TRƯỚC KHI XUẤT DỮ LIỆU TRỢ LÝ. `_bieu_mau()` chỉ
+            # lấy mẫu đã có `public_slug`, nên xuất trước khi gán thì du-lieu.json
+            # có 0 biểu mẫu — trang chủ hiện "Biểu mẫu 0" trong khi kho có đủ.
+            # Cùng lớp lỗi thứ tự với mục "Biểu mẫu kèm theo" trên trang văn bản.
+            html_site.gan_slug_bieu_mau(session)
             tk_troly = assistant_export.xuat_du_lieu(session, tro_ly_dir)
             assistant_export.chep_ung_dung(tro_ly_dir)
             tk = html_site.xuat_site(session, out_dir, version,
