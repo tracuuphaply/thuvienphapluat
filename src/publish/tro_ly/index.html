@@ -2028,21 +2028,14 @@ function capNhatGhiSoDo() {
      xem tưởng mình đang nhìn cả kho trong khi chỉ thấy lân cận. */
   const lang = (S.ke.get(SD.ds[0]) || []).length;
   const cat = !SD.toanKho && !SD.tapChoSan && lang > SD.ds.length - 1;
-  /* KHO KHÔNG CÓ QUAN HỆ NÀO là một trạng thái riêng và phải nói riêng ra.
-     Chế độ toàn kho chỉ nhận nút CÓ ít nhất một cạnh, nên kho 0 cạnh vẽ đúng một
-     nút và dòng chú thích thành "Toàn kho · 1 văn bản". Người xem đọc câu đó ra
-     một trong hai nghĩa, và cả hai đều sai: hoặc cả kho chỉ có một văn bản, hoặc
-     sơ đồ hỏng. Sự thật là kho vẫn đủ văn bản, chỉ chưa có dữ liệu dẫn chiếu —
-     đúng thứ xảy ra với kho demo dựng bằng scripts/nap_demo.py bản đầu, và nó đã
-     tốn một vòng báo lỗi. Danh sách và bộ lọc vẫn chạy bình thường, nên phải nói
-     rõ là THIẾU DỮ LIỆU chứ không phải HỎNG. */
-  if (el && !S.d.do_thi.canh.length) {
-    el.innerHTML = `<b>Kho chưa có dữ liệu dẫn chiếu</b> — không vẽ được sơ đồ liên
-      kết. Phần tra cứu và bộ lọc vẫn đầy đủ ${S.d.van_ban.length.toLocaleString("vi")}
-      văn bản.`;
-    const b0 = khung && khung.querySelector(".pv");
-    if (b0) b0.hidden = true;   /* đổi phạm vi cũng chỉ ra một nút — nút này vô nghĩa */
-    return;
+  const khoTrong = !S.d.do_thi.canh.length;
+  /* Nút đổi phạm vi xử lý MỘT CHỖ, trước mọi nhánh return. Bản trước ẩn nó bên
+     trong nhánh "kho trống" và hiện lại ở cuối hàm, nên nhánh nào return sớm là
+     nút giữ nguyên trạng thái của lần gọi trước. */
+  const nut = khung && khung.querySelector(".pv");
+  if (nut) {
+    nut.hidden = khoTrong;   /* kho 0 cạnh thì đổi phạm vi cũng chỉ ra một nút */
+    nut.textContent = SD.toanKho ? "Thu về lân cận" : "Xem toàn kho";
   }
   /* ĐANG RỌI thì ô chú thích nói về cái đang rọi, không nói về phạm vi sơ đồ.
      Đây là chỗ duy nhất trả lời được câu "tôi vừa trỏ vào, có gì xảy ra không?"
@@ -2060,7 +2053,14 @@ function capNhatGhiSoDo() {
        một câu chung thì có ca nào cũng sai: nói "văn bản căn cứ" về một VĂN BẢN
        là vô nghĩa, còn nói "chưa có quan hệ" về một biểu mẫu chưa khai căn cứ
        là đổ lỗi cho kho văn bản trong khi thiếu sót nằm ở chính biểu mẫu. */
-    const vi = coQuanHe
+    const vi = khoTrong
+      /* CẢ KHO không có cạnh nào là ca riêng, và phải đứng TRƯỚC mọi ca khác.
+         Bản trước để nhánh "kho trống" chặn ở trên nên trỏ vào bất cứ mục nào
+         cũng KHÔNG có gì đổi trên màn hình — người dùng đọc ra là chức năng rọi
+         chưa được làm, chứ không đọc ra là kho thiếu dữ liệu. Đã xảy ra thật.
+         Nói luôn cách sửa, vì nó nằm ở bước dựng chứ không ở trang. */
+      ? "cả kho chưa có dữ liệu dẫn chiếu — nạp lại kho bằng scripts/nap_demo.py"
+      : coQuanHe
       /* CÓ quan hệ mà vẫn không rọi được nghĩa là nút nằm NGOÀI phạm vi sơ đồ
          đang xem, không phải thiếu dữ liệu. Đổ cho "chưa có quan hệ" ở đây là
          nói sai về kho: sơ đồ nền luôn ở chế độ toàn kho nên ca này chưa gặp,
@@ -2080,6 +2080,20 @@ function capNhatGhiSoDo() {
       : `<b>${esc(SD.roiNhan)}</b> · không rọi được — ${esc(vi)}`;
     return;
   }
+  /* KHO KHÔNG CÓ QUAN HỆ NÀO là một trạng thái riêng và phải nói riêng ra.
+     Chế độ toàn kho chỉ nhận nút CÓ ít nhất một cạnh, nên kho 0 cạnh vẽ đúng một
+     nút và dòng chú thích thành "Toàn kho · 1 văn bản". Người xem đọc câu đó ra
+     một trong hai nghĩa, và cả hai đều sai: hoặc cả kho chỉ có một văn bản, hoặc
+     sơ đồ hỏng. Sự thật là kho vẫn đủ văn bản, chỉ chưa có dữ liệu dẫn chiếu —
+     đúng thứ xảy ra với kho demo dựng bằng scripts/nap_demo.py bản đầu, và nó đã
+     tốn một vòng báo lỗi. Danh sách và bộ lọc vẫn chạy bình thường, nên phải nói
+     rõ là THIẾU DỮ LIỆU chứ không phải HỎNG. */
+  if (el && khoTrong) {
+    el.innerHTML = `<b>Kho chưa có dữ liệu dẫn chiếu</b> — không vẽ được sơ đồ liên
+      kết. Phần tra cứu và bộ lọc vẫn đầy đủ ${S.d.van_ban.length.toLocaleString("vi")}
+      văn bản.`;
+    return;
+  }
   if (el) el.innerHTML = (SD.tapChoSan
       ? `${SD.soTrichDan} văn bản được trích dẫn`
         + (SD.soCau ? ` + ${SD.soCau} văn bản trung gian` : "")
@@ -2092,8 +2106,6 @@ function capNhatGhiSoDo() {
     · <span style="color:var(--accent)">●</span> dẫn chiếu tới
     · <span style="color:var(--t-red)">●</span> bị dẫn chiếu
     · <span class="goi">kéo để xoay · lăn chuột để phóng · bấm để mở</span>`;
-  const b = khung && khung.querySelector(".pv");
-  if (b) { b.hidden = false; b.textContent = SD.toanKho ? "Thu về lân cận" : "Xem toàn kho"; }
 }
 
 function htmlSoDo() {

@@ -12,10 +12,23 @@ thật, xem được bằng mắt.
     python -m scripts.nap_demo --tu ../legal-vault-public/tro-ly/du-lieu.json
     python -m scripts.nap_demo --tu du-lieu.json --gioi-han 200
 
+RUỘT BIỂU MẪU lấy được, ruột văn bản thì không. `--noi-dung` trỏ vào thư mục
+`content/` của repo trang công khai: 653/653 trang biểu mẫu ở đó có sẵn mục
+"## Nội dung biểu mẫu" với đủ ruột mẫu, vì ruột mẫu VỐN đã được đăng.
+
+    python -m scripts.nap_demo --tu ../legal-vault-public/tro-ly/du-lieu.json \
+                               --noi-dung ../legal-vault-public/content
+
+Văn bản thì 0/4.168 trang có toàn văn, và đó là CHỦ Ý chứ không phải thiếu sót:
+mỗi trang văn bản đều ghi "Trang này không đăng toàn văn". Toàn văn chỉ nằm ở
+`data/clean_text/*.md` trên máy đã chạy pipeline. Nên trên kho demo, mục nội dung
+của VĂN BẢN sẽ luôn trống — muốn xem thì phải dựng từ kho thật.
+
 GIỚI HẠN, PHẢI NÓI RÕ. Bộ này CHỈ có những gì `du-lieu.json` mang theo. Nó có
 metadata và có QUAN HỆ DẪN CHIẾU (dựng lại từ khối `do_thi`), nhưng KHÔNG có:
   · điểm tác động 21 ngành  → mọi trang sẽ ghi "Chưa chấm điểm tác động"
-  · thân biểu mẫu           → trang biểu mẫu không có phần nội dung
+  · toàn văn văn bản        → mục "Nội dung" của văn bản trống, kể cả khi có --noi-dung
+  · thân biểu mẫu           → trừ khi truyền --noi-dung
 Nên đây là bản để KIỂM GIAO DIỆN VÀ ĐƯỜNG DẪN, không phải bản để đăng.
 
 VÌ SAO PHẢI NẠP CẢ QUAN HỆ. Bản đầu bỏ qua khối `do_thi`, và hệ quả không dừng ở
@@ -31,6 +44,7 @@ import argparse
 import datetime
 import json
 import logging
+import re
 from pathlib import Path
 
 from sqlalchemy import text
@@ -48,8 +62,54 @@ def _ngay(s: str) -> datetime.date | None:
         return None
 
 
-def nap(duong_json: Path, gioi_han: int | None = None) -> tuple[int, int, int]:
-    """Đổ metadata và quan hệ vào kho. Trả về (số văn bản, số biểu mẫu, số cạnh)."""
+_RE_KHOA = re.compile(r'^form_key:\s*"?([^"\n]+)"?\s*$', re.M)
+
+
+def _ruot_tu_trang(thu_muc_content: Path, kho_ruot: Path) -> dict[str, str]:
+    """Rút ruột biểu mẫu từ các trang đã đăng. Trả về {form_key: đường dẫn .md}.
+
+    Trang biểu mẫu công khai có cấu trúc cố định — bốn mục `## Tải về`,
+    `## Căn cứ pháp lý`, `## Nội dung biểu mẫu`, `## Nguồn` — và cả 653 trang đều
+    có đủ bốn. Cắt đúng mục thứ ba.
+
+    CẮT Ở MỤC KẾ TIẾP, không lấy tới hết file: sau ruột còn `## Nguồn` mang URL
+    Thư viện Pháp luật. Lấy tràn là dán địa chỉ nguồn vào giữa thân mẫu — đúng
+    thứ mà chính trang tĩnh cũng cắt bỏ.
+    """
+    ra: dict[str, str] = {}
+    d = Path(thu_muc_content) / "bieu-mau"
+    if not d.is_dir():
+        logger.warning("Không thấy %s — bỏ qua phần ruột biểu mẫu.", d)
+        return ra
+    kho_ruot.mkdir(parents=True, exist_ok=True)
+    for f in sorted(d.glob("*.md")):
+        try:
+            noi = f.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        m = _RE_KHOA.search(noi)
+        dau = noi.find("\n## Nội dung biểu mẫu")
+        if not m or dau < 0:
+            continue
+        than = noi[noi.index("\n", dau + 1) + 1:]
+        ket = than.find("\n## ")
+        than = (than[:ket] if ket >= 0 else than).strip()
+        if not than:
+            continue
+        khoa = m.group(1).strip()
+        p_ra = kho_ruot / f"{khoa}.md"
+        p_ra.write_text(than, encoding="utf-8")
+        ra[khoa] = str(p_ra)
+    logger.info("Rút được ruột của %d biểu mẫu từ %s", len(ra), d)
+    return ra
+
+
+def nap(duong_json: Path, gioi_han: int | None = None,
+        thu_muc_content: Path | None = None) -> tuple[int, int, int, int]:
+    """Đổ metadata, quan hệ và (nếu có) ruột biểu mẫu vào kho.
+
+    Trả về (số văn bản, số biểu mẫu, số cạnh, số ruột biểu mẫu).
+    """
     from src.storage.database import get_session, init_db, upsert_document
     from src.storage.models import DocumentReference, LegalForm
 
@@ -71,7 +131,9 @@ def nap(duong_json: Path, gioi_han: int | None = None) -> tuple[int, int, int]:
         bieu_mau = bieu_mau[:gioi_han]
 
     init_db()
-    n_vb = n_bm = 0
+    ruot = (_ruot_tu_trang(thu_muc_content, Path("data") / "demo_ruot")
+            if thu_muc_content else {})
+    n_vb = n_bm = n_ruot = 0
     with get_session() as s:
         for i, v in enumerate(van_ban):
             so = (v.get("n") or "").strip()
@@ -98,9 +160,19 @@ def nap(duong_json: Path, gioi_han: int | None = None) -> tuple[int, int, int]:
             khoa = (b.get("k") or "").strip()
             if not khoa:
                 continue
-            if s.query(LegalForm).filter_by(form_key=khoa).first():
+            cu_co = s.query(LegalForm).filter_by(form_key=khoa).first()
+            if cu_co:
+                # Chạy lại trên kho đã có: vẫn phải gắn ruột. Bỏ qua thẳng như
+                # bản trước là chạy lại với --noi-dung không có tác dụng gì, mà
+                # người dùng thì không thấy lý do — kho vẫn đủ biểu mẫu.
+                if ruot.get(khoa) and not cu_co.body_md_path:
+                    cu_co.body_md_path = ruot[khoa]
+                    n_ruot += 1
                 continue
+            if ruot.get(khoa):
+                n_ruot += 1
             s.add(LegalForm(
+                body_md_path=ruot.get(khoa),
                 form_key=khoa,
                 source=khoa.split("-")[0] or "hopdong",
                 external_id=khoa.split("-")[-1],
@@ -117,7 +189,7 @@ def nap(duong_json: Path, gioi_han: int | None = None) -> tuple[int, int, int]:
         s.commit()
 
         n_canh = _nap_quan_he(s, goi, van_ban, DocumentReference)
-    return n_vb, n_bm, n_canh
+    return n_vb, n_bm, n_canh, n_ruot
 
 
 def _nap_quan_he(s, goi: dict, van_ban: list, DocumentReference) -> int:
@@ -182,23 +254,36 @@ def main() -> None:
     ap.add_argument("--tu", required=True, help="Đường dẫn tới du-lieu.json")
     ap.add_argument("--gioi-han", type=int, default=None,
                     help="Chỉ nạp N mục đầu, cho nhanh")
+    ap.add_argument("--noi-dung", type=Path, default=None, metavar="THU_MUC",
+                    help="Thư mục content/ của repo trang công khai — rút ruột "
+                         "biểu mẫu từ đó (văn bản KHÔNG có toàn văn ở đó)")
     a = ap.parse_args()
 
     p = Path(a.tu)
     if not p.is_file():
         raise SystemExit(f"Không thấy file: {p}")
 
-    n_vb, n_bm, n_canh = nap(p, a.gioi_han)
+    if a.noi_dung and not a.noi_dung.is_dir():
+        raise SystemExit(f"Không thấy thư mục: {a.noi_dung}")
+    n_vb, n_bm, n_canh, n_ruot = nap(p, a.gioi_han, a.noi_dung)
     print(f"\n=== Đã nạp kho DEMO ===")
     print(f"  văn bản  {n_vb}")
     print(f"  biểu mẫu {n_bm}")
     print(f"  quan hệ  {n_canh}")
+    print(f"  ruột BM  {n_ruot}")
+    if not n_ruot:
+        # Nói ngay ở đây, vì triệu chứng phía sau chỉ là "ruot.bieu_mau 0" giữa
+        # một bảng số toàn số dương, rồi popup không hiện phần nội dung nào.
+        print("  ⚠ Không có ruột biểu mẫu — popup sẽ không hiện phần Nội dung.")
+        print("    Thêm: --noi-dung <đường dẫn>/legal-vault-public/content")
+    print("  ℹ Ruột VĂN BẢN không lấy được từ trang công khai: trang văn bản")
+    print("    cố ý không đăng toàn văn. Muốn xem thì dựng từ kho thật.")
     if not n_canh:
         # Nói thẳng ra, vì triệu chứng của nó trên giao diện là "Toàn kho · 1
         # văn bản" — trông như đồ thị hỏng chứ không như kho thiếu quan hệ.
         print("  ⚠ Không có quan hệ nào — sơ đồ liên kết sẽ chỉ hiện MỘT nút.")
         print("    Kiểm lại: du-lieu.json nguồn có khối \"do_thi\" với cạnh không?")
-    print("\nĐây là bản KHÔNG có điểm tác động và KHÔNG có thân biểu mẫu.")
+    print("\nĐây là bản KHÔNG có điểm tác động và KHÔNG có toàn văn văn bản.")
     print("Dùng để xem giao diện và kiểm đường dẫn, KHÔNG dùng để đăng.")
     print("\nDựng trang:")
     print("  python -m scripts.publish_site --html --out build/site")

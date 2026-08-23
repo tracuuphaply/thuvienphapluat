@@ -108,13 +108,34 @@ def main() -> None:
                 print(f"  troly.{k:6} {v}")
             for k, v in vars(tk_ruot).items():
                 print(f"  ruot.{k:7} {v}")
-            if tk_ruot.thieu_van_ban or tk_ruot.thieu_bieu_mau:
+            if not tk_troly.canh:
+                # KHO KHÔNG CÓ QUAN HỆ là ca đã tốn hai vòng báo lỗi, cả hai lần
+                # vì cùng một chuyện: dựng lại trang từ một kho cũ chưa nạp quan
+                # hệ. Bản dựng chạy trơn, không lỗi, và triệu chứng duy nhất nằm
+                # ở tít bên kia — sơ đồ liên kết ra đúng MỘT nút. Nói ngay ở đây,
+                # kèm luôn câu lệnh sửa.
+                print("\n  ⛔ KHO KHÔNG CÓ QUAN HỆ DẪN CHIẾU NÀO (0 cạnh).")
+                print("     Sơ đồ liên kết sẽ chỉ hiện MỘT nút — trông như hỏng.")
+                print("     Kho demo thì nạp lại:")
+                print("       python -m scripts.nap_demo --tu <du-lieu.json>")
+                print("     Kho thật thì kiểm bảng document_references.")
+            # Chỉ kể loại NÀO ĐANG THIẾU. Câu "4.169 văn bản và 0 biểu mẫu
+            # không có ruột" bắt người đọc tự lọc lấy vế có nghĩa, và số 0 nằm
+            # trong một câu cảnh báo thì đọc thoáng qua rất dễ thành "hỏng cả hai".
+            ke = []
+            if tk_ruot.thieu_van_ban:
+                ke.append(f"{tk_ruot.thieu_van_ban} văn bản")
+            if tk_ruot.thieu_bieu_mau:
+                ke.append(f"{tk_ruot.thieu_bieu_mau} biểu mẫu")
+            if ke:
                 # Nói ra, vì triệu chứng phía người dùng chỉ là "bấm vào không
                 # thấy nội dung" — không phân biệt được với hỏng.
-                print(f"\n  ⚠ {tk_ruot.thieu_van_ban} văn bản và "
-                      f"{tk_ruot.thieu_bieu_mau} biểu mẫu KHÔNG có ruột: kho chưa "
-                      f"có file nguồn (clean_text_path / body_md_path) trên máy này.")
+                print(f"\n  ⚠ {' và '.join(ke)} KHÔNG có ruột: kho chưa có file "
+                      f"nguồn (clean_text_path / body_md_path) trên máy này.")
                 print("    Trang vẫn chạy, các mục đó chỉ hiện dữ kiện như trước.")
+                if tk_ruot.thieu_van_ban and not tk_ruot.van_ban:
+                    print("    Riêng VĂN BẢN: trang công khai cố ý không đăng toàn")
+                    print("    văn, nên kho demo không bao giờ có. Cần kho thật.")
             print(f"\nBản dựng sẵn ở: {out_dir}")
             print("Không cần npm, không cần Quartz.")
             return

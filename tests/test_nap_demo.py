@@ -112,3 +112,63 @@ def test_canh_di_duoc_qua_bo_xuat(kho_ba_van_ban):
     do_thi = assistant_export._do_thi(kho_ba_van_ban, chi_so)
     assert len(do_thi["canh"]) == 1
     assert do_thi["quan_he"] == ["Căn cứ"]
+
+
+class TestRuotTuTrangCongKhai:
+    """Rút ruột biểu mẫu từ các trang đã đăng.
+
+    Ruột biểu mẫu VỐN đã công khai — 653/653 trang `content/bieu-mau/*.md` có
+    sẵn mục "## Nội dung biểu mẫu". Toàn văn VĂN BẢN thì không, và đó là chủ ý:
+    mỗi trang văn bản đều ghi "Trang này không đăng toàn văn". Nên kho demo lấy
+    được ruột biểu mẫu mà không bao giờ lấy được toàn văn văn bản.
+    """
+
+    def _trang(self, tmp_path, ten="bm-hopdong-1.md", khoa="hopdong-1", than=None):
+        d = tmp_path / "content" / "bieu-mau"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / ten).write_text(
+            f'---\ntitle: "X"\nform_key: "{khoa}"\n---\n\n'
+            "# X\n\n## Tải về\n\n- [docx](./x.docx)\n\n"
+            "## Căn cứ pháp lý\n\n*Không có.*\n\n"
+            "## Nội dung biểu mẫu\n\n" + (than or "HỢP ĐỒNG\n\nKính gửi: .....") + "\n\n"
+            "## Nguồn\n\n- https://thuvienphapluat.vn/hopdong/1\n",
+            encoding="utf-8")
+        return tmp_path / "content"
+
+    def test_cat_dung_muc_noi_dung(self, tmp_path):
+        from scripts.nap_demo import _ruot_tu_trang
+        ra = _ruot_tu_trang(self._trang(tmp_path), tmp_path / "ruot")
+        assert set(ra) == {"hopdong-1"}
+        than = (tmp_path / "ruot" / "hopdong-1.md").read_text(encoding="utf-8")
+        assert than.startswith("HỢP ĐỒNG") and "Kính gửi" in than
+
+    def test_khong_nuot_sang_muc_nguon(self, tmp_path):
+        """Sau ruột còn `## Nguồn` mang URL Thư viện Pháp luật.
+
+        Lấy tới hết file là dán địa chỉ nguồn vào giữa thân mẫu — đúng thứ mà
+        trang tĩnh cũng cắt bỏ.
+        """
+        from scripts.nap_demo import _ruot_tu_trang
+        _ruot_tu_trang(self._trang(tmp_path), tmp_path / "ruot")
+        than = (tmp_path / "ruot" / "hopdong-1.md").read_text(encoding="utf-8")
+        assert "thuvienphapluat" not in than
+        assert "## Nguồn" not in than
+
+    def test_bo_qua_trang_thieu_khoa_hoac_thieu_muc(self, tmp_path):
+        from scripts.nap_demo import _ruot_tu_trang
+        d = tmp_path / "content" / "bieu-mau"
+        d.mkdir(parents=True)
+        (d / "a.md").write_text("---\ntitle: X\n---\n\n## Nội dung biểu mẫu\n\nRuột\n",
+                                encoding="utf-8")   # thiếu form_key
+        (d / "b.md").write_text('---\nform_key: "k-b"\n---\n\n## Tải về\n\nx\n',
+                                encoding="utf-8")   # thiếu mục nội dung
+        assert _ruot_tu_trang(tmp_path / "content", tmp_path / "ruot") == {}
+
+    def test_ruot_rong_thi_khong_tinh(self, tmp_path):
+        from scripts.nap_demo import _ruot_tu_trang
+        assert _ruot_tu_trang(self._trang(tmp_path, than="   "), tmp_path / "ruot") == {}
+
+    def test_khong_co_thu_muc_thi_tra_rong_chu_khong_no(self, tmp_path):
+        """Chạy không có repo trang công khai bên cạnh là ca bình thường."""
+        from scripts.nap_demo import _ruot_tu_trang
+        assert _ruot_tu_trang(tmp_path / "khong-ton-tai", tmp_path / "ruot") == {}
