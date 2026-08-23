@@ -45,6 +45,7 @@ import datetime
 import json
 import logging
 import re
+import time
 from pathlib import Path
 
 from sqlalchemy import text
@@ -104,11 +105,72 @@ def _ruot_tu_trang(thu_muc_content: Path, kho_ruot: Path) -> dict[str, str]:
     return ra
 
 
+def _toan_van_tu_drive(goi: dict, van_ban: list, kho: Path,
+                       nghi: float = 0.0) -> dict[str, str]:
+    """Tải toàn văn từng văn bản từ Google Drive, làm sạch, ghi ra .md.
+
+    Trả về {số hiệu: đường dẫn .md}.
+
+    VÌ SAO TẢI ĐƯỢC MÀ KHÔNG CẦN KHOÁ. `upload_file()` đặt quyền
+    `{"type": "anyone", "role": "reader"}` cho mọi file nó đẩy lên, nên bản toàn
+    văn đã công khai theo đường liên kết — chính là đường mà nút "↗ Toàn văn"
+    trên trang vẫn mở. Tải bằng HTTP thường, ai cũng chạy được, không cần
+    `credentials/`.
+
+    File trên Drive là HTML THÔ của Bộ Tư pháp, không phải bản đã sạch. Nên phải
+    đi qua `html_to_clean_text()` ở đây — đúng hàm mà pipeline dùng — chứ không
+    ghi thẳng: ghi thẳng là đưa nguyên style, thẻ và bố cục trang nguồn vào kho.
+
+    BỎ QUA FILE ĐÃ CÓ. 4.169 lượt tải là việc dài; chạy lại phải tiếp được chỗ
+    dở chứ không bắt tải lại từ đầu.
+    """
+    import urllib.request
+
+    from src.pipeline.text_processor import html_to_clean_text
+
+    ra: dict[str, str] = {}
+    kho.mkdir(parents=True, exist_ok=True)
+    co_id = [v for v in van_ban if v.get("g")]
+    logger.info("Tải toàn văn từ Drive: %d/%d văn bản có bản trên Drive",
+                len(co_id), len(van_ban))
+    loi = 0
+    for k, v in enumerate(co_id, 1):
+        so = (v.get("n") or "").strip()
+        if not so:
+            continue
+        dich = kho / (v["s"] + ".md")
+        if dich.is_file() and dich.stat().st_size:
+            ra[so] = str(dich)
+            continue
+        url = f"https://drive.google.com/uc?export=download&id={v['g']}"
+        try:
+            with urllib.request.urlopen(url, timeout=60) as r:
+                tho = r.read().decode("utf-8", errors="replace")
+        except Exception as e:                       # noqa: BLE001
+            loi += 1
+            logger.warning("Không tải được %s: %s", so, e)
+            continue
+        sach = html_to_clean_text(tho)
+        if not sach.strip():
+            loi += 1
+            continue
+        dich.write_text(sach, encoding="utf-8")
+        ra[so] = str(dich)
+        if k % 100 == 0:
+            logger.info("  … %d/%d", k, len(co_id))
+        if nghi:
+            time.sleep(nghi)
+    if loi:
+        logger.warning("%d văn bản tải hỏng — chạy lại sẽ thử tiếp.", loi)
+    return ra
+
+
 def nap(duong_json: Path, gioi_han: int | None = None,
-        thu_muc_content: Path | None = None) -> tuple[int, int, int, int]:
+        thu_muc_content: Path | None = None,
+        tai_toan_van: bool = False) -> tuple[int, int, int, int, int]:
     """Đổ metadata, quan hệ và (nếu có) ruột biểu mẫu vào kho.
 
-    Trả về (số văn bản, số biểu mẫu, số cạnh, số ruột biểu mẫu).
+    Trả về (số văn bản, số biểu mẫu, số cạnh, số ruột BM, số toàn văn VB).
     """
     from src.storage.database import get_session, init_db, upsert_document
     from src.storage.models import DocumentReference, LegalForm
@@ -133,6 +195,8 @@ def nap(duong_json: Path, gioi_han: int | None = None,
     init_db()
     ruot = (_ruot_tu_trang(thu_muc_content, Path("data") / "demo_ruot")
             if thu_muc_content else {})
+    toan_van = (_toan_van_tu_drive(goi, van_ban, Path("data") / "demo_toan_van")
+                if tai_toan_van else {})
     n_vb = n_bm = n_ruot = 0
     with get_session() as s:
         for i, v in enumerate(van_ban):
@@ -149,6 +213,10 @@ def nap(duong_json: Path, gioi_han: int | None = None,
                 "issue_date": _ngay(v.get("d", "")),
                 "territorial_scope": _PHAM_VI.get(v.get("p"), "trung_uong"),
                 "tvpl_field_code": v.get("f"),
+                # Toàn văn tải từ Drive về, đã làm sạch. `upsert_document` bỏ qua
+                # khoá có giá trị None nên không truyền khi chưa tải là đúng —
+                # không xoá mất đường dẫn của lần chạy trước.
+                **({"clean_text_path": toan_van[so]} if toan_van.get(so) else {}),
                 "gdrive_fulltext_link": (
                     f"https://drive.google.com/file/d/{v['g']}/view"
                     if v.get("g") else None),
@@ -189,7 +257,7 @@ def nap(duong_json: Path, gioi_han: int | None = None,
         s.commit()
 
         n_canh = _nap_quan_he(s, goi, van_ban, DocumentReference)
-    return n_vb, n_bm, n_canh, n_ruot
+    return n_vb, n_bm, n_canh, n_ruot, len(toan_van)
 
 
 def _nap_quan_he(s, goi: dict, van_ban: list, DocumentReference) -> int:
@@ -254,6 +322,9 @@ def main() -> None:
     ap.add_argument("--tu", required=True, help="Đường dẫn tới du-lieu.json")
     ap.add_argument("--gioi-han", type=int, default=None,
                     help="Chỉ nạp N mục đầu, cho nhanh")
+    ap.add_argument("--toan-van", action="store_true",
+                    help="Tải toàn văn văn bản từ Google Drive (bản đã công khai "
+                         "theo liên kết). Lâu — 4.169 lượt tải; chạy lại tiếp được.")
     ap.add_argument("--noi-dung", type=Path, default=None, metavar="THU_MUC",
                     help="Thư mục content/ của repo trang công khai — rút ruột "
                          "biểu mẫu từ đó (văn bản KHÔNG có toàn văn ở đó)")
@@ -265,7 +336,7 @@ def main() -> None:
 
     if a.noi_dung and not a.noi_dung.is_dir():
         raise SystemExit(f"Không thấy thư mục: {a.noi_dung}")
-    n_vb, n_bm, n_canh, n_ruot = nap(p, a.gioi_han, a.noi_dung)
+    n_vb, n_bm, n_canh, n_ruot, n_tv = nap(p, a.gioi_han, a.noi_dung, a.toan_van)
     print(f"\n=== Đã nạp kho DEMO ===")
     print(f"  văn bản  {n_vb}")
     print(f"  biểu mẫu {n_bm}")
@@ -276,14 +347,25 @@ def main() -> None:
         # một bảng số toàn số dương, rồi popup không hiện phần nội dung nào.
         print("  ⚠ Không có ruột biểu mẫu — popup sẽ không hiện phần Nội dung.")
         print("    Thêm: --noi-dung <đường dẫn>/legal-vault-public/content")
-    print("  ℹ Ruột VĂN BẢN không lấy được từ trang công khai: trang văn bản")
-    print("    cố ý không đăng toàn văn. Muốn xem thì dựng từ kho thật.")
+    print(f"  toàn văn {n_tv}")
+    if not n_tv:
+        print("  ⚠ Không có toàn văn văn bản — popup văn bản sẽ không có phần")
+        print("    Nội dung. Thêm cờ --toan-van để tải từ Drive (lâu, nhưng")
+        print("    chạy lại tiếp được và không cần khoá).")
     if not n_canh:
         # Nói thẳng ra, vì triệu chứng của nó trên giao diện là "Toàn kho · 1
         # văn bản" — trông như đồ thị hỏng chứ không như kho thiếu quan hệ.
         print("  ⚠ Không có quan hệ nào — sơ đồ liên kết sẽ chỉ hiện MỘT nút.")
         print("    Kiểm lại: du-lieu.json nguồn có khối \"do_thi\" với cạnh không?")
-    print("\nĐây là bản KHÔNG có điểm tác động và KHÔNG có toàn văn văn bản.")
+    # Câu chốt phải theo ĐÚNG thứ vừa nạp. Viết cứng "KHÔNG có toàn văn" thì
+    # chạy với --toan-van xong vẫn đọc được một câu sai ngay dưới dòng báo đã
+    # tải về 25 bản.
+    thieu = ["điểm tác động"]
+    if not n_tv:
+        thieu.append("toàn văn văn bản")
+    if not n_ruot:
+        thieu.append("ruột biểu mẫu")
+    print(f"\nĐây là bản KHÔNG có {', '.join(thieu)}.")
     print("Dùng để xem giao diện và kiểm đường dẫn, KHÔNG dùng để đăng.")
     print("\nDựng trang:")
     print("  python -m scripts.publish_site --html --out build/site")

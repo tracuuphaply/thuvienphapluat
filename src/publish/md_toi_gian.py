@@ -38,16 +38,33 @@ _DAM = re.compile(r"\*\*(?=\S)(.+?)(?<=\S)\*\*", re.S)
 _NGHIENG = re.compile(r"(?<!\*)\*(?=\S)([^*\n]+?)(?<=\S)\*(?!\*)")
 
 _MUC_DAU_DONG = re.compile(r"^\s*(?:[-*]\s+|\d+[.)]\s+)")
+# Đậm/nghiêng của VĂN BẢN nới hơn: cho phép khoảng trắng sát bên trong cặp dấu.
+# HTML Bộ Tư pháp có `<b>Quy định… </b>` với dấu cách trước thẻ đóng, ra thành
+# `**Quy định… **`, và mẫu chặt `(?<=\S)\*\*` không khớp — dấu sao hiện nguyên
+# ra màn hình. Đo trên 004/2025/TT-BNV: ba dòng tiêu đề đều dính.
+_DAM_NOI = re.compile(r"\*\*\s*(\S.*?\S|\S)\s*\*\*", re.S)
+_NGHIENG_NOI = re.compile(r"(?<!\*)\*\s*(\S[^*\n]*?\S|\S)\s*\*(?!\*)")
+# Dấu sao CÒN SÓT sau khi ghép cặp. Không phải rác vô cớ: <b> của nguồn bao qua
+# NHIỀU thẻ khối, mà mỗi thẻ khối thành một đoạn riêng — dấu mở nằm ở đoạn này,
+# dấu đóng ở đoạn cách đó bảy đoạn. Markdown không có cặp nào bắc qua đoạn được,
+# nên chúng KHÔNG BAO GIỜ ghép được và chỉ còn cách bỏ đi. Giữ lại là rải `**`
+# và `*` khắp mọi văn bản — đúng thứ nhìn thấy trên 004/2025/TT-BNV.
+_SAO_SOT = re.compile(r"\*{1,3}")
 _PHAN_CACH_BANG = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
 # `<hr>` của Bộ Tư pháp ra đúng "---" — không có dấu | nào, khác dòng phân cách bảng.
 _KE_NGANG = re.compile(r"^\s*-{3,}\s*$")
 
 
-def _noi_tuyen(s: str) -> str:
+def _noi_tuyen(s: str, la_vb: bool = False) -> str:
     """Cú pháp nội tuyến, áp lên chuỗi ĐÃ thoát HTML."""
     s = _MA.sub(lambda m: f"<code>{m.group(1)}</code>", s)
-    s = _DAM.sub(lambda m: f"<strong>{m.group(1)}</strong>", s)
-    s = _NGHIENG.sub(lambda m: f"<em>{m.group(1)}</em>", s)
+    if la_vb:
+        s = _DAM_NOI.sub(lambda m: f"<strong>{m.group(1)}</strong>", s)
+        s = _NGHIENG_NOI.sub(lambda m: f"<em>{m.group(1)}</em>", s)
+        s = _SAO_SOT.sub("", s)
+    else:
+        s = _DAM.sub(lambda m: f"<strong>{m.group(1)}</strong>", s)
+        s = _NGHIENG.sub(lambda m: f"<em>{m.group(1)}</em>", s)
     return s
 
 
@@ -61,7 +78,7 @@ def _o_bang(dong: str) -> list[str]:
     return [o.strip() for o in d.split("|")]
 
 
-def _dung_bang(khoi: list[str]) -> str:
+def _dung_bang(khoi: list[str], la_vb: bool = False) -> str:
     """Bảng pipe → <table>. Dòng đầu là tiêu đề nếu có dòng phân cách theo sau.
 
     Bảng biểu mẫu thường KHÔNG có hàng tiêu đề thật — `renderer.luoi_bang()` lấy
@@ -77,11 +94,11 @@ def _dung_bang(khoi: list[str]) -> str:
     ra = ['<div class="cuon"><table>']
     if dau is not None:
         ra.append("<thead><tr>"
-                  + "".join(f"<th>{_noi_tuyen(o)}</th>" for o in _o_bang(dau))
+                  + "".join(f"<th>{_noi_tuyen(o, la_vb)}</th>" for o in _o_bang(dau))
                   + "</tr></thead>")
     ra.append("<tbody>")
     for d in than:
-        ra.append("<tr>" + "".join(f"<td>{_noi_tuyen(o)}</td>" for o in _o_bang(d))
+        ra.append("<tr>" + "".join(f"<td>{_noi_tuyen(o, la_vb)}</td>" for o in _o_bang(d))
                   + "</tr>")
     ra.append("</tbody></table></div>")
     return "".join(ra)
@@ -157,7 +174,7 @@ def sang_html(md: str, kieu: str = "bieu_mau") -> str:
                     khoi.append(dong[j])
                     j += 1
                 i = j
-            ra.append(_dung_bang(khoi))
+            ra.append(_dung_bang(khoi, la_vb))
             continue
 
         # ── Danh sách (KHÔNG áp cho văn bản; xem chú thích 1) ──
@@ -190,6 +207,10 @@ def sang_html(md: str, kieu: str = "bieu_mau") -> str:
         # Ngắt dòng trong một đoạn là CÓ NGHĨA ở biểu mẫu: những dòng chấm chấm
         # để điền tay phải giữ đúng vị trí xuống dòng, gộp lại thành một dòng dài
         # là làm hỏng bố cục tờ mẫu.
-        ra.append("<p>" + "<br>".join(_noi_tuyen(x) for x in khoi) + "</p>")
+        # Đoạn CHỈ CÒN dấu sao sau khi dọn thì bỏ hẳn, không để lại <p></p> rỗng:
+        # một ô trống cao bằng dòng chữ, rải giữa văn bản, trông như trang lỗi.
+        dong_ra = [y for y in (_noi_tuyen(x, la_vb) for x in khoi) if not la_vb or y.strip()]
+        if dong_ra:
+            ra.append("<p>" + "<br>".join(dong_ra) + "</p>")
 
     return "\n".join(ra)

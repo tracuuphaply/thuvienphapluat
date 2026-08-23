@@ -166,3 +166,34 @@ class TestKieuVanBan:
                    "\n\n---\n\ncuối"):
             for kieu in ("van_ban", "bieu_mau"):
                 sang_html(md, kieu=kieu)   # treo là test không bao giờ về
+
+    def test_dam_co_khoang_trang_sat_trong_van_dung_duoc(self):
+        """`<b>Quy định… </b>` của nguồn ra thành `**Quy định… **`.
+
+        Mẫu chặt đòi ký tự KHÔNG TRẮNG ngay trước `**`, nên bản trước không khớp
+        và dấu sao hiện nguyên ra màn hình. Đo trên 004/2025/TT-BNV: cả ba dòng
+        tiêu đề đều dính.
+        """
+        ra = sang_html("**Quy định mức lương **", kieu="van_ban")
+        assert "<strong>Quy định mức lương</strong>" in ra
+        assert "*" not in ra
+
+    def test_bo_dau_sao_khong_bao_gio_ghep_duoc(self):
+        """`<b>` của nguồn bao qua NHIỀU thẻ khối → dấu mở và dấu đóng ở hai đoạn.
+
+        Markdown không có cặp nào bắc qua đoạn, nên chúng không bao giờ ghép
+        được. Giữ lại là rải `**` khắp mọi văn bản.
+        """
+        ra = sang_html("**\n\nBỘ NỘI VỤ\n\nTHÔNG TƯ **", kieu="van_ban")
+        assert "*" not in ra
+        assert "<p>BỘ NỘI VỤ</p>" in ra and "THÔNG TƯ" in ra
+
+    def test_doan_chi_con_dau_sao_thi_bo_han(self):
+        """Không để lại <p></p> rỗng — một ô trống rải giữa văn bản trông như lỗi."""
+        ra = sang_html("Trên\n\n*\n\nDưới", kieu="van_ban")
+        assert "<p></p>" not in ra
+        assert ra.count("<p>") == 2
+
+    def test_bieu_mau_khong_bi_don_dau_sao(self):
+        """Chế độ biểu mẫu KHÔNG dọn: ở đó dấu sao lẻ là chữ thật của tờ mẫu."""
+        assert "*" in sang_html("Ghi chú: (*) bắt buộc")
