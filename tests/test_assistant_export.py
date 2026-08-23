@@ -138,6 +138,29 @@ class TestBieuMau:
         assert b["w"] == "hopdong-1.docx" and b["p"] == "hopdong-1.pdf"
         assert b["c"] == ["96/2024/NĐ-CP"]
 
+    def test_can_cu_khop_duoc_voi_so_hieu_van_ban_da_xuat(
+            self, master_session, kho, tmp_path):
+        """`c` của biểu mẫu phải nối được vào `n` của văn bản, không chỉ có mặt.
+
+        Trang trợ lý rọi biểu mẫu lên sơ đồ bằng cách tra SỐ HIỆU CĂN CỨ trong
+        bảng số hiệu → văn bản. Biểu mẫu không phải nút trong đồ thị (đồ thị chỉ
+        gồm văn bản), nên đây là chỗ neo duy nhất của nó.
+
+        Hai bên phải cùng một dạng chuỗi. Lệch đi một khoảng trắng hay một cách
+        viết hoa thì phép tra ra rỗng, và triệu chứng là trỏ vào biểu mẫu mà sơ
+        đồ đứng yên — không lỗi, không cảnh báo, chỉ là không có gì xảy ra. Test
+        `test_kem_ten_file_tai_ve_va_can_cu` không bắt được ca này: nó soi `c`
+        một mình, không đối chiếu với phía văn bản.
+        """
+        kho.vb("96/2024/NĐ-CP", "vb-96-2024")
+        kho.bm("hopdong-1", "bm-hopdong-1", can_cu=["96/2024/NĐ-CP"])
+        g = doc_goi(master_session, tmp_path)
+        so_hieu = {v["n"] for v in g["van_ban"]}
+        (b,) = g["bieu_mau"]
+        assert b["c"], "biểu mẫu mất căn cứ thì không rọi được lên sơ đồ"
+        assert set(b["c"]) <= so_hieu, (
+            f"căn cứ {b['c']} không khớp số hiệu nào đã xuất: {sorted(so_hieu)}")
+
     def test_co_co_da_bi_go(self, master_session, kho, tmp_path):
         kho.bm("hopdong-1", "bm-hopdong-1", go=date(2026, 8, 19))
         assert doc_goi(master_session, tmp_path)["bieu_mau"][0]["x"] == 1

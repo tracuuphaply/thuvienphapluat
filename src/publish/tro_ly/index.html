@@ -678,7 +678,7 @@ function datVeSoDo(bat) {
 const S = {                        /* trạng thái ứng dụng */
   d: null, kho: "van_ban", linhVuc: null,
   mo: null, hoiThoai: [], nguon: {}, tdChon: null, dangChay: false,
-  idxVB: [], idxBM: [], ke: null, dsCuoi: null, boCucKho: null,
+  idxVB: [], idxBM: [], ke: null, theoSo: null, dsCuoi: null, boCucKho: null,
 };
 
 /* ── Cờ hiệu lực → hình thức ─────────────────────────────── */
@@ -729,6 +729,20 @@ async function nap() {
     S.ke.get(b).push([a, t, -1]);
   }
 
+  /* Số hiệu → chỉ số văn bản, để rọi biểu mẫu lên sơ đồ. Biểu mẫu không phải
+     nút trong đồ thị — đồ thị chỉ có văn bản — nên chỗ neo duy nhất của nó là
+     danh sách SỐ HIỆU CĂN CỨ (`c`).
+     Giá trị là MẢNG chứ không phải một chỉ số: số hiệu KHÔNG duy nhất trong kho
+     (4.201 mục gộp theo số hiệu chỉ còn 4.166 số khác nhau), nên ghi đè bằng
+     một chỉ số là im lặng bỏ mất bản còn lại của cùng một số hiệu. */
+  S.theoSo = new Map();
+  S.d.van_ban.forEach((v, i) => {
+    const k = (v.n || "").trim();
+    if (!k) return;
+    if (!S.theoSo.has(k)) S.theoSo.set(k, []);
+    S.theoSo.get(k).push(i);
+  });
+
   $("#dem-vb").textContent = S.d.van_ban.length.toLocaleString("vi");
   $("#dem-bm").textContent = S.d.bieu_mau.length.toLocaleString("vi");
   /* Ngày dựng dữ liệu hiện ngay trên giao diện: người dùng phải TỰ kiểm được
@@ -736,6 +750,7 @@ async function nap() {
   $("#moc-du-lieu").textContent = "Dữ liệu dựng ngày "
     + S.d.tao_luc.split("-").reverse().join("/");
   dungLoc(); dungNhom(); veDanhSach();
+  ganRoiDanhSach();
 }
 
 function dungLoc() {
@@ -880,6 +895,10 @@ const urlDrive = id => `https://drive.google.com/file/d/${id}/view`;
    tiêu điểm và inert cho nền; tự làm lại ba thứ đó bằng tay là ba chỗ để sai. */
 function moTaiLieu(kho, i) {
   S.mo = { kho, i };
+  /* Popup che kín cột trái, nên `pointerleave` của danh sách KHÔNG bao giờ bắn
+     ra sau cú bấm — tập rọi sẽ nằm lại và tô nhầm lên sơ đồ trong popup, vốn
+     nói về một văn bản khác. */
+  sdThoiRoi();
   const v = (kho === "van_ban" ? S.d.van_ban : S.d.bieu_mau)[i];
   $("#doc-nhan").textContent = kho === "van_ban" ? v.n : v.k;
   /* Nhãn nút phải nói đúng nó sẽ mở ra cái gì. "Trang gốc" khi nó dẫn tới một
@@ -910,14 +929,31 @@ function moTaiLieu(kho, i) {
 }
 
 function dongTaiLieu() {
+  /* CHỈ đóng. Phần dọn dẹp nằm ở bộ nghe "close" ngay dưới, vì <dialog> đóng
+     được bằng nhiều đường mà hàm này chỉ là một trong số đó. */
+  $("#dlg-doc").close();
+}
+
+/* MỌI đường đóng popup đều phải trả bộ mô phỏng về sơ đồ nền — kể cả đường
+   KHÔNG đi qua dongTaiLieu().
+
+   Phím Esc đóng <dialog> ở tầng trình duyệt, không gọi hàm nào của trang. Bản
+   trước dọn dẹp bên trong dongTaiLieu(), nên đóng bằng Esc thì `SD.cv` nằm lại
+   ở canvas trong popup: đo được sau khi bấm Esc, SD.cv vẫn là "sodo-cv" trong
+   khi thứ đang hiện trên màn hình là "sodo-nen-cv". Hệ quả là sơ đồ nền đứng
+   hình và mọi lần ghi chú thích sau đó rơi vào ô đã bị ẩn — trang trông vẫn
+   bình thường, chỉ là không phản ứng gì nữa.
+
+   Đặt ở "close" thì mọi đường vào đều qua đây: Esc, bấm nền, nút đóng, hay
+   <form method="dialog">. Không đệ quy: lúc sự kiện này bắn ra thì `open` đã
+   là false, và close() trên hộp đã đóng không bắn thêm sự kiện nào. */
+$("#dlg-doc").addEventListener("close", () => {
   SD.id++;            /* cắt vòng lặp mô phỏng: đóng popup là hết việc của nó */
   SD.cv = null;
-  const d = $("#dlg-doc");
-  if (d.open) d.close();
   /* Sơ đồ nền nhận lại bộ mô phỏng — nhưng KHÔNG chạy lại hoạt ảnh: bố cục toàn
      kho đã nhớ, và đóng một popup thì không phải lúc bắt người ta chờ 6 giây. */
   datSoDo();
-}
+});
 
 function htmlVanBan(v, i) {
   const ke = (S.ke.get(i) || []);
@@ -1029,6 +1065,11 @@ const SD = {
   alpha: 0, cam: { x: 0, y: 0, z: 1 }, tro: -1, keo: -1, panh: null,
   toanKho: false, nhan: new Set(), tuTay: false, daDi: false, tam: null,
   tapChoSan: null, soTrichDan: 0, soCau: 0,
+  /* Tập nút đang được RỌI từ ngoài sơ đồ (hover danh sách bên trái).
+     Giữ CHỈ SỐ TOÀN CỤC, không phải chỉ số cục bộ trong SD.ds: sơ đồ dựng lại
+     là mọi chỉ số cục bộ đổi hết, và một tập rọi cũ sẽ lặng lẽ trỏ sang nút
+     khác. Đổi sang cục bộ ngay lúc vẽ, qua SD.viTri. */
+  roi: new Set(), roiNhan: "", roiKho: "", roiCanCu: 0,
 };
 
 /* NGÂN SÁCH NÚT — 90, không phải 240.
@@ -1599,11 +1640,33 @@ function sdVe() {
   const z = SD.cam.z, ox = SD.W / 2 + SD.cam.x, oy = SD.H / 2 + SD.cam.y;
   const X = i => SD.x[i] * z + ox, Y = i => SD.y[i] * z + oy;
 
-  const noi = SD.tro >= 0 ? SD.tro : (SD.keo >= 0 ? SD.keo : -1);
+  /* TÂM RỌI — TẬP nút được làm nổi, không phải một nút.
+     Trước đây chỉ có một: nút con trỏ đang chỉ trên chính canvas. Giờ danh sách
+     bên trái cũng rọi được, và một biểu mẫu neo vào tới 4 văn bản căn cứ, nên
+     phải là tập. Rọi từ danh sách được ưu tiên hơn con trỏ trên canvas: hai
+     nguồn không bao giờ cùng hoạt động (con trỏ chỉ ở được một chỗ), mà nếu có
+     thì cái người dùng vừa động tới mới là cái họ đang hỏi.
+     Đổi chỉ số toàn cục → cục bộ ở ĐÂY: nút được rọi có thể không nằm trong sơ
+     đồ (chế độ toàn kho chỉ nhận nút có cạnh), và bỏ sót phép tra này là vẽ
+     nhầm nút mang chỉ số cục bộ trùng số. */
+  let tamRoi = null;
+  if (SD.roi.size) {
+    tamRoi = new Set();
+    for (const g of SD.roi) {
+      const k = SD.viTri.get(g);
+      if (k !== undefined) tamRoi.add(k);
+    }
+    if (!tamRoi.size) tamRoi = null;
+  }
+  if (!tamRoi) {
+    const i = SD.tro >= 0 ? SD.tro : SD.keo;
+    if (i >= 0) tamRoi = new Set([i]);
+  }
+  const laTam = k => tamRoi !== null && tamRoi.has(k);
   const ke = new Set();
-  if (noi >= 0) for (let e = 0; e < SD.ca.length; e++) {
-    if (SD.ca[e] === noi) ke.add(SD.cb[e]);
-    if (SD.cb[e] === noi) ke.add(SD.ca[e]);
+  if (tamRoi) for (let e = 0; e < SD.ca.length; e++) {
+    if (laTam(SD.ca[e])) ke.add(SD.cb[e]);
+    if (laTam(SD.cb[e])) ke.add(SD.ca[e]);
   }
 
   /* Cạnh vẽ thành MỘT path gộp rồi stroke một lần. 23.801 lệnh stroke riêng lẻ
@@ -1614,17 +1677,17 @@ function sdVe() {
   c.beginPath();
   for (let e = 0; e < SD.ca.length; e++) {
     const i = SD.ca[e], j = SD.cb[e];
-    if (noi >= 0 && (i === noi || j === noi)) continue;
+    if (laTam(i) || laTam(j)) continue;
     c.moveTo(X(i), Y(i)); c.lineTo(X(j), Y(j));
   }
   c.stroke();
 
-  if (noi >= 0) {
+  if (tamRoi) {
     c.globalAlpha = .95; c.strokeStyle = SD.cAccent; c.lineWidth = 1.4;
     c.beginPath();
     for (let e = 0; e < SD.ca.length; e++) {
       const i = SD.ca[e], j = SD.cb[e];
-      if (i !== noi && j !== noi) continue;
+      if (!laTam(i) && !laTam(j)) continue;
       c.moveTo(X(i), Y(i)); c.lineTo(X(j), Y(j));
     }
     c.stroke();
@@ -1632,14 +1695,20 @@ function sdVe() {
 
   c.globalAlpha = 1;
   for (let k = n - 1; k >= 0; k--) {
-    const r = SD.bkinh[k] * Math.min(1.25, Math.max(.75, z));
-    const sang = noi < 0 || k === noi || ke.has(k);
+    const tam = laTam(k);
+    /* Nút được rọi VẼ TO HẲN LÊN, không chỉ sáng hơn. Ở chế độ toàn kho bán
+       kính nút là 1,1–3,4 px giữa 4.138 nút khác: đổi mỗi độ mờ thì cái nút
+       đang rọi không tài nào tìm ra trong đám ấy — tức là tính năng có mà
+       không dùng được. Sàn 5 px là cỡ nhỏ nhất còn nhận ra được khi lướt mắt. */
+    const r = (tam ? Math.max(5, SD.bkinh[k] + 2) : SD.bkinh[k])
+      * Math.min(1.25, Math.max(.75, z));
+    const sang = !tamRoi || tam || ke.has(k);
     c.globalAlpha = sang ? 1 : .3;
-    c.fillStyle = sdMau(k, SD.cGoc);
+    c.fillStyle = tam ? SD.cAccent : sdMau(k, SD.cGoc);
     c.beginPath(); c.arc(X(k), Y(k), r, 0, 6.2832); c.fill();
-    if (k === 0 || k === noi) {
+    if (k === 0 || tam) {
       c.lineWidth = 2; c.strokeStyle = SD.cNen; c.stroke();
-      c.lineWidth = 1.6; c.strokeStyle = k === 0 ? SD.cGoc : SD.cAccent;
+      c.lineWidth = 1.6; c.strokeStyle = k === 0 && !tam ? SD.cGoc : SD.cAccent;
       c.beginPath(); c.arc(X(k), Y(k), r + 3.5, 0, 6.2832); c.stroke();
     }
   }
@@ -1657,7 +1726,7 @@ function sdVe() {
   const veNhan = k => {
     const v = S.d.van_ban[SD.ds[k]];
     const t = tenNgan(v);
-    const chinh = k === 0 || k === noi;
+    const chinh = k === 0 || laTam(k);
     c.font = (k === 0 ? "600 " : "") + "10px " + chuFont;
     const w = c.measureText(t).width, hh = 12;
     const px = X(k), py = Y(k) + SD.bkinh[k] * Math.min(1.25, Math.max(.75, z)) + 11;
@@ -1666,12 +1735,14 @@ function sdVe() {
     if (hop.some(q => o[0] < q[2] && o[2] > q[0] && o[1] < q[3] && o[3] > q[1])) return;
     hop.push(o);
     c.globalAlpha = chinh ? 1 : .72;
-    c.fillStyle = k === 0 ? SD.cGoc : SD.cChu;
+    c.fillStyle = laTam(k) ? SD.cAccent : k === 0 ? SD.cGoc : SD.cChu;
     c.fillText(t, px, py);
   };
-  veNhan(0);
-  if (noi > 0) veNhan(noi);
-  if (hienNhan) for (const k of SD.nhan) if (k !== 0 && k !== noi) veNhan(k);
+  /* Nút được rọi giành chỗ nhãn TRƯỚC cả văn bản đang mở: phép kiểm chồng lấn
+     cho nhãn vẽ trước thắng, và cái người dùng vừa trỏ tới mới là cái cần đọc. */
+  if (tamRoi) for (const k of tamRoi) veNhan(k);
+  if (!laTam(0)) veNhan(0);
+  if (hienNhan) for (const k of SD.nhan) if (k !== 0 && !laTam(k)) veNhan(k);
   c.globalAlpha = 1;
 }
 
@@ -1763,6 +1834,64 @@ function sdGanSuKien(cv) {
   }, { passive: false });
 }
 
+/* ── RỌI TỪ DANH SÁCH ────────────────────────────────────────────────────────
+   Trỏ vào một mục ở cột trái thì sơ đồ bên phải làm nổi đúng nút ấy và các nút
+   nối với nó. Dùng lại nguyên đường tô sáng sẵn có của con trỏ-trên-canvas thay
+   vì vẽ thêm một lớp riêng — một cách tô, một chỗ sửa.
+
+   VĂN BẢN neo thẳng vào nút cùng chỉ số. BIỂU MẪU thì không có nút nào: đồ thị
+   chỉ gồm văn bản. Chỗ neo duy nhất của biểu mẫu là các SỐ HIỆU CĂN CỨ, nên rọi
+   biểu mẫu = rọi những văn bản căn cứ của nó.
+
+   Ba trường hợp KHÔNG rọi được gì, và cả ba phải nói ra chứ không im lặng —
+   người dùng trỏ vào mà sơ đồ đứng yên thì họ đọc ra là hỏng:
+     · văn bản chưa có quan hệ dẫn chiếu nào  → không có nút trong chế độ toàn kho
+     · biểu mẫu chưa ghi nhận văn bản căn cứ
+     · căn cứ có ghi nhưng số hiệu ấy không có trong kho                        */
+function sdRoi(kho, i) {
+  const truocTap = SD.roi, truocNhan = SD.roiNhan;
+  SD.roi = new Set();
+  SD.roiNhan = SD.roiKho = "";
+  SD.roiCanCu = 0;
+  if (kho === "van_ban") {
+    const v = S.d.van_ban[i];
+    if (!v) return;
+    SD.roi.add(i);
+    SD.roiNhan = tenNgan(v);
+  } else {
+    const b = S.d.bieu_mau[i];
+    if (!b) return;
+    const cc = b.c || [];
+    SD.roiCanCu = cc.length;
+    for (const so of cc)
+      for (const j of (S.theoSo.get((so || "").trim()) || [])) SD.roi.add(j);
+    SD.roiNhan = b.k || b.t || "Biểu mẫu";
+  }
+  SD.roiKho = kho;
+  /* Chỉ ghi lại ô chú thích khi thứ đang rọi THẬT SỰ đổi. Cuộn qua danh sách
+     bắn ra hàng chục lượt trỏ mỗi giây.
+     Phải so CẢ TÊN, không chỉ so tập nút: hai biểu mẫu khác nhau cùng không neo
+     được vào nút nào đều cho tập RỖNG, và so mỗi tập thì lượt thứ hai bị coi là
+     "không đổi" nên ô chú thích đứng nguyên ở nội dung của lượt trước — đúng
+     lỗi đo được: trỏ vào biểu mẫu không có căn cứ mà chú thích vẫn ghi "Toàn
+     kho · 4.170 văn bản". */
+  if (SD.roiNhan !== truocNhan || !bangTap(truocTap, SD.roi)) capNhatGhiSoDo();
+}
+
+function sdThoiRoi() {
+  if (!SD.roi.size && !SD.roiNhan) return;
+  SD.roi = new Set();
+  SD.roiNhan = SD.roiKho = "";
+  SD.roiCanCu = 0;
+  capNhatGhiSoDo();
+}
+
+function bangTap(a, b) {
+  if (a.size !== b.size) return false;
+  for (const x of a) if (!b.has(x)) return false;
+  return true;
+}
+
 function nhanNut(i) {
   const v = S.d.van_ban[SD.ds[i]];
   return v.n + " — " + v.t;
@@ -1835,6 +1964,42 @@ function capNhatGhiSoDo() {
       văn bản.`;
     const b0 = khung && khung.querySelector(".pv");
     if (b0) b0.hidden = true;   /* đổi phạm vi cũng chỉ ra một nút — nút này vô nghĩa */
+    return;
+  }
+  /* ĐANG RỌI thì ô chú thích nói về cái đang rọi, không nói về phạm vi sơ đồ.
+     Đây là chỗ duy nhất trả lời được câu "tôi vừa trỏ vào, có gì xảy ra không?"
+     — nhất là khi câu trả lời là KHÔNG, vì nút không nằm trong sơ đồ. Im lặng
+     ở đúng trường hợp đó là để người dùng tự kết luận rằng sơ đồ hỏng. */
+  if (el && SD.roiNhan) {
+    let trong = 0, bac = 0, coQuanHe = 0;
+    for (const g of SD.roi) {
+      if (S.ke.has(g)) coQuanHe++;
+      if (SD.viTri.get(g) === undefined) continue;
+      trong++;
+      bac += (S.ke.get(g) || []).length;
+    }
+    /* Lý do phải nói ĐÚNG LOẠI. Bốn ca "không rọi được" khác hẳn nhau, mà chỉ
+       một câu chung thì có ca nào cũng sai: nói "văn bản căn cứ" về một VĂN BẢN
+       là vô nghĩa, còn nói "chưa có quan hệ" về một biểu mẫu chưa khai căn cứ
+       là đổ lỗi cho kho văn bản trong khi thiếu sót nằm ở chính biểu mẫu. */
+    const vi = coQuanHe
+      /* CÓ quan hệ mà vẫn không rọi được nghĩa là nút nằm NGOÀI phạm vi sơ đồ
+         đang xem, không phải thiếu dữ liệu. Đổ cho "chưa có quan hệ" ở đây là
+         nói sai về kho: sơ đồ nền luôn ở chế độ toàn kho nên ca này chưa gặp,
+         nhưng chế độ lân cận chỉ giữ ~90 nút và câu trả lời phải đúng theo dữ
+         liệu chứ không theo khung nhìn đang mở. */
+      ? "văn bản đó không nằm trong phạm vi sơ đồ đang xem"
+      : SD.roiKho === "van_ban"
+      ? "văn bản này chưa có quan hệ dẫn chiếu nào"
+      : !SD.roiCanCu
+      ? "biểu mẫu này chưa ghi nhận văn bản căn cứ"
+      : !SD.roi.size
+      ? `${SD.roiCanCu} số hiệu căn cứ, nhưng kho chưa có văn bản nào mang số ấy`
+      : "văn bản căn cứ chưa có quan hệ dẫn chiếu nào";
+    el.innerHTML = trong
+      ? `<b>${esc(SD.roiNhan)}</b> · đang rọi ${trong.toLocaleString("vi")} nút ·
+         ${bac.toLocaleString("vi")} quan hệ trực tiếp`
+      : `<b>${esc(SD.roiNhan)}</b> · không rọi được — ${esc(vi)}`;
     return;
   }
   if (el) el.innerHTML = (SD.tapChoSan
@@ -2282,6 +2447,36 @@ function hienCot(id) {
      điều phối. Không gọi thì trên màn hẹp sơ đồ trích dẫn không bao giờ dựng,
      vì lúc nó được yêu cầu dựng thì cột còn đang ẩn. */
   if (S.d) datSoDo();
+}
+
+/* TRỎ VÀO MỘT MỤC Ở CỘT TRÁI → RỌI NÓ LÊN SƠ ĐỒ.
+   Uỷ quyền ở khung `#ds` chứ không gắn vào từng thẻ: danh sách vẽ lại mỗi lần
+   lọc hay tra cứu, gắn từng thẻ là 300 bộ xử lý phải tháo ra lắp lại mỗi lượt —
+   và lượt nào quên tháo thì rò.
+
+   `pointerover` chứ không phải `mouseenter`: `mouseenter` KHÔNG nổi bọt nên uỷ
+   quyền không bắt được. Xoá thì bắt ở `pointerleave` của cả khung, không bắt
+   `pointerout` từng thẻ: rê từ thẻ này sang thẻ kia bắn ra `pointerout` rồi mới
+   `pointerover`, nên xoá theo thẻ là chớp tắt một nhịp giữa mỗi hai thẻ.
+
+   `focusin`/`focusout` đi kèm chứ không phải thêm thắt: các mục là <button>, đi
+   bằng phím Tab là đường dùng bình thường của chúng, và một tính năng chỉ chạy
+   khi có chuột thì với người dùng bàn phím nó không tồn tại. */
+function ganRoiDanhSach() {
+  const ds = $("#ds");
+  if (!ds) return;
+  const roi = e => {
+    const muc = e.target.closest && e.target.closest(".muc");
+    if (muc) sdRoi(muc.dataset.kho, +muc.dataset.i);
+  };
+  ds.addEventListener("pointerover", roi);
+  ds.addEventListener("focusin", roi);
+  ds.addEventListener("pointerleave", sdThoiRoi);
+  ds.addEventListener("focusout", e => {
+    /* Chỉ thôi rọi khi tiêu điểm rời hẳn danh sách. `relatedTarget` là chỗ tiêu
+       điểm SẮP tới; Tab từ thẻ này sang thẻ kia vẫn nằm trong `#ds`. */
+    if (!e.relatedTarget || !ds.contains(e.relatedTarget)) sdThoiRoi();
+  });
 }
 
 document.addEventListener("click", e => {
