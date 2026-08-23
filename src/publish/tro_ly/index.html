@@ -1821,6 +1821,22 @@ function capNhatGhiSoDo() {
      xem tưởng mình đang nhìn cả kho trong khi chỉ thấy lân cận. */
   const lang = (S.ke.get(SD.ds[0]) || []).length;
   const cat = !SD.toanKho && !SD.tapChoSan && lang > SD.ds.length - 1;
+  /* KHO KHÔNG CÓ QUAN HỆ NÀO là một trạng thái riêng và phải nói riêng ra.
+     Chế độ toàn kho chỉ nhận nút CÓ ít nhất một cạnh, nên kho 0 cạnh vẽ đúng một
+     nút và dòng chú thích thành "Toàn kho · 1 văn bản". Người xem đọc câu đó ra
+     một trong hai nghĩa, và cả hai đều sai: hoặc cả kho chỉ có một văn bản, hoặc
+     sơ đồ hỏng. Sự thật là kho vẫn đủ văn bản, chỉ chưa có dữ liệu dẫn chiếu —
+     đúng thứ xảy ra với kho demo dựng bằng scripts/nap_demo.py bản đầu, và nó đã
+     tốn một vòng báo lỗi. Danh sách và bộ lọc vẫn chạy bình thường, nên phải nói
+     rõ là THIẾU DỮ LIỆU chứ không phải HỎNG. */
+  if (el && !S.d.do_thi.canh.length) {
+    el.innerHTML = `<b>Kho chưa có dữ liệu dẫn chiếu</b> — không vẽ được sơ đồ liên
+      kết. Phần tra cứu và bộ lọc vẫn đầy đủ ${S.d.van_ban.length.toLocaleString("vi")}
+      văn bản.`;
+    const b0 = khung && khung.querySelector(".pv");
+    if (b0) b0.hidden = true;   /* đổi phạm vi cũng chỉ ra một nút — nút này vô nghĩa */
+    return;
+  }
   if (el) el.innerHTML = (SD.tapChoSan
       ? `${SD.soTrichDan} văn bản được trích dẫn`
         + (SD.soCau ? ` + ${SD.soCau} văn bản trung gian` : "")
@@ -1834,7 +1850,7 @@ function capNhatGhiSoDo() {
     · <span style="color:var(--t-red)">●</span> bị dẫn chiếu
     · <span class="goi">kéo để xoay · lăn chuột để phóng · bấm để mở</span>`;
   const b = khung && khung.querySelector(".pv");
-  if (b) b.textContent = SD.toanKho ? "Thu về lân cận" : "Xem toàn kho";
+  if (b) { b.hidden = false; b.textContent = SD.toanKho ? "Thu về lân cận" : "Xem toàn kho"; }
 }
 
 function htmlSoDo() {
