@@ -167,7 +167,7 @@ def _toan_van_tu_drive(goi: dict, van_ban: list, kho: Path,
 
 def nap(duong_json: Path, gioi_han: int | None = None,
         thu_muc_content: Path | None = None,
-        tai_toan_van: bool = False) -> tuple[int, int, int, int, int]:
+        tai_toan_van: bool = False) -> tuple[int, int, int, int, int, int]:
     """Đổ metadata, quan hệ và (nếu có) ruột biểu mẫu vào kho.
 
     Trả về (số văn bản, số biểu mẫu, số cạnh, số ruột BM, số toàn văn VB).
@@ -199,7 +199,7 @@ def nap(duong_json: Path, gioi_han: int | None = None,
                 if tai_toan_van else {})
     n_vb = n_bm = n_ruot = 0
     with get_session() as s:
-        for i, v in enumerate(van_ban):
+        for v in van_ban:
             so = (v.get("n") or "").strip()
             if not so:
                 continue
@@ -207,7 +207,32 @@ def nap(duong_json: Path, gioi_han: int | None = None,
                 "doc_num": so,
                 "title": v.get("t") or so,
                 "doc_type": v.get("l") or "",
-                "moj_id": f"demo-{i}",
+                # ĐỊNH DANH THEO SLUG, KHÔNG THEO CHỈ SỐ MẢNG. Bản trước ghi
+                # `f"demo-{i}"` với `i` là vị trí trong mảng, mà
+                # `resolve_existing_document()` tra `moj_id` TRƯỚC TIÊN. Mảng
+                # `van_ban` sắp theo `public_slug`, nên chỉ cần bản du-lieu.json
+                # mới chèn thêm một văn bản sắp trước là mọi chỉ số phía sau dịch
+                # một — và nạp lại lên kho cũ thì từng hàng bị ghi đè bằng dữ
+                # liệu của văn bản KẾ BÊN.
+                # Dựng lại được: nạp 6 văn bản, thêm một mục vào đầu rồi nạp lại
+                # → hàng doc_num 01/1997/QH10 (một Luật) mang tiêu đề và
+                # doc_type của một Quyết định, nên apply_derived_facts() tính lại
+                # hierarchy_level/is_vbqppl/territorial_scope theo loại SAI. Văn
+                # bản mới không bao giờ được thêm, mà script vẫn in "văn bản 7".
+                # Không ngoại lệ, không log, trang dựng ra vẫn hợp lệ.
+                # `s` là slug đã đăng công khai — ổn định giữa các bản dữ liệu.
+                "moj_id": f"demo-{v.get('s') or so}",
+                # Slug lấy THẲNG từ nguồn, không sinh lại. make_public_slug()
+                # gắn 4 ký tự băm của doc_key = "{số hiệu}::{cơ quan}"; kho demo
+                # đoán lại băm đó sẽ ra khác, nên 663/4.201 văn bản địa phương có
+                # URL lệch bản đã đăng — trong khi script tự khai mục đích là
+                # "kiểm đường dẫn".
+                "public_slug": v.get("s") or None,
+                # Cơ quan ban hành: thiếu nó thì doc_key rụng mất nửa sau, và hai
+                # văn bản khác nhau trùng số hiệu (26 cặp trong kho, hầu hết là
+                # QĐ-UBND/NQ-HĐND của các tỉnh khác nhau) bị gộp làm MỘT hàng
+                # trộn dữ liệu của cả hai.
+                "agency_name": v.get("a") or None,
                 "hierarchy_level": v.get("c"),
                 "eff_status": nhan_hl.get(v.get("e"), ""),
                 "issue_date": _ngay(v.get("d", "")),
@@ -223,6 +248,11 @@ def nap(duong_json: Path, gioi_han: int | None = None,
             })
             n_vb += 1
         s.commit()
+        # ĐẾM HÀNG THẬT, không đếm mục JSON. Hai con số lệch nhau khi số hiệu
+        # trùng bị gộp, và người vận hành đọc "văn bản 400" ở bước nạp rồi
+        # "van_ban 396" ở bước dựng ngay sau đó mà không có gì giải thích.
+        n_doc_vao = n_vb
+        n_vb = s.execute(text("SELECT COUNT(*) FROM documents")).scalar() or 0
 
         for b in bieu_mau:
             khoa = (b.get("k") or "").strip()
@@ -255,9 +285,21 @@ def nap(duong_json: Path, gioi_han: int | None = None,
             ))
             n_bm += 1
         s.commit()
+        # Cùng lý do với n_vb: đếm theo KHO. Chạy lại thì mọi biểu mẫu đã có nên
+        # vòng lặp `continue` hết, n_bm cục bộ bằng 0 và bản in ra thành "biểu
+        # mẫu 0" trong khi kho vẫn đủ.
+        n_bm = s.execute(text("SELECT COUNT(*) FROM legal_forms")).scalar() or 0
 
         n_canh = _nap_quan_he(s, goi, van_ban, DocumentReference)
-    return n_vb, n_bm, n_canh, n_ruot, len(toan_van)
+        # Cũng đếm theo KHO: chạy lần hai thì `n_ruot` cục bộ bằng 0 (mọi biểu
+        # mẫu đã có body_md_path nên nhánh gắn ruột không chạy), và bản trước in
+        # cảnh báo sai "Không có ruột biểu mẫu — popup sẽ không hiện nội dung"
+        # trong khi ruột vẫn còn nguyên trong kho. `n_tv` cũng vậy.
+        n_ruot = s.execute(text(
+            "SELECT COUNT(*) FROM legal_forms WHERE body_md_path IS NOT NULL")).scalar() or 0
+        n_tv = s.execute(text(
+            "SELECT COUNT(*) FROM documents WHERE clean_text_path IS NOT NULL")).scalar() or 0
+    return n_vb, n_bm, n_canh, n_ruot, n_tv, n_doc_vao
 
 
 def _nap_quan_he(s, goi: dict, van_ban: list, DocumentReference) -> int:
@@ -310,10 +352,37 @@ def _nap_quan_he(s, goi: dict, van_ban: list, DocumentReference) -> int:
             "target_doc_id": id_theo_so.get(so_dich),
         })
 
-    if hang:
-        s.bulk_insert_mappings(DocumentReference, hang)
+    if not hang:
+        return 0
+
+    # KHỬ TRÙNG VỚI KHO ĐÃ CÓ, không chỉ trong một lần chạy. `da_co` ở trên chỉ
+    # lọc trong lô này; `bulk_insert_mappings` thì ghi thẳng, mà bảng
+    # `document_references` KHÔNG có ràng buộc UNIQUE và `init_db()` chỉ
+    # `create_all` chứ không xoá bảng. Nên chạy lại script trên cùng kho là cộng
+    # dồn — đo được: hai lần nạp 300 mục cho 188 hàng trên 94 cạnh phân biệt, mà
+    # cả hai lần đều in "quan hệ 94" vì hàm trả về số hàng chèn LẦN NÀY.
+    #
+    # Sơ đồ trợ lý che mất lỗi này (`_do_thi()` gom cạnh vào một `set`), nhưng
+    # trang tĩnh thì lộ: `html_site._lien_quan()` duyệt từng hàng nên mỗi quan hệ
+    # hiện hai lần. Đo trên bản dựng sau hai lần nạp: 133 khối danh sách bị lặp.
+    #
+    # Chạy lại là thao tác ĐƯỢC KỲ VỌNG — docstring nêu hai lệnh mẫu khác nhau,
+    # và đường "chạy lại để gắn ruột biểu mẫu" cũng đi qua đây.
+    cu_co = {
+        (r[0], r[1], r[2])
+        for r in s.execute(text(
+            "SELECT source_doc_id, target_doc_num, relation_type "
+            "FROM document_references")).fetchall()
+    }
+    moi = [h for h in hang
+           if (h["source_doc_id"], h["target_doc_num"], h["relation_type"]) not in cu_co]
+    if moi:
+        s.bulk_insert_mappings(DocumentReference, moi)
         s.commit()
-    return len(hang)
+    # Trả về số cạnh CÓ TRONG KHO, không phải số vừa chèn: chạy lại lần hai mà
+    # in "quan hệ 0" thì người vận hành tưởng hỏng.
+    return len(cu_co | {(h["source_doc_id"], h["target_doc_num"], h["relation_type"])
+                        for h in hang})
 
 
 def main() -> None:
@@ -336,9 +405,13 @@ def main() -> None:
 
     if a.noi_dung and not a.noi_dung.is_dir():
         raise SystemExit(f"Không thấy thư mục: {a.noi_dung}")
-    n_vb, n_bm, n_canh, n_ruot, n_tv = nap(p, a.gioi_han, a.noi_dung, a.toan_van)
+    n_vb, n_bm, n_canh, n_ruot, n_tv, n_vao = nap(
+        p, a.gioi_han, a.noi_dung, a.toan_van)
     print(f"\n=== Đã nạp kho DEMO ===")
     print(f"  văn bản  {n_vb}")
+    if n_vao > n_vb:
+        print(f"    ({n_vao} mục đọc vào — {n_vao - n_vb} bị gộp vì trùng số hiệu")
+        print(f"     mà nguồn không ghi cơ quan ban hành để phân biệt)")
     print(f"  biểu mẫu {n_bm}")
     print(f"  quan hệ  {n_canh}")
     print(f"  ruột BM  {n_ruot}")

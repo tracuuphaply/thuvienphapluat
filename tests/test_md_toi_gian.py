@@ -230,3 +230,33 @@ class TestKieuVanBan:
         """
         for t in ("...", "..............", "Họ tên: ______", "-- ghi chú", "A---B"):
             assert "<hr>" not in sang_html(f"Trên\n\n{t}\n\nDưới", kieu="van_ban"), t
+
+    def test_hai_cum_dam_roi_nhau_khong_dinh_vao_nhau(self):
+        """Ruột cặp dấu KHÔNG được chứa `**`.
+
+        Bản nới lỏng dùng `.*?` nên một cặp bắc qua khoảng giữa hai cụm rời:
+        `**A** **B**` ra `<strong>A<em></strong>B</em>` — thẻ cắt chéo, HTML
+        hỏng; `**A** và **B**` còn nuốt luôn chữ "và".
+        """
+        assert sang_html("**A** **B**", kieu="van_ban") == \
+            "<p><strong>A</strong> <strong>B</strong></p>"
+        assert sang_html("**A** và **B**", kieu="van_ban") == \
+            "<p><strong>A</strong> và <strong>B</strong></p>"
+        assert sang_html("*a* *b*", kieu="van_ban") == "<p><em>a</em> <em>b</em></p>"
+
+    def test_van_giu_duoc_khoang_trang_sat_trong(self):
+        """Nới lỏng vẫn phải còn tác dụng: `<b>… </b>` của nguồn ra `**… **`."""
+        assert "<strong>Quy định mức lương</strong>" in \
+            sang_html("**Quy định mức lương **", kieu="van_ban")
+
+    def test_khong_gop_hai_bang_khac_so_cot(self):
+        """Hai phụ lục nối nhau là chuyện thường trong văn bản quy phạm.
+
+        Không có điều kiện số cột thì phép gộp dán chúng làm một bảng.
+        """
+        ra = sang_html("| A | B\n\n| 1 | 2\n\n| X | Y | Z\n\n| 7 | 8 | 9", kieu="van_ban")
+        assert ra.count("<table") == 2
+
+    def test_van_gop_cac_hang_cua_MOT_bang(self):
+        ra = sang_html("| A | B\n\n| 1 | 2\n\n| 3 | 4", kieu="van_ban")
+        assert ra.count("<table") == 1 and ra.count("<tr>") == 3

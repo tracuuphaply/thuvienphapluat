@@ -42,8 +42,14 @@ _MUC_DAU_DONG = re.compile(r"^\s*(?:[-*]\s+|\d+[.)]\s+)")
 # HTML Bộ Tư pháp có `<b>Quy định… </b>` với dấu cách trước thẻ đóng, ra thành
 # `**Quy định… **`, và mẫu chặt `(?<=\S)\*\*` không khớp — dấu sao hiện nguyên
 # ra màn hình. Đo trên 004/2025/TT-BNV: ba dòng tiêu đề đều dính.
-_DAM_NOI = re.compile(r"\*\*\s*(\S.*?\S|\S)\s*\*\*", re.S)
-_NGHIENG_NOI = re.compile(r"(?<!\*)\*\s*(\S[^*\n]*?\S|\S)\s*\*(?!\*)")
+# `(?:(?!\*\*)[\s\S])+?` — ruột KHÔNG được chứa `**`. Bản trước dùng `.*?` nên một
+# cặp dấu có thể bắc qua khoảng giữa HAI cụm đậm rời nhau: `**A** **B**` khớp
+# thành một cặp duy nhất, và đầu ra là `<strong>A<em></strong>B</em>` — thẻ cắt
+# chéo nhau, HTML hỏng. `**A** và **B**` còn nuốt luôn chữ "và". Mẫu chặt cũ
+# không dính vì nó đòi ký tự không trắng sát hai đầu; nới ra là mất chốt ấy, nên
+# phải cấm ruột chứa dấu đóng bằng cách khác.
+_DAM_NOI = re.compile(r"\*\*\s*((?:(?!\*\*)[\s\S])+?)\s*\*\*")
+_NGHIENG_NOI = re.compile(r"(?<!\*)\*\s*([^*\n]+?)\s*\*(?!\*)")
 # Dấu sao CÒN SÓT sau khi ghép cặp. Không phải rác vô cớ: <b> của nguồn bao qua
 # NHIỀU thẻ khối, mà mỗi thẻ khối thành một đoạn riêng — dấu mở nằm ở đoạn này,
 # dấu đóng ở đoạn cách đó bảy đoạn. Markdown không có cặp nào bắc qua đoạn được,
@@ -190,13 +196,20 @@ def sang_html(md: str, kieu: str = "bieu_mau") -> str:
                 i += 1
             # Gộp qua dòng trống: xem chú thích 2. Chỉ gộp khi dòng có nội dung
             # kế tiếp LẠI là một hàng bảng — hết bảng thì thôi.
+            # VÀ chỉ khi SỐ CỘT khớp. Không có điều kiện này thì hai bảng KHÁC
+            # NHAU đứng liền nhau bị dán làm một — mà trong văn bản quy phạm,
+            # hai phụ lục nối nhau là chuyện thường. Số cột là dấu hiệu phân biệt
+            # rẻ nhất và đúng trong đa số ca: cùng một bảng thì mọi hàng cùng số ô.
+            so_o = len(_o_bang(khoi[0]))
             while la_vb:
                 j = i
                 while j < n and not dong[j].strip():
                     j += 1
-                if j >= n or not dong[j].lstrip().startswith("|"):
+                if (j >= n or not dong[j].lstrip().startswith("|")
+                        or len(_o_bang(dong[j])) != so_o):
                     break
-                while j < n and dong[j].lstrip().startswith("|"):
+                while (j < n and dong[j].lstrip().startswith("|")
+                       and len(_o_bang(dong[j])) == so_o):
                     khoi.append(dong[j])
                     j += 1
                 i = j

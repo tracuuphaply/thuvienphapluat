@@ -172,3 +172,52 @@ class TestRuotTuTrangCongKhai:
         """Chạy không có repo trang công khai bên cạnh là ca bình thường."""
         from scripts.nap_demo import _ruot_tu_trang
         assert _ruot_tu_trang(tmp_path / "khong-ton-tai", tmp_path / "ruot") == {}
+
+
+class TestChayLaiKhongHongDuLieu:
+    """Bộ nạp phải CHẠY LẠI ĐƯỢC — docstring nêu hai lệnh mẫu, và đường "chạy
+    lại để gắn ruột biểu mẫu" cũng đi qua đây. Ba lỗi từng có, đều im lặng."""
+
+    def test_dinh_danh_khong_lay_theo_chi_so_mang(self, master_session, kho_ba_van_ban):
+        """`moj_id` phải ổn định theo VĂN BẢN, không theo vị trí trong mảng.
+
+        `resolve_existing_document()` tra `moj_id` TRƯỚC TIÊN. Mảng `van_ban` sắp
+        theo `public_slug`, nên bản dữ liệu mới chèn thêm một văn bản sắp trước
+        là mọi chỉ số phía sau dịch một — nạp lại lên kho cũ thì từng hàng bị ghi
+        đè bằng dữ liệu của văn bản KẾ BÊN. Dựng lại được: hàng doc_num
+        01/1997/QH10 (một Luật) mang tiêu đề và doc_type của một Quyết định.
+        """
+        import inspect
+        from scripts import nap_demo
+        ma = inspect.getsource(nap_demo.nap)
+        ma = "\n".join(d.split("#")[0] for d in ma.split("\n"))
+        assert 'f"demo-{i}"' not in ma, "định danh lại lấy theo chỉ số mảng"
+        assert "enumerate(van_ban)" not in ma, "vòng lặp văn bản không được dùng chỉ số"
+
+    def test_nap_quan_he_chay_lai_khong_nhan_doi(self, kho_ba_van_ban):
+        """`document_references` không có ràng buộc UNIQUE và `init_db()` không
+        xoá bảng, nên chèn thẳng là cộng dồn qua mỗi lần chạy.
+
+        Đo trước khi sửa: hai lần nạp 300 mục cho 188 hàng trên 94 cạnh phân
+        biệt, mà cả hai lần đều in "quan hệ 94". Sơ đồ trợ lý che mất (`_do_thi()`
+        gom vào `set`), nhưng trang tĩnh thì lộ — 133 khối danh sách bị lặp.
+        """
+        from scripts.nap_demo import _nap_quan_he
+        goi = {"do_thi": {"quan_he": ["Căn cứ"], "canh": [[0, 1, 0], [1, 2, 0]]}}
+        vb = _van_ban("01/2020/QH14", "02/2021/NĐ-CP", "03/2022/TT-BTC")
+        n1 = _nap_quan_he(kho_ba_van_ban, goi, vb, DocumentReference)
+        n2 = _nap_quan_he(kho_ba_van_ban, goi, vb, DocumentReference)
+        n3 = _nap_quan_he(kho_ba_van_ban, goi, vb, DocumentReference)
+        assert (n1, n2, n3) == (2, 2, 2), "số báo phải là số cạnh TRONG KHO"
+        assert kho_ba_van_ban.query(DocumentReference).count() == 2, "đã nhân đôi"
+
+    def test_slug_lay_thang_tu_nguon(self):
+        """`make_public_slug()` gắn 4 ký tự băm của doc_key = "{số hiệu}::{cơ quan}".
+
+        Kho demo không biết cơ quan nên băm ra khác, và 663/4.201 văn bản địa
+        phương có URL lệch bản đã đăng — trong khi script tự khai mục đích là
+        "kiểm đường dẫn".
+        """
+        import inspect
+        from scripts import nap_demo
+        assert '"public_slug"' in inspect.getsource(nap_demo.nap)

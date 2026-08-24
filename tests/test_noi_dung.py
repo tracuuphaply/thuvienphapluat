@@ -151,3 +151,23 @@ class TestCoKhopBoDuLieu:
         import json
         d = json.loads((out / assistant_export.TEN_FILE).read_text(encoding="utf-8"))
         assert all("r" not in m for m in d["van_ban"])
+
+
+class TestChiXuatVanBanQuyPham:
+    def test_bo_qua_van_ban_khong_phai_qppl(self, master_session, kho, tmp_path):
+        """Bộ lọc phải khớp `assistant_export._van_ban()` và `html_site.xuat_van_ban()`,
+        cả hai đều lọc `is_vbqppl`.
+
+        Thiếu nó thì ruột của văn bản không phải quy phạm vẫn được ghi ra site —
+        thành file mồ côi: không trang nào trỏ tới, không mục nào trong bộ dữ liệu
+        trợ lý mang cờ `r`, mà nội dung thì vẫn nằm công khai trên máy chủ.
+        """
+        d = kho.vb("vb-qppl", "Nội dung quy phạm.")
+        k = kho.vb("vb-khac", "Nội dung không quy phạm.")
+        k.is_vbqppl = False
+        master_session.commit()
+        out = tmp_path / "site"
+        tk, cv, _ = noi_dung.xuat_noi_dung(master_session, out)
+        assert cv == {"vb-qppl"}
+        assert not (out / "noi-dung" / "van-ban" / "vb-khac.html").exists()
+        assert tk.van_ban == 1

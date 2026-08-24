@@ -103,8 +103,13 @@ def xuat_noi_dung(session, out_dir: Path) -> tuple[ThongKeNoiDung, set[str], set
     d_bm.mkdir(parents=True, exist_ok=True)
 
     for slug, duong in session.execute(text(
+        # `is_vbqppl` PHẢI có, cho khớp hai bộ xuất kia: `assistant_export._van_ban()`
+        # lọc `is_vbqppl = 1`, `html_site.xuat_van_ban()` cũng vậy. Thiếu nó ở đây
+        # thì ruột của văn bản KHÔNG phải quy phạm vẫn được ghi ra site — thành
+        # file mồ côi: không trang nào trỏ tới, không mục nào trong bộ dữ liệu trợ
+        # lý mang cờ `r`, mà nội dung thì vẫn nằm công khai trên máy chủ.
         "SELECT public_slug, clean_text_path FROM documents "
-        "WHERE public_slug IS NOT NULL"
+        "WHERE public_slug IS NOT NULL AND is_vbqppl = 1"
     )).fetchall():
         md = _doc(duong)
         if not md.strip():
