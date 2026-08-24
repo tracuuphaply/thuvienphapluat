@@ -52,7 +52,16 @@ _NGHIENG_NOI = re.compile(r"(?<!\*)\*\s*(\S[^*\n]*?\S|\S)\s*\*(?!\*)")
 _SAO_SOT = re.compile(r"\*{1,3}")
 _PHAN_CACH_BANG = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
 # `<hr>` của Bộ Tư pháp ra đúng "---" — không có dấu | nào, khác dòng phân cách bảng.
-_KE_NGANG = re.compile(r"^\s*-{3,}\s*$")
+# `\*{0,2}` ở hai đầu: măng-sét văn bản có gạch trang trí nằm TRONG thẻ <b>, nên
+# ra thành `-------**`. Mẫu chặt không khớp, dòng đó rơi xuống nhánh đoạn văn và
+# hiện nguyên một hàng gạch ngang giữa trang — thấy trên 01/2007/TT-BTC.
+# Ký tự trang trí, đo trên 25 văn bản thật lấy ngẫu nhiên từ kho:
+#     11 lần  dãy `_`  (từ 10 tới 29 ký tự) — phổ biến nhất, nằm dưới măng-sét
+#      1 lần  dãy `—`
+#      1 lần  dãy `-`
+# CỐ Ý KHÔNG nhận dấu chấm: `...` là dấu ba chấm có nghĩa trong câu văn, không
+# phải đường kẻ. Gộp nó vào là biến một câu bỏ lửng thành một vạch ngang.
+_KE_NGANG = re.compile(r"^\s*\*{0,2}\s*([-_=—–])\1{2,}\s*\*{0,2}\s*$")
 
 
 def _noi_tuyen(s: str, la_vb: bool = False) -> str:
@@ -90,6 +99,23 @@ def _dung_bang(khoi: list[str], la_vb: bool = False) -> str:
         dau, than = khoi[0], khoi[2:]
     else:
         dau, than = None, khoi
+
+    # HÀNG TOÀN Ô RỖNG thì bỏ. Măng-sét văn bản Bộ Tư pháp nằm trong một <table>
+    # bố cục, và `</td>` được thay bằng hai dòng xuống nên nội dung ô trôi sang
+    # khối khác — còn lại đúng một dấu `|` đứng lẻ trên dòng của nó. Dựng ra thì
+    # thành một thanh viền rỗng cao bằng dòng chữ, và với phép gộp bảng thì
+    # nhiều thanh dính lại thành một khối kẻ ô trống. Đo trên 01/2007/TT-BTC:
+    # bốn `<td>` cho ra bốn thanh như vậy ngay đầu mục "Nội dung".
+    # Chỉ áp cho chế độ văn bản: ở biểu mẫu, ô rỗng là Ô ĐỂ ĐIỀN, bỏ đi là làm
+    # hỏng tờ mẫu.
+    def _rong(dong: str) -> bool:
+        return la_vb and not any(o.strip() for o in _o_bang(dong))
+
+    than = [d for d in than if not _rong(d)]
+    if dau is not None and _rong(dau):
+        dau, than = (than[0], than[1:]) if than else (None, than)
+    if la_vb and dau is None and not than:
+        return ""
 
     ra = ['<div class="cuon"><table>']
     if dau is not None:
@@ -174,7 +200,9 @@ def sang_html(md: str, kieu: str = "bieu_mau") -> str:
                     khoi.append(dong[j])
                     j += 1
                 i = j
-            ra.append(_dung_bang(khoi, la_vb))
+            bang = _dung_bang(khoi, la_vb)
+            if bang:
+                ra.append(bang)
             continue
 
         # ── Danh sách (KHÔNG áp cho văn bản; xem chú thích 1) ──

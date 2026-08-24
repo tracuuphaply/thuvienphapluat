@@ -197,3 +197,36 @@ class TestKieuVanBan:
     def test_bieu_mau_khong_bi_don_dau_sao(self):
         """Chế độ biểu mẫu KHÔNG dọn: ở đó dấu sao lẻ là chữ thật của tờ mẫu."""
         assert "*" in sang_html("Ghi chú: (*) bắt buộc")
+
+    def test_bo_hang_bang_toan_o_rong(self):
+        """Măng-sét văn bản nằm trong <table> bố cục, không phải bảng dữ liệu.
+
+        `</td>` bị thay bằng hai dòng xuống nên nội dung ô trôi sang khối khác,
+        còn lại đúng một dấu `|` đứng lẻ. Dựng ra thì thành thanh viền rỗng cao
+        bằng dòng chữ. Đo trên 01/2007/TT-BTC: bốn <td> cho bốn thanh như vậy
+        ngay đầu mục "Nội dung".
+        """
+        ra = sang_html("|\n\n|\n\n| A | B", kieu="van_ban")
+        assert "<td></td>" not in ra
+        assert ra.count("<tr>") == 1 and "A" in ra and "B" in ra
+
+    def test_bang_khong_con_hang_nao_thi_bo_han(self):
+        assert sang_html("|\n\n|\n\n|", kieu="van_ban") == ""
+
+    def test_o_rong_cua_BIEU_MAU_phai_giu(self):
+        """Ở tờ mẫu, ô rỗng là Ô ĐỂ ĐIỀN — bỏ đi là làm hỏng mẫu."""
+        ra = sang_html("| Mã số thuế | \n| Địa chỉ | ")
+        assert ra.count("<tr>") == 2
+
+    def test_gach_trang_tri_moi_kieu_thanh_duong_ke(self):
+        """Đo trên 25 văn bản thật: `_` phổ biến nhất (11 lần), rồi `—`, `-`."""
+        for t in ("---", "_______", "**_________________**", "—————", "=====", "-------**"):
+            assert "<hr>" in sang_html(f"Trên\n\n{t}\n\nDưới", kieu="van_ban"), t
+
+    def test_ba_cham_KHONG_thanh_duong_ke(self):
+        """`...` là dấu ba chấm có nghĩa, không phải đường kẻ.
+
+        Gộp nó vào là biến một câu bỏ lửng thành một vạch ngang giữa trang.
+        """
+        for t in ("...", "..............", "Họ tên: ______", "-- ghi chú", "A---B"):
+            assert "<hr>" not in sang_html(f"Trên\n\n{t}\n\nDưới", kieu="van_ban"), t
