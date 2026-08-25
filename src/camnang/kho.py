@@ -182,8 +182,19 @@ def doc_kho(vault: str | Path) -> Kho:
     vault = Path(vault)
     goi = _doc_chi_muc(vault)
 
+    if not isinstance(goi, dict):
+        raise KhoKhongDoc(
+            f"chỉ mục phải là đối tượng JSON, nhận {type(goi).__name__}")
+    for ten in ("van_ban", "bieu_mau"):
+        if goi.get(ten) is not None and not isinstance(goi[ten], list):
+            raise KhoKhongDoc(
+                f"trường {ten!r} của chỉ mục phải là mảng, nhận "
+                f"{type(goi[ten]).__name__}")
+
     van_ban: dict[str, VanBan] = {}
     for muc in goi.get("van_ban") or []:
+        if not isinstance(muc, dict):
+            continue
         so_hieu = muc.get("n") or ""
         if not so_hieu:
             continue
@@ -199,13 +210,24 @@ def doc_kho(vault: str | Path) -> Kho:
     thieu_trang = 0
     bieu_mau: list[BieuMau] = []
     for muc in goi.get("bieu_mau") or []:
+        if not isinstance(muc, dict):
+            continue
         khoa = muc.get("k") or ""
         if not khoa:
             continue
         slug = muc.get("s") or ""
         _, da_go = _drive_id_bieu_mau(muc.get("g"))
 
-        duong_dan = thu_muc_bm / f"{slug}.md" if slug else None
+        # Ghép slug vào đường dẫn sau khi đã chốt nó không thoát khỏi thư mục
+        # kho. Slug hiện do chính bộ xuất của repo này sinh ra nên lành, nhưng
+        # `du-lieu.json` là file đọc từ MỘT REPO KHÁC — ràng buộc đó nằm ngoài
+        # tầm với của module này, nên phải kiểm chứ không giả định.
+        duong_dan = None
+        if slug and "/" not in slug and "\\" not in slug and not slug.startswith("."):
+            ung = thu_muc_bm / f"{slug}.md"
+            if ung.resolve().parent == thu_muc_bm.resolve():
+                duong_dan = ung
+
         ruot = ""
         if duong_dan and duong_dan.exists():
             ruot = ruot_mau_tu_trang(duong_dan.read_text(encoding="utf-8"))

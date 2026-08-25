@@ -1006,3 +1006,59 @@ def _bai_gia(ung_vien):
         than_bai="## Khi nào cần\n\nNội dung sạch, không số hiệu.",
         citation_ok=True, model="test",
     )
+
+
+class TestChiMucMeo:
+    """`du-lieu.json` đọc từ MỘT REPO KHÁC — chỉ mục méo phải hỏng tử tế.
+
+    Ràng buộc "slug do bộ xuất của repo này sinh ra nên lành" nằm ngoài tầm với
+    của module này, nên nó phải kiểm chứ không giả định.
+    """
+
+    def _ghi_chi_muc(self, vault, goi):
+        (vault / "tro-ly" / "du-lieu.json").write_text(
+            json.dumps(goi, ensure_ascii=False), encoding="utf-8")
+
+    def test_slug_thoat_khoi_thu_muc_kho_bi_bo(self, vault):
+        """Đích phải là file THẬT SỰ TỚI ĐƯỢC, nếu không ca test chẳng chứng minh gì.
+
+        Trang biểu mẫu nằm ở <vault>/content/bieu-mau/<slug>.md, nên `../../x`
+        trỏ đúng vào <vault>/x.md — có thật, đọc được, và chỉ bị chặn nhờ chốt
+        kiểm. Nhắm vào một đường dẫn nằm ngoài tầm với thì `exists()` trả False
+        dù có chốt hay không, và mutation gỡ chốt vẫn PASS.
+        """
+        ngoai = vault / "ngoai-kho.md"
+        ngoai.write_text("## Nội dung biểu mẫu\n\n" + "x" * 900
+                         + "\n\n## Nguồn\n", encoding="utf-8")
+        assert (vault / "content" / "bieu-mau" / "../../ngoai-kho.md").exists()
+
+        goi = json.loads((vault / "tro-ly" / "du-lieu.json").read_text(encoding="utf-8"))
+        goi["bieu_mau"] = [{"s": "../../ngoai-kho", "k": "hd-x",
+                            "t": "X", "v": [], "e": "khong_ro", "c": []}]
+        self._ghi_chi_muc(vault, goi)
+        assert doc_kho(vault).bieu_mau[0].ruot_mau == ""
+
+    @pytest.mark.parametrize("goi", [
+        [1, 2, 3],
+        {"bieu_mau": {"khong": "phai mang"}},
+        {"van_ban": "chuỗi chứ không phải mảng"},
+    ])
+    def test_chi_muc_sai_kieu_nem_KhoKhongDoc(self, vault, goi):
+        from src.camnang.kho import KhoKhongDoc
+        self._ghi_chi_muc(vault, goi)
+        with pytest.raises(KhoKhongDoc):
+            doc_kho(vault)
+
+    def test_phan_tu_khong_phai_dict_bi_bo_qua_chu_khong_vo(self, vault):
+        goi = json.loads((vault / "tro-ly" / "du-lieu.json").read_text(encoding="utf-8"))
+        goi["bieu_mau"] = ["chuỗi lạc", None, 42] + goi["bieu_mau"]
+        goi["van_ban"] = [None, "lạc"] + goi["van_ban"]
+        self._ghi_chi_muc(vault, goi)
+        kho = doc_kho(vault)
+        assert len(kho.bieu_mau) == 4
+        assert kho.tra_van_ban("91/2015/QH13") is not None
+
+    def test_chi_muc_khong_doc_duoc_nem_KhoKhongDoc(self, tmp_path):
+        from src.camnang.kho import KhoKhongDoc
+        with pytest.raises(KhoKhongDoc):
+            doc_kho(tmp_path / "khong-ton-tai")
