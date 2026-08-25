@@ -34,13 +34,25 @@ TIEU_DE_MIN = 3
 TIEU_DE_MAX = 200
 MO_TA_MAX = 500
 
-#: Trần cho riêng `than_bai`. Hợp đồng đặt trần 200.000 ký tự cho TOÀN BỘ HTML
-#: một bài (hộp hiệu lực + thân bài + ruột mẫu + footer). Ruột mẫu thường vài KB
-#: nhưng có mẫu lên tới vài chục KB, và HTML nở ra so với markdown — nên chặn
-#: thân bài ở mức thấp hơn hẳn để phần còn lại luôn có chỗ. Bài đúng chuẩn
-#: 900–1.600 chữ chỉ khoảng 6–12 KB, chạm trần này nghĩa là mô hình đang chép tờ
-#: mẫu hoặc lặp vô hạn — cả hai đều phải loại, không phải cắt bớt.
+#: Trần cho riêng `than_bai`. Bài đúng chuẩn 900–1.600 chữ chỉ khoảng 6–12 KB;
+#: chạm trần này nghĩa là mô hình đang chép tờ mẫu hoặc lặp vô hạn — cả hai đều
+#: phải LOẠI, không phải cắt bớt.
 THAN_BAI_MAX = 60_000
+
+#: Trần hợp đồng cho TOÀN BỘ HTML một bài, do bên xuất bản đặt.
+TONG_HTML_MAX = 200_000
+
+#: Hệ số nở markdown → HTML. Đo thô: mỗi đoạn thêm `<p></p>`, mỗi mục danh sách
+#: thêm `<li></li>`, mỗi ô bảng thêm `<td></td>`. 1,4 là mức thận trọng cho văn
+#: xuôi có bảng; ruột tờ mẫu (bảng lồng bảng do Aspose xuất) nở mạnh hơn nên
+#: được tính riêng ở dưới.
+HE_SO_NO_HTML = 1.4
+HE_SO_NO_RUOT_MAU = 1.6
+
+#: Chỗ dành cho hộp hiệu lực (bảng "Căn cứ / Tình trạng / Văn bản thay thế") và
+#: footer nguồn + miễn trừ. Hai khối này do bên xuất bản dựng, ta không đo được
+#: nên phải trừ hụt đi một khoảng rộng rãi.
+CHO_DANH_KHOI_HE_THONG = 8_000
 
 
 def _gap(s: str) -> str:
@@ -143,11 +155,18 @@ def cong_tieu_de(tieu_de) -> KetQuaCong:
     return KetQuaCong(True)
 
 
-def cong_hop_dong(ban_ghi: dict) -> KetQuaCong:
+def cong_hop_dong(ban_ghi: dict, ruot_mau_len: int = 0) -> KetQuaCong:
     """Kiểm bản ghi có đúng §1 hợp đồng trước khi ghi ra file.
 
     Kiểm ở đây chứ không tin bên nhận kiểm hộ: bên nhận bỏ bản ghi hỏng và báo,
     nhưng lúc đó file đã giao đi và người vận hành phải chạy lại cả lượt.
+
+    `ruot_mau_len`: độ dài ruột tờ mẫu của biểu mẫu này. TRUYỀN VÀO KHI CÓ.
+    Trần thật của hợp đồng là 200.000 ký tự cho TOÀN BỘ HTML trang — thân bài
+    CỘNG ruột mẫu CỘNG hộp hiệu lực CỘNG footer. Chỉ đo thân bài rồi trừ nhẩm
+    một khoảng cố định là đoán, không phải bảo đảm: một biểu mẫu ruột mẫu 200 KB
+    vượt trần ngay cả khi thân bài hoàn toàn hợp lệ. Ta đang CẦM ruột mẫu trong
+    tay, nên đo nó chứ đừng đoán. Bỏ trống thì chỉ kiểm được trần thân bài.
     """
     khoa = chuoi_hop_le(ban_ghi.get("form_key"))
     if khoa is None:
@@ -175,6 +194,17 @@ def cong_hop_dong(ban_ghi: dict) -> KetQuaCong:
         return KetQuaCong(
             False, f"thân bài dài {len(than_bai)} ký tự, trần {THAN_BAI_MAX}"
         )
+
+    if ruot_mau_len:
+        uoc = (HE_SO_NO_HTML * len(than_bai)
+               + HE_SO_NO_RUOT_MAU * ruot_mau_len
+               + CHO_DANH_KHOI_HE_THONG)
+        if uoc > TONG_HTML_MAX:
+            return KetQuaCong(
+                False,
+                f"tổng HTML ước {uoc:,.0f} ký tự vượt trần {TONG_HTML_MAX:,} "
+                f"(thân bài {len(than_bai):,} + ruột mẫu {ruot_mau_len:,})"
+            )
 
     if ban_ghi.get("citation_ok") is not True:
         return KetQuaCong(False, "citation_ok không phải true")
@@ -244,7 +274,7 @@ def cong_trich_dan(
 
 
 __all__ = [
-    "TIEU_DE_MIN", "TIEU_DE_MAX", "MO_TA_MAX", "THAN_BAI_MAX",
+    "TIEU_DE_MIN", "TIEU_DE_MAX", "MO_TA_MAX", "THAN_BAI_MAX", "TONG_HTML_MAX",
     "KetQuaCong", "NguonTrichDan", "KhoDoiChieuHong", "chuoi_hop_le",
     "cong_tieu_de", "cong_hop_dong", "cong_trich_dan", "van_ban_doi_chieu",
 ]

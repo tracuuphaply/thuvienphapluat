@@ -211,7 +211,7 @@ def main() -> int:
             hong.append((bm.form_key, str(e)))
             continue
 
-        kq = cong.cong_hop_dong(bai.ban_ghi())
+        kq = cong.cong_hop_dong(bai.ban_ghi(), ruot_mau_len=len(bm.ruot_mau))
         if not kq:
             print(f"    BỎ: không qua hợp đồng — {kq.ly_do}")
             if not bai.citation_ok:
