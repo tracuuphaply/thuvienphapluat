@@ -54,7 +54,7 @@ npm run import:phapluat -- --dir <legal-vault-public> --generated bai.json
 | `--form-key <k>` | Chỉ sinh cho `form_key` này (lặp lại được) |
 | `--tat-ca` | Sinh lại cả biểu mẫu nguồn chưa đổi (**tốn tiền**) |
 | `--khong-toan-van` | Không tải toàn văn từ Drive — bài sẽ nông hơn |
-| `--trang-thai <file>` | Sổ `da-sinh.json` (mặc định `cam-nang/da-sinh.json`) |
+| `--trang-thai <file>` | Sổ `da-sinh.json` (mặc định `cam-nang-da-sinh.json`) |
 | `--db <file>` | SQLite đối chiếu trích dẫn. Bỏ trống = dựng từ chỉ mục vault |
 | `--model <tên>` | Ghi đè `CAM_NANG_MODEL` |
 
@@ -191,7 +191,7 @@ Chạy lại toàn bộ **không hỏng gì** bên xuất bản: `import_key` = 
 ánh xạ đúng một bài; bài đã xuất bản không bị ghi đè (trừ `--update-published`);
 slug không đổi khi tiêu đề đổi. Nhưng sinh lại thân bài bằng LLM thì **tốn tiền**.
 
-Sổ `cam-nang/da-sinh.json` giữ vân tay nguồn:
+Sổ `cam-nang-da-sinh.json` giữ vân tay nguồn:
 
 ```jsonc
 {

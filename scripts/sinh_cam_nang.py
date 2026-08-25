@@ -36,12 +36,17 @@ from src.camnang import cong
 from src.camnang.kho import KhoKhongDoc, chon_ung_vien, db_so_hieu_tu_kho, doc_kho
 from src.camnang.sinh import SinhThatBai, sinh_bai
 from src.camnang.trang_thai import DUONG_DAN_MAC_DINH, SoTrangThai
-from src.config import cam_nang_max_tokens, cam_nang_model
+from src.config import PROJECT_ROOT, cam_nang_max_tokens, cam_nang_model
 from src.rag.reports.llm import LLMUnavailable
 
 logger = logging.getLogger(__name__)
 
 MAC_DINH_LIMIT = 20
+
+#: DB đối chiếu trích dẫn là file TẠM, dựng lại được từ chỉ mục vault mỗi lượt
+#: chạy — để chung chỗ với nhớ đệm toàn văn dưới data/ (đã gitignore), không vứt
+#: ra gốc repo cạnh sổ trạng thái.
+DB_DOI_CHIEU = PROJECT_ROOT / "data" / "cam-nang" / "so-hieu-vault.db"
 
 
 def _bang_soi(kho, ung_vien) -> None:
@@ -145,8 +150,7 @@ def main() -> int:
     # trong git nên trên CI nó vắng mặt — dựng từ chỉ mục vault thì pipeline
     # chạy được ở mọi nơi có checkout, và đối chiếu đúng tập văn bản mà bên xuất
     # bản có trang để dẫn tới.
-    db_path = Path(args.db) if args.db else db_so_hieu_tu_kho(
-        kho, Path(args.trang_thai).parent / "so-hieu-vault.db")
+    db_path = Path(args.db) if args.db else db_so_hieu_tu_kho(kho, DB_DOI_CHIEU)
 
     model = args.model or cam_nang_model()
     print(f"Sinh {len(ung_vien)} bài bằng {model}…\n")

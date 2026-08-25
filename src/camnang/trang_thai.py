@@ -23,7 +23,10 @@ from src.config import PROJECT_ROOT
 
 logger = logging.getLogger(__name__)
 
-DUONG_DAN_MAC_DINH = PROJECT_ROOT / "cam-nang" / "da-sinh.json"
+#: Một FILE ở gốc repo, không phải một thư mục riêng: sổ này là thứ duy nhất
+#: của pipeline cần nằm trong git, và bọc một file vào một thư mục chỉ để nó có
+#: chỗ đứng thì thêm một tầng mà không thêm thông tin gì.
+DUONG_DAN_MAC_DINH = PROJECT_ROOT / "cam-nang-da-sinh.json"
 
 
 @dataclass

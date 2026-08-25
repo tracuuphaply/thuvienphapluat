@@ -39,7 +39,7 @@ on:
         type: boolean
         default: false
 
-# Hai lượt chạy chồng nhau sẽ cùng sửa `cam-nang/da-sinh.json` rồi đá nhau lúc
+# Hai lượt chạy chồng nhau sẽ cùng sửa `cam-nang-da-sinh.json` rồi đá nhau lúc
 # push — và tệ hơn, lượt sau không thấy bài lượt trước vừa sinh nên gọi mô hình
 # lại từ đầu.
 concurrency:
@@ -140,7 +140,7 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A cam-nang/
+          git add cam-nang-da-sinh.json
           if git diff --cached --quiet; then
             echo "Sổ không đổi"
           else

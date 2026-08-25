@@ -38,8 +38,8 @@ data/chrome_profile/
 
 # Toàn văn tải từ Drive để dựng ngữ cảnh bài Cẩm nang. Nhớ đệm thuần tuý — tải
 # lại được từ ID trong du-lieu.json, và cùng lý do như data/forms/: không thuộc
-# về git. Sổ cam-nang/da-sinh.json thì NGƯỢC LẠI, phải nằm trong git — nó là thứ
-# duy nhất đứng giữa "chạy lại được" và "chạy lại tốn tiền lần nữa".
+# về git. Sổ cam-nang-da-sinh.json ở gốc repo thì NGƯỢC LẠI, phải nằm trong git —
+# nó là thứ duy nhất đứng giữa "chạy lại được" và "chạy lại tốn tiền lần nữa".
 data/cam-nang/
 # Đầu ra bàn giao: sinh lại được từ vault + sổ trạng thái, và bản đem dùng thật
 # đi qua release asset chứ không qua git.

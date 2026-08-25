@@ -247,7 +247,7 @@ sinh lại một lượt), **hợp đồng** (đủ trường, đúng độ dài
 thiếu cờ cũng trượt), **trích dẫn** (`check_citations()` với nhóm bảo chứng dựng
 từ nguồn, không bao giờ từ đầu ra mô hình).
 
-Chạy lại chỉ sinh lại thứ đã đổi, theo vân tay nguồn trong `cam-nang/da-sinh.json`.
+Chạy lại chỉ sinh lại thứ đã đổi, theo vân tay nguồn trong `cam-nang-da-sinh.json`.
 Tự động hằng tuần qua `.github/workflows/cam-nang.yml`. Chi tiết:
 `docs/CAM_NANG_PIPELINE.md`.
 
