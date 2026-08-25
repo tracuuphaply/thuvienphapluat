@@ -77,6 +77,7 @@ Chạy tự động: `scripts/install_scheduler.sh` cài ba launchd agent — `r
 | `src/rag/` | Truy xuất lai (FTS5 + sqlite-vec + RRF), prompt, bộ sinh 3 loại báo cáo, kiểm trích dẫn |
 | `src/obsidian/` | Vault Markdown cho Obsidian cục bộ |
 | `src/publish/` | Sinh trang tra cứu công khai và link từ PDF về trang đó |
+| `src/camnang/` | Sinh thân bài Cẩm nang cho biểu mẫu, giao sang `thongtincty` qua `bai.json` |
 | `src/notification/` | Bot Telegram điều khiển báo cáo, cảnh báo lỗi |
 
 ## Điều khiển qua Telegram
@@ -226,6 +227,30 @@ của cơ sở dữ liệu thương mại thì không tự do, nên không dùng
 Cập nhật: `python -m scripts.publish_site` rồi chép `build/public-vault/content` sang
 repo kia và push.
 
+## Bài Cẩm nang cho `thongtincty`
+
+Repo này **sinh nội dung**, repo `ThongtinCty/thongtincty` **xuất bản**. Hai bên
+gặp nhau qua đúng một file JSON.
+
+```bash
+python -m scripts.sinh_cam_nang --vault ../legal-vault-public --soi    # đối chiếu kho
+python -m scripts.sinh_cam_nang --vault ../legal-vault-public --co-toan-van --limit 20
+```
+
+Mỗi bản ghi chỉ có **bốn trường nội dung** — `form_key`, `tieu_de`, `mo_ta`,
+`than_bai` — cộng cờ `citation_ok` do cổng ghi. Slug, chủ đề, hộp hiệu lực, ruột
+tờ mẫu và footer nguồn do bên kia tự dựng từ kho; sinh trùng là tạo ra bài nói
+hai lần, lệch nhau.
+
+Ba cổng chạy trước khi ghi file: **tiêu đề** (chặn tiêu đề lấy từ ruột tờ mẫu,
+sinh lại một lượt), **hợp đồng** (đủ trường, đúng độ dài, `citation_ok is True` —
+thiếu cờ cũng trượt), **trích dẫn** (`check_citations()` với nhóm bảo chứng dựng
+từ nguồn, không bao giờ từ đầu ra mô hình).
+
+Chạy lại chỉ sinh lại thứ đã đổi, theo vân tay nguồn trong `cam-nang/da-sinh.json`.
+Tự động hằng tuần qua `.github/workflows/cam-nang.yml`. Chi tiết:
+`docs/CAM_NANG_PIPELINE.md`.
+
 ## Khoá cần có
 
 | Khoá | Dùng cho | Lấy ở đâu |
@@ -255,6 +280,7 @@ repo kia và push.
 | `HUONG_DAN_CHUYEN_GIAO.md` | Bàn giao đầy đủ: kiến trúc, quy trình, cấu hình |
 | `docs/VAN_HANH.md` | Vận hành hằng ngày, sao lưu, xử lý sự cố |
 | `docs/VIEC_CAN_BAN_LAM.md` | Việc cần người vận hành tự làm |
+| `docs/CAM_NANG_PIPELINE.md` | Pipeline sinh bài Cẩm nang, hợp đồng `bai.json` nối sang `thongtincty` |
 
 ## Kiểm thử
 

@@ -217,6 +217,26 @@ def form_classifier_max_tokens() -> int:
     return int(os.getenv("FORM_CLASSIFIER_MAX_TOKENS", "600"))
 
 
+def cam_nang_model() -> str:
+    """Model sinh thân bài Cẩm nang.
+
+    Để trống = dùng REPORT_MODEL. Tách biến riêng vì bài Cẩm nang là văn xuôi
+    cho người đọc phổ thông, không phải báo cáo pháp lý — người vận hành có thể
+    muốn một model khác ở đây, và số lượt gọi bằng số biểu mẫu chứ không phải số
+    báo cáo.
+    """
+    return os.getenv("CAM_NANG_MODEL", "") or report_model()
+
+
+def cam_nang_max_tokens() -> int:
+    """Bài 900-1.600 chữ tiếng Việt cộng khối JSON bọc ngoài.
+
+    8000 là dư một khoảng an toàn: bài chạm trần bị LOẠI chứ không được cắt bớt
+    rồi giao đi, nên đặt sát quá là biến một bài viết tốt thành một bài bỏ đi.
+    """
+    return int(os.getenv("CAM_NANG_MAX_TOKENS", "8000"))
+
+
 def report_prompt_path() -> str:
     return os.getenv("REPORT_PROMPT_PATH", "")
 

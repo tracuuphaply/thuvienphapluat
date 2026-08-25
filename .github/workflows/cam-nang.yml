@@ -1,0 +1,149 @@
+# Sinh bài Cẩm nang cho biểu mẫu, đẩy `bai.json` lên release asset.
+#
+# ĐÂY LÀ NỬA A CỦA ĐƯỜNG NỐI. Nửa B nằm bên `thongtincty`: tải asset mới nhất về
+# rồi chạy `npm run import:phapluat -- --dir <vault> --generated bai.json`. Bước
+# đó cần SUPABASE_SERVICE_ROLE_KEY nên phải chạy ở nơi giữ được secret ấy —
+# không phải ở đây.
+#
+# KHÔNG TỰ ĐỘNG HOÁ BƯỚC XUẤT BẢN, ở cả hai nửa. Bộ nhập tạo bài dạng `draft`,
+# admin duyệt tay ở /admin/cam-nang rồi mới bấm Xuất bản. Đó là chốt chặn cuối
+# giữa "có nội dung" và "đăng nội dung sai lên trang public", và nó phải là người.
+#
+# XÁC THỰC. `GITHUB_TOKEN` mặc định chỉ có quyền trong repo đang chạy, nên không
+# checkout được `legal-vault-public`. Cần một fine-grained PAT đọc được cả hai
+# repo của `tracuuphaply`, lưu thành secret `VAULT_READ_TOKEN`.
+#
+# Secrets phải khai:
+#   VAULT_READ_TOKEN   PAT đọc tracuuphaply/legal-vault-public
+#   V98_API_KEY        khoá gọi mô hình (hoặc OPENAI_API_KEY)
+#   OPENAI_API_BASE    (tuỳ chọn) gateway khác mặc định
+
+name: Sinh bài Cẩm nang
+
+on:
+  schedule:
+    # 02:00 UTC thứ Hai = 09:00 giờ Việt Nam. Hằng tuần, không hằng ngày: trần
+    # sản lượng toàn hệ thống là ~150 bài/tháng và Cẩm nang chỉ chiếm phần nhỏ.
+    - cron: "0 2 * * 1"
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Số bài tối đa một lượt"
+        default: "20"
+      co_toan_van:
+        description: "Chỉ biểu mẫu có căn cứ kèm toàn văn trên Drive"
+        type: boolean
+        default: true
+      tat_ca:
+        description: "Sinh lại cả biểu mẫu nguồn chưa đổi (TỐN TIỀN)"
+        type: boolean
+        default: false
+
+# Hai lượt chạy chồng nhau sẽ cùng sửa `cam-nang/da-sinh.json` rồi đá nhau lúc
+# push — và tệ hơn, lượt sau không thấy bài lượt trước vừa sinh nên gọi mô hình
+# lại từ đầu.
+concurrency:
+  group: cam-nang
+  cancel-in-progress: false
+
+jobs:
+  sinh-bai:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # ghi lại sổ trạng thái + tạo release asset
+
+    steps:
+      - name: Checkout thuvienphapluat
+        uses: actions/checkout@v4
+
+      - name: Checkout legal-vault-public
+        uses: actions/checkout@v4
+        with:
+          repository: tracuuphaply/legal-vault-public
+          token: ${{ secrets.VAULT_READ_TOKEN }}
+          path: legal-vault-public
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cài phụ thuộc
+        # Chỉ những gói pipeline này thật sự dùng. Cài cả `pip install -e .` kéo
+        # theo playwright, matplotlib, reportlab — vài trăm MB không dùng tới.
+        run: pip install httpx sqlalchemy python-dotenv
+
+      - name: Nhớ đệm toàn văn tải từ Drive
+        # Toàn văn không đổi giữa các lượt và tải lại là vài trăm file từ Drive,
+        # đủ để bị chặn tốc độ. Key gắn run_id nên KHÔNG BAO GIỜ trúng — đó là
+        # chủ đích: mỗi lượt khôi phục bản gần nhất qua restore-keys rồi lưu ra
+        # một bản mới, nên đệm lớn dần thay vì đóng băng ở lượt đầu.
+        uses: actions/cache@v4
+        with:
+          path: data/cam-nang/toan-van
+          key: cam-nang-toan-van-${{ github.run_id }}
+          restore-keys: cam-nang-toan-van-
+
+      - name: Đối chiếu kho
+        run: |
+          python -m scripts.sinh_cam_nang --vault legal-vault-public --soi
+
+      - name: Sinh bai.json
+        env:
+          V98_API_KEY: ${{ secrets.V98_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_API_BASE: ${{ secrets.OPENAI_API_BASE }}
+          CAM_NANG_MODEL: ${{ vars.CAM_NANG_MODEL }}
+          # Dựng cờ trong shell chứ không trong biểu thức ${{ }}: lượt chạy
+          # theo LỊCH không có `inputs` nào, mà `null == false` trong biểu thức
+          # GitHub lại đúng — nên viết trong đó thì lượt theo lịch âm thầm chạy
+          # với bộ cờ ngược hẳn ý muốn.
+          LIMIT: ${{ inputs.limit }}
+          CO_TOAN_VAN: ${{ inputs.co_toan_van }}
+          TAT_CA: ${{ inputs.tat_ca }}
+        run: |
+          # if/then chứ không `[ … ] && …`: GitHub chạy khối run bằng
+          # `bash -eo pipefail`, nên một dòng `&&` sai vế trái trả mã 1 và giết
+          # cả bước dù không có gì hỏng.
+          co=()
+          if [ "$CO_TOAN_VAN" != "false" ]; then co+=(--co-toan-van); fi
+          if [ "$TAT_CA" = "true" ]; then co+=(--tat-ca); fi
+          python -m scripts.sinh_cam_nang \
+            --vault legal-vault-public \
+            --out bai.json \
+            --limit "${LIMIT:-20}" \
+            "${co[@]}"
+
+      - name: Dừng nếu không sinh được bài nào
+        # Một lượt ra 0 bài mà vẫn "xanh" là cách chắc chắn nhất để pipeline chết
+        # âm thầm hàng tháng trời — khoá API hết hạn cũng ra đúng hình ảnh đó.
+        run: |
+          so=$(python -c "import json;print(len(json.load(open('bai.json'))))")
+          echo "Sinh được $so bài"
+          if [ "$so" -eq 0 ]; then
+            echo "::warning::Không sinh được bài nào — kiểm tra khoá API và kho vault"
+          fi
+
+      - name: Đẩy lên release asset
+        # Release asset chứ không phải artifact: artifact mặc định hết hạn sau 90
+        # ngày, mà bên `thongtincty` tải bản "mới nhất" theo lịch riêng của nó.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="cam-nang-$(date -u +%Y%m%d-%H%M)"
+          gh release create "$tag" bai.json \
+            --title "Bài Cẩm nang $tag" \
+            --notes "Sinh tự động từ legal-vault-public. Nạp bằng \`npm run import:phapluat -- --dir <vault> --generated bai.json\`. Mọi bài vào dạng NHÁP, duyệt tay trước khi xuất bản."
+
+      - name: Ghi lại sổ trạng thái
+        # Sổ phải sống qua các lượt chạy, nếu không mỗi tuần lại sinh lại từ đầu
+        # đúng những bài đã có. Commit thẳng vào nhánh đang chạy.
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A cam-nang/
+          if git diff --cached --quiet; then
+            echo "Sổ không đổi"
+          else
+            git commit -m "chore: cập nhật sổ đã-sinh bài Cẩm nang"
+            git push
+          fi

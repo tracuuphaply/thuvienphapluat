@@ -21,6 +21,10 @@ KIND_TO_FILE: dict[str, str] = {
 # Mẫu cho bước ĐỌC — tóm tắt insight từng văn bản, dùng trước cả ba loại báo cáo.
 SUMMARY_FILE = "prompt_tom_tat_van_ban.md"
 
+# Mẫu sinh thân bài Cẩm nang cho một biểu mẫu — đầu vào của bộ nhập bên
+# xuất bản. Không phải "loại báo cáo": đầu ra là bài web, không có PDF.
+CAM_NANG_FILE = "prompt_cam_nang_bieu_mau.md"
+
 # Mục 9 trở đi là tài liệu cho người vận hành (hợp đồng dữ liệu, tham số API),
 # không phải chỉ dẫn cho mô hình. Mỗi mẫu tự khai chỗ cắt bằng tiêu đề này.
 _CUT_MARKERS = ("## 9. HỢP ĐỒNG DỮ LIỆU", "## 7. HỢP ĐỒNG DỮ LIỆU")
@@ -92,3 +96,20 @@ def load_summary_prompt() -> str:
         return _expand_includes(path.read_text(encoding="utf-8"))
     except OSError as e:
         raise PromptTemplateMissing(f"Không đọc được mẫu tóm tắt {path}: {e}")
+
+
+def load_cam_nang_prompt() -> str:
+    """Mẫu hệ thống cho bước SINH THÂN BÀI Cẩm nang của một biểu mẫu.
+
+    Đi qua đúng cơ chế `{{include:…}}` của báo cáo để tái dùng nguyên văn hai
+    phần dùng chung (giọng văn, điều cấm) — nhân bản chúng lần thứ tư là cách
+    chắc chắn nhất để bốn bản trôi khác nhau.
+
+    KHÔNG cắt ở `_CUT_MARKERS`: mẫu này không có khối HỢP ĐỒNG DỮ LIỆU dành cho
+    người vận hành, mọi mục trong nó đều là chỉ dẫn cho mô hình.
+    """
+    path = PROMPT_DIR / CAM_NANG_FILE
+    try:
+        return _expand_includes(path.read_text(encoding="utf-8"))
+    except OSError as e:
+        raise PromptTemplateMissing(f"Không đọc được mẫu Cẩm nang {path}: {e}")
