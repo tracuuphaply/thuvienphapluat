@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import re
+import sqlite3
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -22,6 +23,10 @@ from pathlib import Path
 from src.rag.citation_check import CitationReport, check_citations, extract_doc_nums, fold_dau
 
 logger = logging.getLogger(__name__)
+
+
+class KhoDoiChieuHong(RuntimeError):
+    """Không mở được kho để đối chiếu trích dẫn — cổng bắt buộc không chạy được."""
 
 # Ràng buộc trường, chép từ §1 hợp đồng bàn giao. Đổi ở đây là đổi hợp đồng —
 # phải báo bên xuất bản trước.
@@ -95,7 +100,21 @@ class KetQuaCong:
         return self.dat
 
 
-def cong_tieu_de(tieu_de: str) -> KetQuaCong:
+def chuoi_hop_le(gia_tri) -> str | None:
+    """Ép về chuỗi, hoặc None nếu đầu vào không phải chuỗi.
+
+    Đầu ra mô hình là JSON tuỳ ý: `"tieu_de": 123`, `"than_bai": ["a","b"]`,
+    `"mo_ta": null` đều là JSON hợp lệ. Gọi thẳng `.strip()` lên chúng ném
+    AttributeError — mà AttributeError KHÔNG phải SinhThatBai, nên nó thoát khỏi
+    mọi lớp bắt lỗi của bên gọi, giết cả lượt chạy và vứt luôn những bài đã sinh
+    thành công trước đó. Một bản ghi méo phải làm hỏng đúng một biểu mẫu.
+    """
+    if gia_tri is None:
+        return ""
+    return gia_tri if isinstance(gia_tri, str) else None
+
+
+def cong_tieu_de(tieu_de) -> KetQuaCong:
     """Từ chối tiêu đề mang dấu hiệu lấy từ ruột tờ mẫu.
 
     Đây là bản sao chủ động của cổng bên xuất bản. Nó nhân bản một quy tắc — có
@@ -103,7 +122,10 @@ def cong_tieu_de(tieu_de: str) -> KetQuaCong:
     lại được. Danh sách dấu hiệu nằm ngay trên, và mẫu prompt §5 nói lại cùng
     những dấu hiệu đó cho mô hình.
     """
-    goc = (tieu_de or "").strip()
+    tho = chuoi_hop_le(tieu_de)
+    if tho is None:
+        return KetQuaCong(False, f"tiêu đề không phải chuỗi ({type(tieu_de).__name__})")
+    goc = tho.strip()
     if len(goc) < TIEU_DE_MIN:
         return KetQuaCong(False, f"tiêu đề ngắn hơn {TIEU_DE_MIN} ký tự")
     if len(goc) > TIEU_DE_MAX:
@@ -127,20 +149,26 @@ def cong_hop_dong(ban_ghi: dict) -> KetQuaCong:
     Kiểm ở đây chứ không tin bên nhận kiểm hộ: bên nhận bỏ bản ghi hỏng và báo,
     nhưng lúc đó file đã giao đi và người vận hành phải chạy lại cả lượt.
     """
-    khoa = (ban_ghi.get("form_key") or "").strip()
-    if not khoa:
+    khoa = chuoi_hop_le(ban_ghi.get("form_key"))
+    if khoa is None:
+        return KetQuaCong(False, "form_key không phải chuỗi")
+    if not khoa.strip():
         return KetQuaCong(False, "thiếu form_key")
 
-    tieu_de = (ban_ghi.get("tieu_de") or "").strip()
-    kq = cong_tieu_de(tieu_de)
+    kq = cong_tieu_de(ban_ghi.get("tieu_de"))
     if not kq:
         return kq
 
-    mo_ta = (ban_ghi.get("mo_ta") or "").strip()
+    mo_ta = chuoi_hop_le(ban_ghi.get("mo_ta"))
+    if mo_ta is None:
+        return KetQuaCong(False, "mo_ta không phải chuỗi")
+    mo_ta = mo_ta.strip()
     if len(mo_ta) > MO_TA_MAX:
         return KetQuaCong(False, f"mo_ta dài {len(mo_ta)} ký tự, trần {MO_TA_MAX}")
 
-    than_bai = ban_ghi.get("than_bai") or ""
+    than_bai = chuoi_hop_le(ban_ghi.get("than_bai"))
+    if than_bai is None:
+        return KetQuaCong(False, "than_bai không phải chuỗi")
     if not than_bai.strip():
         return KetQuaCong(False, "thân bài rỗng")
     if len(than_bai) > THAN_BAI_MAX:
@@ -173,24 +201,50 @@ class NguonTrichDan:
         self.so_hieu.update(s for s in ds if s)
 
 
+def van_ban_doi_chieu(tieu_de: str = "", mo_ta: str = "", than_bai: str = "") -> str:
+    """Gộp MỌI trường văn bản của bản ghi để đem đi đối chiếu trích dẫn.
+
+    VÌ SAO KHÔNG CHỈ SOI `than_bai`: cả ba trường đều được đăng lên trang public.
+    `tieu_de` thành thẻ `<title>` và `<h1>`, `mo_ta` thành meta description —
+    tức là thứ hiện ra trên kết quả tìm kiếm của Google. Một số hiệu bịa nằm ở đó
+    còn dễ thấy hơn nằm giữa thân bài, mà nếu cổng chỉ soi thân bài thì bản ghi
+    ấy vẫn được đóng dấu `citation_ok: true` và đi thẳng sang bên xuất bản.
+    """
+    return "\n".join(t for t in (tieu_de, mo_ta, than_bai) if t)
+
+
 def cong_trich_dan(
-    than_bai: str,
+    van_ban: str,
     nguon: NguonTrichDan,
     db_path: Path | None = None,
 ) -> tuple[bool, CitationReport]:
     """Chạy cổng đối chiếu trích dẫn, trả về (đạt, báo cáo chi tiết).
+
+    `van_ban` phải là TOÀN BỘ phần chữ của bản ghi — dựng bằng
+    `van_ban_doi_chieu(tieu_de, mo_ta, than_bai)`, không phải riêng thân bài.
 
     MẶC ĐỊNH TỪ CHỐI. Bên xuất bản phân biệt ba trạng thái: `true` nhận, `false`
     loại vĩnh viễn, THIẾU CỜ cũng loại — vì thiếu cờ nghĩa là cổng CHƯA CHẠY,
     không phải "đã qua". Nên hàm này luôn trả về một giá trị boolean thật; bên
     gọi không được để trống trường `citation_ok`.
     """
-    bao_cao = check_citations(than_bai, db_path=db_path, extra_allowed=nguon.so_hieu)
+    try:
+        bao_cao = check_citations(van_ban, db_path=db_path,
+                                  extra_allowed=nguon.so_hieu)
+    except sqlite3.Error as e:
+        # Kho đối chiếu không mở được thì cổng KHÔNG chạy được, và cổng không
+        # chạy được nghĩa là không bài nào được đóng dấu — chứ không phải mọi
+        # bài đều qua. Ném lỗi có tên riêng để bên gọi dừng cả lượt một cách
+        # tường minh, thay vì để OperationalError thô làm vỡ giữa chừng và vứt
+        # luôn những bài đã sinh xong.
+        raise KhoDoiChieuHong(
+            f"không mở được kho đối chiếu trích dẫn ({db_path}): {e}"
+        ) from e
     return bao_cao.ok, bao_cao
 
 
 __all__ = [
     "TIEU_DE_MIN", "TIEU_DE_MAX", "MO_TA_MAX", "THAN_BAI_MAX",
-    "KetQuaCong", "NguonTrichDan",
-    "cong_tieu_de", "cong_hop_dong", "cong_trich_dan",
+    "KetQuaCong", "NguonTrichDan", "KhoDoiChieuHong", "chuoi_hop_le",
+    "cong_tieu_de", "cong_hop_dong", "cong_trich_dan", "van_ban_doi_chieu",
 ]

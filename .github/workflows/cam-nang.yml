@@ -113,9 +113,11 @@ jobs:
             --limit "${LIMIT:-20}" \
             "${co[@]}"
 
-      - name: Dừng nếu không sinh được bài nào
-        # Một lượt ra 0 bài mà vẫn "xanh" là cách chắc chắn nhất để pipeline chết
-        # âm thầm hàng tháng trời — khoá API hết hạn cũng ra đúng hình ảnh đó.
+      - name: Đếm bài sinh được
+        # KHÔNG fail khi ra 0 bài: "không có gì đổi nên không sinh gì" là trạng
+        # thái BÌNH THƯỜNG của mọi lượt theo lịch sau lượt đầu. Fail ở đó là dạy
+        # người vận hành bỏ qua màu đỏ. Chỉ cảnh báo — và bước sinh phía trên đã
+        # thoát khác 0 khi có ứng viên mà không bài nào ra được, đó mới là hỏng.
         run: |
           so=$(python -c "import json;print(len(json.load(open('bai.json'))))")
           echo "Sinh được $so bài"
@@ -143,7 +145,17 @@ jobs:
           git add cam-nang-da-sinh.json
           if git diff --cached --quiet; then
             echo "Sổ không đổi"
-          else
-            git commit -m "chore: cập nhật sổ đã-sinh bài Cẩm nang"
-            git push
+            exit 0
           fi
+          git commit -m "chore: cập nhật sổ đã-sinh bài Cẩm nang"
+          # Rebase rồi thử lại: nhánh có thể đã được đẩy tiếp trong lúc job chạy
+          # (job này mất hàng chục phút vì gọi mô hình). Push trần thất bại là
+          # MẤT SỔ — lượt sau sinh lại đúng những bài vừa trả tiền để sinh.
+          for lan in 1 2 3; do
+            if git push; then echo "Đã đẩy sổ (lần $lan)"; exit 0; fi
+            echo "Push hỏng lần $lan — rebase rồi thử lại"
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || true
+            sleep $((lan * 5))
+          done
+          echo "::error::Không đẩy được sổ trạng thái sau 3 lần — lượt sau sẽ sinh lại các bài này"
+          exit 1

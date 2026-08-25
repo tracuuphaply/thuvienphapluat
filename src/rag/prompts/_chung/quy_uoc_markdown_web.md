@@ -37,12 +37,20 @@ Không cần dòng trống ngăn giữa các khối: bộ chuyển phân loại 
 heading dính liền danh sách vẫn ra đúng cấu trúc. Vẫn nên để dòng trống cho dễ
 đọc khi soát tay.
 
-### Liên kết — phần này là lý do bài tồn tại
+### Liên kết
 
-- Link ngoài `https://…` được giữ và tự gắn `rel="nofollow noopener"
-  target="_blank"`. Chỉ trỏ tới nguồn có thật mà bạn được cung cấp trong dữ liệu
-  đầu vào; **không tự nghĩ ra URL**.
-- Đường dẫn nội bộ bắt đầu bằng `/` được giữ nguyên và truyền PageRank. Chỉ dùng
-  đường dẫn nội bộ khi dữ liệu đầu vào đưa sẵn cho bạn.
-- Mọi scheme khác (`javascript:`, `data:`) bị bỏ, link hiện thành chữ trần.
-- Trong một bài, **tối đa 3–5 liên kết**. Nhồi link không giúp gì cho người đọc.
+Bộ chuyển bên nhận có hỗ trợ liên kết, nhưng **quyền dùng nó phụ thuộc dữ liệu
+đầu vào, không phụ thuộc ý muốn của bạn**:
+
+- **Dữ liệu đầu vào KHÔNG có mục liệt kê URL hay đường dẫn cho phép → viết bài
+  KHÔNG CÓ MỘT LIÊN KẾT NÀO.** Đây là trường hợp mặc định. Không có link là
+  đúng, không phải thiếu sót, và **không ai trừ điểm bài vì nó không có link**.
+- Chỉ khi đầu vào đưa sẵn URL hoặc đường dẫn thì mới được dùng, và chỉ được dùng
+  **đúng những địa chỉ đã được đưa**, chép nguyên văn.
+- **Tuyệt đối không tự nghĩ ra URL.** Một liên kết bịa dẫn người đọc tới trang
+  404 hoặc tới trang của người khác — tệ hơn hẳn việc không có liên kết. Quy tắc
+  này giống hệt quy tắc cấm bịa số hiệu văn bản.
+- Khi được phép dùng: link ngoài `https://…` tự gắn `rel="nofollow noopener"
+  target="_blank"`; đường dẫn nội bộ bắt đầu bằng `/` được giữ nguyên; mọi scheme
+  khác (`javascript:`, `data:`) bị bỏ và link hiện thành chữ trần. Tối đa 3–5
+  liên kết một bài.

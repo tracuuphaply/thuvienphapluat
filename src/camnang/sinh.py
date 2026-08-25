@@ -37,6 +37,24 @@ TRAN_TOAN_VAN_MOI_VB = 30_000
 TRAN_RUOT_MAU = 20_000
 
 
+def _cat_mo_ta(mo_ta: str) -> str:
+    """Đưa mô tả về trong trần, cắt ở RANH GIỚI TỪ.
+
+    Khác THAN_BAI_MAX (chạm trần thì LOẠI, vì đó là dấu hiệu mô hình đang chép
+    tờ mẫu): mô tả dài 520 ký tự chỉ là hơi dài lời, và nó là meta description —
+    cắt gọn ở đó là việc bình thường, vứt cả bài thì không. Nhưng cắt cứng bằng
+    slice thì đứt giữa từ ("…trong 10 ngày làm vi"), và đó là thứ hiện nguyên
+    văn trên kết quả tìm kiếm.
+    """
+    if len(mo_ta) <= cong.MO_TA_MAX:
+        return mo_ta
+    cat = mo_ta[:cong.MO_TA_MAX]
+    lui = cat.rfind(" ")
+    if lui > cong.MO_TA_MAX // 2:
+        cat = cat[:lui]
+    return cat.rstrip(" ,;:-–—") + "…"
+
+
 class SinhThatBai(RuntimeError):
     """Không sinh được bài cho biểu mẫu này. Bỏ qua nó, không dừng cả lượt."""
 
@@ -128,10 +146,16 @@ def dung_ngu_canh(
             except KhongTaiDuoc as e:
                 logger.warning("Không lấy được toàn văn %s: %s", vb.so_hieu, e)
             else:
-                nguon.them_van_ban(text)
+                # CẮT TRƯỚC, BẢO CHỨNG SAU — thứ tự này là toàn bộ ý nghĩa của
+                # nhóm bảo chứng. Nạp bản đầy đủ rồi mới cắt cho prompt nghĩa là
+                # cổng bảo chứng cho những số hiệu nằm sau mốc cắt, tức những số
+                # mô hình CHƯA TỪNG ĐỌC — mà "mô hình chưa từng đọc mà vẫn viết
+                # ra" chính là định nghĩa của bịa.
+                text_cat = cat_gon(text, TRAN_TOAN_VAN_MOI_VB)
+                nguon.them_van_ban(text_cat)
                 dong.append("")
                 dong.append("Toàn văn:")
-                dong.append(cat_gon(text, TRAN_TOAN_VAN_MOI_VB))
+                dong.append(text_cat)
         khoi_can_cu.append("\n".join(dong))
 
     thieu_can_cu = not ung_vien.can_cu_khop
@@ -226,18 +250,33 @@ def sinh_bai(
     if not kq_tieu_de:
         raise SinhThatBai(f"cổng tiêu đề loại sau 2 lượt: {kq_tieu_de.ly_do}")
 
-    than_bai = (goi.get("than_bai") or "").strip()
+    tb = cong.chuoi_hop_le(goi.get("than_bai"))
+    if tb is None:
+        raise SinhThatBai(
+            f"than_bai không phải chuỗi ({type(goi.get('than_bai')).__name__})")
+    than_bai = tb.strip()
     if not than_bai:
         raise SinhThatBai("mô hình trả thân bài rỗng")
 
-    dat, bao_cao = cong.cong_trich_dan(than_bai, nguon, db_path=db_path)
+    mt = cong.chuoi_hop_le(goi.get("mo_ta"))
+    if mt is None:
+        raise SinhThatBai(
+            f"mo_ta không phải chuỗi ({type(goi.get('mo_ta')).__name__})")
+    mo_ta = _cat_mo_ta(re.sub(r"\s+", " ", mt.strip()))
+
+    # Đối chiếu TOÀN BỘ phần chữ, không riêng thân bài: tiêu đề thành <title> và
+    # mô tả thành meta description — số hiệu bịa nằm đó còn hiện ra trên trang
+    # kết quả Google, dễ thấy hơn nằm giữa bài.
+    tieu_de = (cong.chuoi_hop_le(goi.get("tieu_de")) or "").strip()
+    dat, bao_cao = cong.cong_trich_dan(
+        cong.van_ban_doi_chieu(tieu_de, mo_ta, than_bai), nguon, db_path=db_path)
     if not dat:
         logger.warning("[%s] cổng trích dẫn: %s", bm.form_key, bao_cao.summary())
 
     return BaiSinhRa(
         form_key=bm.form_key,
-        tieu_de=(goi.get("tieu_de") or "").strip(),
-        mo_ta=re.sub(r"\s+", " ", (goi.get("mo_ta") or "").strip())[:cong.MO_TA_MAX],
+        tieu_de=tieu_de,
+        mo_ta=mo_ta,
         than_bai=than_bai,
         citation_ok=dat,
         so_hieu_la=list(bao_cao.missing),

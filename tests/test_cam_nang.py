@@ -63,12 +63,25 @@ def vault(tmp_path):
              "t": "Bộ luật Dân sự", "e": "con_hieu_luc", "g": "DRIVEID12345"},
             {"s": "nghi-dinh-301-2026-nd-cp", "n": "301/2026/NĐ-CP",
              "t": "Nghị định 301", "e": "con_hieu_luc"},
+            {"s": "qd-47-2026", "n": "47/2026/QĐ-UBND",
+             "t": "Quyết định 47", "e": "con_hieu_luc"},
         ],
         "bieu_mau": [
             {"s": "bm-tvpl-101", "k": "hopdong-101", "t": "HỢP ĐỒNG LÀM GIA SƯ",
              "v": ["hop_dong"], "e": "con_hieu_luc", "c": ["91/2015/QH13"]},
             {"s": "bm-tvpl-102", "k": "hopdong-102", "t": "HỢP ĐỒNG MƯỢN TÀI SẢN",
              "v": ["hop_dong"], "e": "khong_ro", "c": []},
+            # Hai căn cứ KHỚP KHO nhưng KHÔNG căn cứ nào có toàn văn. Không có
+            # bản ghi kiểu này thì test thứ tự ưu tiên đúng với mọi trọng số
+            # dương — tức là không kiểm được gì.
+            {"s": "bm-tvpl-103", "k": "hopdong-103", "t": "HỢP ĐỒNG THUÊ NHÀ",
+             "v": ["lao_dong"], "e": "khong_ro",
+             "c": ["301/2026/NĐ-CP", "47/2026/QĐ-UBND"]},
+            # `g` là CHUỖI ID Drive, không phải cờ gỡ. Nhánh này của
+            # _drive_id_bieu_mau chưa từng chạy trong bộ test cũ.
+            {"s": "bm-tvpl-104", "k": "hopdong-104", "t": "HỢP ĐỒNG VẬN CHUYỂN",
+             "v": ["hop_dong"], "e": "con_hieu_luc", "c": [],
+             "g": "1AbCdEfGhIjKlMnO"},
         ],
     }
     (tmp_path / "tro-ly").mkdir()
@@ -76,8 +89,8 @@ def vault(tmp_path):
         json.dumps(goi, ensure_ascii=False), encoding="utf-8")
     bm_dir = tmp_path / "content" / "bieu-mau"
     bm_dir.mkdir(parents=True)
-    (bm_dir / "bm-tvpl-101.md").write_text(_trang_bieu_mau(), encoding="utf-8")
-    (bm_dir / "bm-tvpl-102.md").write_text(_trang_bieu_mau(), encoding="utf-8")
+    for slug in ("bm-tvpl-101", "bm-tvpl-102", "bm-tvpl-103", "bm-tvpl-104"):
+        (bm_dir / f"{slug}.md").write_text(_trang_bieu_mau(), encoding="utf-8")
     return tmp_path
 
 
@@ -102,7 +115,7 @@ def _llm_gia(tieu_de="Hợp đồng làm gia sư: 7 chỗ hở cần vá trướ
     ds = []
 
     def goi(he_thong, nguoi_dung, model="", max_tokens=0):
-        ds.append((he_thong, nguoi_dung))
+        ds.append((he_thong, nguoi_dung, model, max_tokens))
         i = min(len(ds) - 1, len(tieu_de_ds) - 1) if isinstance(tieu_de, list) else 0
         td = tieu_de_ds[i] if isinstance(tieu_de, list) else tieu_de
         return LLMResult(
@@ -324,7 +337,7 @@ class TestVanTayNguon:
 class TestDocKho:
     def test_doc_du_hai_nguon(self, vault):
         kho = doc_kho(vault)
-        assert len(kho.bieu_mau) == 2
+        assert len(kho.bieu_mau) == 4
         assert kho.tra_van_ban("91/2015/QH13").tieu_de == "Bộ luật Dân sự"
         assert kho.theo_khoa()["hopdong-101"].co_ruot_mau
 
@@ -465,3 +478,340 @@ class TestPrompt:
         t = load_cam_nang_prompt()
         for k in ["Slug", "hộp hiệu lực", "Ruột tờ mẫu", "footer"]:
             assert k.lower() in t.lower(), k
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CÁC LỚP DƯỚI ĐÂY RA ĐỜI TỪ MỘT ĐỢT MUTATION TESTING.
+#
+# Bộ test cũ có 61 ca và PASS hết, nhưng phá code theo tám cách khác nhau thì nó
+# vẫn PASS: xoá ruột mẫu khỏi vân tay nguồn, đảo trọng số chọn ứng viên, nối
+# nhầm sang mẫu prompt báo cáo, bỏ hai bộ lọc của chon_ung_vien, dựng DB đối
+# chiếu rỗng, bỏ phép cắt mô tả, và cả toan_van.py không có lấy một ca.
+#
+# "61 test pass" không phải bằng chứng nếu không test nào chết khi code sai.
+# Mỗi ca dưới đây được viết bằng cách phá code trước, rồi viết ca bắt được nó.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestCongTrichDanPhuHetTruong:
+    """Số hiệu bịa ở BẤT KỲ trường nào cũng phải chặn, không riêng thân bài.
+
+    Tiêu đề thành <title> và <h1>, mô tả thành meta description — tức là thứ
+    hiện trên trang kết quả Google. Cổng chỉ soi thân bài thì số bịa ở hai chỗ
+    kia vẫn được đóng dấu citation_ok:true và đi thẳng sang bên xuất bản.
+    """
+
+    def test_so_hieu_bia_trong_tieu_de_bi_chan(self, vault, docs_db):
+        kho = doc_kho(vault)
+        bai = sinh_bai(
+            chon_ung_vien(kho)[0], kho, tai_toan_van_ve=False, db_path=docs_db,
+            goi_llm=_llm_gia(tieu_de="Hợp đồng theo Nghị định 999/2099/NĐ-CP là gì",
+                             than_bai="## Mục\n\nThân bài sạch, không số hiệu."),
+        )
+        assert bai.citation_ok is False
+        assert not cong.cong_hop_dong(bai.ban_ghi())
+
+    def test_so_hieu_bia_trong_mo_ta_bi_chan(self, vault, docs_db):
+        kho = doc_kho(vault)
+        bai = sinh_bai(
+            chon_ung_vien(kho)[0], kho, tai_toan_van_ve=False, db_path=docs_db,
+            goi_llm=_llm_gia(mo_ta="Căn cứ Thông tư 888/2099/TT-BTC, bạn phải nộp.",
+                             than_bai="## Mục\n\nThân bài sạch, không số hiệu."),
+        )
+        assert bai.citation_ok is False
+
+    def test_van_ban_doi_chieu_gop_du_ba_truong(self):
+        gop = cong.van_ban_doi_chieu("A", "B", "C")
+        assert "A" in gop and "B" in gop and "C" in gop
+
+    def test_kho_doi_chieu_hong_thi_nem_loi_co_ten(self, tmp_path):
+        """Không mở được kho ≠ mọi bài đều qua. Cổng không chạy được thì phải nói ra."""
+        with pytest.raises(cong.KhoDoiChieuHong):
+            cong.cong_trich_dan("Theo 91/2015/QH13", cong.NguonTrichDan(),
+                                db_path=tmp_path / "khong-co.db")
+
+
+class TestDauRaMoHinhMeo:
+    """Giá trị không phải chuỗi trong JSON của mô hình chỉ được hỏng MỘT biểu mẫu.
+
+    Trước đây `.strip()` gọi thẳng lên chúng ném AttributeError — mà
+    AttributeError không phải SinhThatBai nên nó thoát khỏi mọi lớp bắt lỗi của
+    CLI, giết cả lượt chạy và vứt luôn những bài đã sinh xong trước đó.
+    """
+
+    @pytest.mark.parametrize("xau", [123, ["a"], {"a": 1}, True])
+    def test_tieu_de_khong_phai_chuoi_bi_loai_chu_khong_no(self, xau):
+        kq = cong.cong_tieu_de(xau)
+        assert not kq and "không phải chuỗi" in kq.ly_do
+
+    @pytest.mark.parametrize("khoa", ["tieu_de", "mo_ta", "than_bai", "form_key"])
+    def test_hop_dong_loai_moi_truong_khong_phai_chuoi(self, khoa):
+        ban = {"form_key": "k", "tieu_de": "Hợp đồng gia sư: 7 chỗ hở",
+               "mo_ta": "x", "than_bai": "## A\n\nB", "citation_ok": True}
+        ban[khoa] = {"khong": "phai chuoi"}
+        assert not cong.cong_hop_dong(ban)
+
+    @pytest.mark.parametrize("khoa", ["than_bai", "mo_ta"])
+    def test_sinh_bai_nem_SinhThatBai_chu_khong_AttributeError(
+            self, vault, docs_db, khoa):
+        kho = doc_kho(vault)
+
+        def goi(he_thong, nguoi_dung, model="", max_tokens=0):
+            goi_ra = {"tieu_de": "Hợp đồng gia sư: 7 chỗ hở",
+                      "mo_ta": "x", "than_bai": "## A\n\nB"}
+            goi_ra[khoa] = 12345
+            return LLMResult(text=json.dumps(goi_ra, ensure_ascii=False),
+                             truncated=False, model="t")
+
+        with pytest.raises(SinhThatBai, match="không phải chuỗi"):
+            sinh_bai(chon_ung_vien(kho)[0], kho, tai_toan_van_ve=False,
+                     db_path=docs_db, goi_llm=goi)
+
+
+class TestNhomBaoChungKhopVoiThuMoHinhDoc:
+    """Nhóm bảo chứng chỉ được gồm số hiệu mô hình THẬT SỰ đọc được.
+
+    Nạp toàn văn đầy đủ rồi mới cắt cho prompt nghĩa là cổng bảo chứng cho số
+    hiệu nằm sau mốc cắt — số mô hình chưa từng đọc mà vẫn viết ra, tức là bịa.
+    """
+
+    def test_toan_van_duoc_cat_TRUOC_khi_bao_chung(self, vault, monkeypatch):
+        from src.camnang import sinh as mod
+
+        dai = ("Điều 1. Nội dung không có số hiệu nào.\n" * 4000
+               + "Số hiệu nằm sau mốc cắt: 777/2099/NĐ-CP\n")
+        assert len(dai) > mod.TRAN_TOAN_VAN_MOI_VB
+        monkeypatch.setattr(mod, "tai_toan_van", lambda *a, **k: dai)
+
+        kho = doc_kho(vault)
+        u = next(u for u in chon_ung_vien(kho) if u.co_toan_van)
+        ngu_canh, nguon = mod.dung_ngu_canh(u, kho, tai_toan_van_ve=True)
+
+        assert "777/2099/NĐ-CP" not in ngu_canh        # mô hình không đọc được
+        assert "777/2099/NĐ-CP" not in nguon.so_hieu   # nên cũng không bảo chứng
+
+    def test_toan_van_trong_phan_cat_THI_duoc_bao_chung(self, vault, monkeypatch):
+        from src.camnang import sinh as mod
+        monkeypatch.setattr(mod, "tai_toan_van",
+                            lambda *a, **k: "Thay thế Nghị định 18/2016/NĐ-CP.")
+        kho = doc_kho(vault)
+        u = next(u for u in chon_ung_vien(kho) if u.co_toan_van)
+        ngu_canh, nguon = mod.dung_ngu_canh(u, kho, tai_toan_van_ve=True)
+        assert "18/2016/NĐ-CP" in ngu_canh
+        assert "18/2016/NĐ-CP" in nguon.so_hieu
+
+
+class TestDbDoiChieuTuVault:
+    """db_so_hieu_tu_kho là kho đối chiếu MẶC ĐỊNH — nó rỗng thì cổng chặn sạch."""
+
+    def test_db_dung_tu_vault_tra_ra_dung_so_hieu(self, vault, tmp_path):
+        from src.camnang.kho import db_so_hieu_tu_kho
+        kho = doc_kho(vault)
+        db = db_so_hieu_tu_kho(kho, tmp_path / "sh.db")
+
+        import sqlite3
+        conn = sqlite3.connect(str(db))
+        so = {r[0] for r in conn.execute("SELECT doc_num FROM documents")}
+        conn.close()
+        assert so == {vb.so_hieu for vb in kho.van_ban.values()}
+        assert len(so) == 3
+
+    def test_cong_trich_dan_dung_duoc_db_tu_vault(self, vault, tmp_path):
+        from src.camnang.kho import db_so_hieu_tu_kho
+        db = db_so_hieu_tu_kho(doc_kho(vault), tmp_path / "sh.db")
+        assert cong.cong_trich_dan("Theo 91/2015/QH13 …",
+                                   cong.NguonTrichDan(), db_path=db)[0]
+        assert not cong.cong_trich_dan("Theo 999/2099/NĐ-CP …",
+                                       cong.NguonTrichDan(), db_path=db)[0]
+
+
+class TestToanVan:
+    """toan_van.py trước đây không có một ca nào — cat_gon trả rỗng vẫn PASS."""
+
+    def test_cat_gon_giu_nguyen_khi_ngan(self):
+        from src.camnang.toan_van import cat_gon
+        assert cat_gon("ngắn", 100) == "ngắn"
+
+    def test_cat_gon_cat_o_ranh_gioi_dong(self):
+        from src.camnang.toan_van import cat_gon
+        goc = "\n".join(f"dòng {i} có nội dung dài vừa phải" for i in range(200))
+        ra = cat_gon(goc, 500)
+        assert len(ra) < len(goc)
+        assert "đã bị cắt" in ra
+        than = ra.split("\n\n[…")[0]
+        assert goc.startswith(than)              # phần giữ lại là tiền tố thật
+        assert not than.endswith("dòng")         # không đứt giữa dòng
+
+    def test_tai_toan_van_thieu_id_thi_nem(self):
+        from src.camnang.toan_van import KhongTaiDuoc, tai_toan_van
+        with pytest.raises(KhongTaiDuoc):
+            tai_toan_van("")
+
+    def test_toan_van_qua_ngan_bi_tu_choi(self, tmp_path, monkeypatch):
+        """Trang lỗi của Drive cũng là HTML 200 OK — ghi nó vào đệm rồi gọi là
+        toàn văn thì bịt mất dấu hiệu còn thiếu."""
+        from src.camnang import toan_van as mod
+        monkeypatch.setattr(mod, "_tai_html_tho", lambda i: "<html><body>x</body></html>")
+        with pytest.raises(mod.KhongTaiDuoc, match="không phải văn bản thật"):
+            mod.tai_toan_van("ID12345678", thu_muc_dem=tmp_path)
+
+    def test_nho_dem_khong_tai_lai(self, tmp_path, monkeypatch):
+        from src.camnang import toan_van as mod
+        dem = tmp_path / "d"; dem.mkdir()
+        (dem / "ID12345678.md").write_text("đã có sẵn", encoding="utf-8")
+
+        def khong_duoc_goi(i):
+            raise AssertionError("đã có trong đệm mà vẫn tải lại")
+
+        monkeypatch.setattr(mod, "_tai_html_tho", khong_duoc_goi)
+        assert mod.tai_toan_van("ID12345678", thu_muc_dem=dem) == "đã có sẵn"
+
+
+class TestNoiDayPromptVaThamSo:
+    """Nối nhầm sang mẫu prompt báo cáo, hoặc mất pass-through model, phải bị bắt."""
+
+    def test_prompt_gui_di_dung_la_mau_cam_nang(self, vault, docs_db):
+        goi = _llm_gia()
+        kho = doc_kho(vault)
+        sinh_bai(chon_ung_vien(kho)[0], kho, tai_toan_van_ve=False,
+                 db_path=docs_db, goi_llm=goi)
+        he_thong = goi.loi_goi[0][0]
+        assert "QUY ƯỚC MARKDOWN (bài đăng web" in he_thong
+        assert "ĐIỀU CẤM" in he_thong
+        assert "### CHƯƠNG I" not in he_thong        # không phải mẫu báo cáo PDF
+
+    def test_model_va_max_tokens_duoc_truyen_xuong(self, vault, docs_db):
+        goi = _llm_gia()
+        kho = doc_kho(vault)
+        sinh_bai(chon_ung_vien(kho)[0], kho, tai_toan_van_ve=False,
+                 db_path=docs_db, goi_llm=goi, model="model-thu", max_tokens=1234)
+        assert goi.loi_goi[0][2] == "model-thu"
+        assert goi.loi_goi[0][3] == 1234
+
+    def test_ruot_to_mau_that_su_nam_trong_prompt(self, vault):
+        """Ba assert cũ đều thoả bằng phần header, ruột mẫu rỗng vẫn PASS."""
+        kho = doc_kho(vault)
+        ngu_canh, _ = dung_ngu_canh(chon_ung_vien(kho)[0], kho,
+                                    tai_toan_van_ve=False)
+        rieng_cua_ruot = "Điều 2. Thù lao và phương thức thanh toán"
+        assert rieng_cua_ruot in ngu_canh
+        assert ngu_canh.index("RUỘT TỜ MẪU") < ngu_canh.index(rieng_cua_ruot)
+
+
+class TestVanTayNguonDayDu:
+    """Vân tay phải đổi khi BẤT KỲ thành phần nào đổi — kể cả hai thành phần
+
+    mà docstring nói là lý do nó tồn tại, nhưng bộ cũ lại không test."""
+
+    def _bm(self, **ghi_de) -> BieuMau:
+        goc = dict(form_key="hd-1", slug="s", tieu_de="HỢP ĐỒNG",
+                   hieu_luc="con_hieu_luc", can_cu=["91/2015/QH13"],
+                   ruot_mau=RUOT_MAU_MAU)
+        goc.update(ghi_de)
+        return BieuMau(**goc)
+
+    def test_ruot_mau_doi_thi_hash_doi(self):
+        assert self._bm().nguon_hash() != self._bm(ruot_mau="khác hẳn").nguon_hash()
+
+    def test_tieu_de_doi_thi_hash_doi(self):
+        assert self._bm().nguon_hash() != self._bm(tieu_de="TÊN KHÁC").nguon_hash()
+
+    def test_so_ghi_citation_false_song_qua_vong_ghi_doc(self, tmp_path):
+        """Bộ cũ chỉ hỏi trong bộ nhớ; đọc lại từ đĩa mà coi là đạt vẫn PASS."""
+        duong_dan = tmp_path / "s.json"
+        so = SoTrangThai(duong_dan)
+        so.ghi_nhan("hd-1", "HASH", citation_ok=False)
+        so.luu()
+        assert SoTrangThai(duong_dan).can_sinh_lai("hd-1", "HASH")
+
+
+class TestChonUngVienDayDu:
+    """Trọng số điểm và hai bộ lọc — bộ cũ xoá đi vẫn PASS."""
+
+    def test_toan_van_an_diem_cao_hon_can_cu_khong_toan_van(self, vault):
+        """hopdong-103 có 2 căn cứ khớp kho nhưng không toàn văn;
+        hopdong-101 chỉ 1 căn cứ nhưng CÓ toàn văn — 101 phải đứng trên."""
+        ds = chon_ung_vien(doc_kho(vault))
+        thu_tu = [u.bieu_mau.form_key for u in ds]
+        assert thu_tu.index("hopdong-101") < thu_tu.index("hopdong-103")
+        diem = {u.bieu_mau.form_key: u.diem for u in ds}
+        assert diem["hopdong-101"] > diem["hopdong-103"]
+
+    def test_loc_nghiep_vu(self, vault):
+        kho = doc_kho(vault)
+        ra = {u.bieu_mau.form_key for u in chon_ung_vien(kho, nghiep_vu="lao_dong")}
+        assert ra == {"hopdong-103"}
+        assert chon_ung_vien(kho, nghiep_vu="khong_co_nhom_nay") == []
+
+    def test_loc_hieu_luc(self, vault):
+        kho = doc_kho(vault)
+        ra = {u.bieu_mau.form_key
+              for u in chon_ung_vien(kho, hieu_luc="con_hieu_luc")}
+        assert ra == {"hopdong-101", "hopdong-104"}
+
+    def test_g_la_chuoi_ID_Drive_KHONG_bi_hieu_la_da_go(self, vault):
+        """`g` mang hai nghĩa. Nhánh chuỗi-ID trước đây chưa từng chạy."""
+        ds = {u.bieu_mau.form_key for u in chon_ung_vien(doc_kho(vault))}
+        assert "hopdong-104" in ds
+
+    @pytest.mark.parametrize("gia_tri,mong_doi", [
+        (1, ("", True)), ("1", ("", True)), (True, ("", True)),
+        ("1AbCdEfGhIjKlMnO", ("1AbCdEfGhIjKlMnO", False)),
+        (None, ("", False)), ("ngắn", ("", False)),
+    ])
+    def test_drive_id_bieu_mau(self, gia_tri, mong_doi):
+        from src.camnang.kho import _drive_id_bieu_mau
+        assert _drive_id_bieu_mau(gia_tri) == mong_doi
+
+
+class TestHopDongNoiVoiCongTieuDe:
+    """Gỡ cong_tieu_de khỏi cong_hop_dong, bộ cũ vẫn PASS — không ca nào nối hai cổng."""
+
+    def _ban_ghi(self, **ghi_de):
+        goc = {"form_key": "hd-1", "tieu_de": "Hợp đồng gia sư: 7 chỗ hở",
+               "mo_ta": "x", "than_bai": "## A\n\nB", "citation_ok": True}
+        goc.update(ghi_de)
+        return goc
+
+    def test_tieu_de_kieu_ruot_mau_bi_hop_dong_loai(self):
+        assert not cong.cong_hop_dong(
+            self._ban_ghi(tieu_de="CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"))
+        assert not cong.cong_hop_dong(self._ban_ghi(tieu_de="Mẫu số 01-ĐK-TCT"))
+
+    def test_tieu_de_qua_dai_bi_hop_dong_loai(self):
+        assert not cong.cong_hop_dong(self._ban_ghi(tieu_de="A" * 201))
+
+    def test_tran_than_bai_neo_bang_so_tuyet_doi(self):
+        """Dùng chính hằng số làm dữ liệu thì nới hằng số lên 200.000 vẫn PASS."""
+        assert cong.THAN_BAI_MAX <= 60_000
+        assert not cong.cong_hop_dong(self._ban_ghi(than_bai="x" * 60_001))
+
+
+class TestCatMoTa:
+    """Mô tả quá dài phải gọn lại ở RANH GIỚI TỪ, không đứt giữa chữ."""
+
+    def test_mo_ta_dai_duoc_cat_ve_trong_tran(self, vault, docs_db):
+        kho = doc_kho(vault)
+        dai = " ".join(["doanhnghiepphainoptrongmuoingaylamviec"] * 40)
+        bai = sinh_bai(chon_ung_vien(kho)[0], kho, tai_toan_van_ve=False,
+                       db_path=docs_db, goi_llm=_llm_gia(mo_ta=dai))
+        assert len(bai.mo_ta) <= cong.MO_TA_MAX
+        assert cong.cong_hop_dong(bai.ban_ghi())
+
+    def test_khong_cat_giua_tu(self, vault, docs_db):
+        kho = doc_kho(vault)
+        dai = ("Doanh nghiệp phải nộp báo cáo lao động trước ngày 15 tháng 01 "
+               "mỗi năm theo quy định hiện hành. ") * 12
+        bai = sinh_bai(chon_ung_vien(kho)[0], kho, tai_toan_van_ve=False,
+                       db_path=docs_db, goi_llm=_llm_gia(mo_ta=dai))
+        assert len(bai.mo_ta) <= cong.MO_TA_MAX
+        assert bai.mo_ta.endswith("…")
+        # phần trước dấu … phải là một tiền tố kết thúc đúng ranh giới từ
+        than = bai.mo_ta[:-1].rstrip(" ,;:-–—")
+        assert dai.startswith(than), "cắt giữa từ"
+
+    def test_mo_ta_ngan_giu_nguyen(self, vault, docs_db):
+        kho = doc_kho(vault)
+        bai = sinh_bai(chon_ung_vien(kho)[0], kho, tai_toan_van_ve=False,
+                       db_path=docs_db, goi_llm=_llm_gia(mo_ta="Ngắn gọn."))
+        assert bai.mo_ta == "Ngắn gọn."

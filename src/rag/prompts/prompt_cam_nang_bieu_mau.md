@@ -70,9 +70,10 @@ không viết một chữ nào giải thích vì sao thiếu.
 Độ dài mục tiêu: **900–1.600 chữ**. Ngắn hơn thì không đủ dùng; dài hơn thì
 thường là đang chép tờ mẫu hoặc đang nói vòng.
 
-Khi dữ liệu đầu vào có `noi_dung_chinh`, `nghia_vu_moi`, `moc_thoi_gian`,
-`che_tai` rút từ toàn văn văn bản căn cứ — dùng chúng làm nguyên liệu cho mục 2,
-4, 5 và 6. Đó là chỗ duy nhất bạn được lấy nội dung điều khoản.
+Khi phần **VĂN BẢN CĂN CỨ** trong dữ liệu đầu vào có mục `Toàn văn:` — dùng
+chính nó làm nguyên liệu cho mục 2, 4, 5 và 6. **Đó là chỗ duy nhất bạn được lấy
+nội dung điều khoản.** Không có mục `Toàn văn:` thì không có điều khoản nào để
+trích; xem §4.
 
 ---
 
@@ -127,14 +128,31 @@ Không lặp lại nguyên văn tiêu đề.
 
 {{include:_chung/dieu_cam_va_checklist.md}}
 
-### Điều chỉnh riêng cho bài Cẩm nang
+### Điều chỉnh riêng cho bài Cẩm nang — ĐỌC KỸ, PHẦN NÀY GỠ MÂU THUẪN
 
-Phần điều cấm phía trên viết cho báo cáo gửi khách. Với bài Cẩm nang, ba mục
-checklist về "bảng lộ trình tuân thủ", "danh mục tham chiếu", "tuyên bố miễn
-trách nhiệm" và "mỗi chương đủ 4 khối" **không áp dụng** — footer miễn trừ do hệ
-thống dựng, còn cấu trúc bài theo §3 ở trên. Mọi điều **cấm** thì áp dụng
-nguyên vẹn, đặc biệt là cấm bịa số hiệu: mọi số hiệu bạn viết ra đều bị đối
-chiếu máy móc với kho sau khi bạn trả kết quả, và bài có số hiệu lạ bị loại.
+Hai phần dùng chung phía trên viết cho **báo cáo pháp lý gửi khách**, không phải
+cho bài Cẩm nang. Những mục sau **không áp dụng** ở đây:
+
+1. `danh_sach_van_ban` — tên một trường dữ liệu của quy trình báo cáo. Nó
+   **không tồn tại** trong dữ liệu bạn nhận. Nguồn số hiệu hợp lệ của bạn là
+   phần **VĂN BẢN CĂN CỨ**, và chỉ nó.
+2. "Bảng lộ trình tuân thủ", "danh mục tham chiếu", "tuyên bố miễn trách nhiệm",
+   "mỗi chương đủ 4 khối" — không viết. Footer miễn trừ do hệ thống dựng, cấu
+   trúc bài theo §3.
+3. **"Mỗi nhận định phải gắn với ít nhất một dẫn chiếu điều khoản cụ thể."**
+   Luật này ở phần văn phong chỉ áp dụng **khi dữ liệu đầu vào có mục
+   `Toàn văn:`**. Với biểu mẫu không rõ căn cứ (§4), nó **bị vô hiệu hoàn toàn**:
+   ở đó **không có** điều khoản nào để dẫn, và bài đúng là bài **không trích một
+   số hiệu nào**.
+
+> ⚠ Nếu bạn thấy mình đang phân vân giữa "phải dẫn điều khoản" và "không có căn
+> cứ để dẫn" — câu trả lời LUÔN là **không dẫn gì cả**. Bịa một số hiệu để thoả
+> mãn một quy tắc hình thức là lỗi nghiêm trọng nhất có thể mắc trong hệ thống
+> này. Thà bài không có dẫn chiếu nào còn hơn có một dẫn chiếu sai.
+
+Mọi điều **cấm** thì áp dụng nguyên vẹn, đặc biệt là cấm bịa số hiệu: mọi số
+hiệu bạn viết ra — trong tiêu đề, mô tả lẫn thân bài — đều bị đối chiếu máy móc
+với kho sau khi bạn trả kết quả, và bài có số hiệu lạ bị loại.
 
 ---
 

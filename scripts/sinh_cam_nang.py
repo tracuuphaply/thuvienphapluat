@@ -49,6 +49,21 @@ MAC_DINH_LIMIT = 20
 DB_DOI_CHIEU = PROJECT_ROOT / "data" / "cam-nang" / "so-hieu-vault.db"
 
 
+def _ghi_dau_ra(duong_dan: Path, ban_ghi: list[dict]) -> Path:
+    """Ghi ĐÚNG mảng ở gốc, dạng chính của §1 hợp đồng.
+
+    Không thêm khối metadata bọc ngoài: bên nhận đọc được cả `{bai:[…]}` lẫn
+    `{data:[…]}`, nhưng một khoá lạ nằm cạnh thì không có gì bảo đảm nó được bỏ
+    qua. Một hàm dùng chung cho mọi đường ra, kể cả đường "không có gì để sinh" —
+    hai chỗ ghi khác nhau là hai chỗ để quên mất một chỗ.
+    """
+    duong_dan.parent.mkdir(parents=True, exist_ok=True)
+    duong_dan.write_text(
+        json.dumps(ban_ghi, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    return duong_dan
+
+
 def _bang_soi(kho, ung_vien) -> None:
     """In đối chiếu kho — biểu mẫu nào viết được bài sâu, nhóm nào chỉ soi mẫu."""
     co_toan_van = sum(1 for u in ung_vien if u.co_toan_van)
@@ -105,6 +120,12 @@ def main() -> int:
                          "Bỏ trống = dựng từ chính chỉ mục vault")
     args = ap.parse_args()
 
+    # `--limit -1` không phải "không giới hạn": `ds[:-1]` sinh TẤT CẢ TRỪ biểu
+    # mẫu cuối. Trần sản lượng mà fail-open thì đúng là thứ nó tồn tại để chặn.
+    if args.limit < 1:
+        print(f"LỖI: --limit phải >= 1 (nhận {args.limit}).", file=sys.stderr)
+        return 2
+
     try:
         kho = doc_kho(args.vault)
     except KhoKhongDoc as e:
@@ -143,7 +164,13 @@ def main() -> int:
 
     ung_vien = ung_vien[:args.limit]
     if not ung_vien:
+        # GHI FILE RỖNG chứ không thoát tay không. "Không có gì đổi" là trạng
+        # thái BÌNH THƯỜNG của mọi lượt chạy theo lịch sau lượt đầu — thoát mà
+        # không để lại file khiến bước kế tiếp (`json.load(bai.json)`) vỡ bằng
+        # FileNotFoundError đúng ở đường chạy hay gặp nhất.
+        _ghi_dau_ra(Path(args.out), [])
         print("Không có biểu mẫu nào cần sinh bài. Dùng --tat-ca để sinh lại.")
+        print(f"Đã ghi mảng rỗng vào {args.out}.")
         return 0
 
     # Cổng trích dẫn phải có kho để đối chiếu. `data/legal_docs.db` không nằm
@@ -170,9 +197,12 @@ def main() -> int:
                 model=model,
                 max_tokens=cam_nang_max_tokens(),
             )
-        except LLMUnavailable as e:
-            # Không có mô hình thì mọi biểu mẫu còn lại cũng hỏng như nhau —
-            # chạy tiếp chỉ in ra n dòng lỗi giống hệt nhau.
+        except (LLMUnavailable, cong.KhoDoiChieuHong) as e:
+            # Không có mô hình, hoặc không mở được kho đối chiếu — cả hai đều là
+            # hỏng TOÀN CỤC: mọi biểu mẫu còn lại sẽ hỏng y hệt, chạy tiếp chỉ in
+            # ra n dòng lỗi giống nhau. Dừng vòng lặp chứ KHÔNG để lỗi thoát ra
+            # ngoài: những bài đã sinh xong trước đó vẫn phải được ghi ra file,
+            # nếu không là đốt tiền mô hình rồi vứt kết quả.
             print(f"    DỪNG: {e}", file=sys.stderr)
             hong.append((bm.form_key, str(e)))
             break
@@ -188,9 +218,13 @@ def main() -> int:
                 truot_trich_dan.append(bm.form_key)
                 print(f"         số hiệu lạ: {', '.join(bai.so_hieu_la[:5])}")
             hong.append((bm.form_key, kq.ly_do))
-            # Vẫn ghi sổ: lần sau `can_sinh_lai` thấy citation_ok=false và sinh
-            # lại — bài trượt cổng chưa bao giờ tới được bên xuất bản.
-            so.ghi_nhan(bm.form_key, bm.nguon_hash(), bai.citation_ok)
+            # Ghi sổ với cờ FALSE, bất kể vì sao trượt. Cờ trong sổ trả lời đúng
+            # một câu: "biểu mẫu này đã có bài giao đi được chưa?" — trượt hợp
+            # đồng thì chưa, kể cả khi trượt vì mô tả quá dài chứ không phải vì
+            # trích dẫn. Ghi `bai.citation_ok` (có thể là True) làm
+            # `can_sinh_lai` trả False ở lượt sau, và biểu mẫu đó VĨNH VIỄN
+            # không có bài mà không ai thấy.
+            so.ghi_nhan(bm.form_key, bm.nguon_hash(), False)
             continue
 
         ban_ghi.append(bai.ban_ghi())
@@ -199,14 +233,7 @@ def main() -> int:
         print(f"      {len(bai.than_bai)} ký tự · {bai.so_hieu_dat} số hiệu đối "
               f"chiếu đạt{' · đã sinh lại tiêu đề' if bai.sinh_lai else ''}")
 
-    # Ghi ĐÚNG mảng ở gốc, dạng chính của §1 hợp đồng. Không thêm khối metadata
-    # bọc ngoài: bên nhận đọc được cả `{bai:[…]}` lẫn `{data:[…]}`, nhưng một
-    # khoá lạ nằm cạnh thì không có gì bảo đảm nó được bỏ qua.
-    duong_dan = Path(args.out)
-    duong_dan.parent.mkdir(parents=True, exist_ok=True)
-    duong_dan.write_text(
-        json.dumps(ban_ghi, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
+    duong_dan = _ghi_dau_ra(Path(args.out), ban_ghi)
     so_trang_thai = so.luu()
 
     print("\n=== Kết quả ===")
