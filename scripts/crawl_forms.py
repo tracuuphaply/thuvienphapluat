@@ -190,7 +190,7 @@ async def _liet_ke(crawler: TVPLFormCrawler, source: str, field: int | None,
 async def _cao(source: str, field: int | None, gioi_han: int | None,
                dry_run: bool, lam_lai: bool = False,
                tiep_tuc: bool = False, chi_hang_doi: bool = False,
-               dang_nhap: bool = True) -> KetQuaLuu:
+               dang_nhap: bool = True, loc_tieu_de: bool = False) -> KetQuaLuu:
     crawler = TVPLFormCrawler()
     kq = KetQuaLuu()
 
@@ -203,6 +203,12 @@ async def _cao(source: str, field: int | None, gioi_han: int | None,
             muc = hang_doi_con_lai(session, source)
         finally:
             session.close()
+        if loc_tieu_de:
+            truoc = len(muc)
+            muc = [it for it in muc if _dang_doc_tiep(it.title)]
+            print(f"Lọc tiêu đề: bỏ {truoc - len(muc)}/{truoc} mẫu "
+                  f"({(truoc - len(muc)) / max(truoc, 1) * 100:.0f}%) "
+                  f"không phục vụ đối tượng nào đang theo dõi.")
         if gioi_han:
             muc = muc[:gioi_han]
         print(f"Chạy tiếp: {len(muc)} mẫu còn thiếu, không lật lại trang liệt kê.")
@@ -264,6 +270,34 @@ async def _cao(source: str, field: int | None, gioi_han: int | None,
         await crawler.stop()
 
 
+def _dang_doc_tiep(tieu_de: str | None) -> bool:
+    """Tiêu đề này có đáng bỏ một lượt tải trang chi tiết không.
+
+    BỎ khi loại văn bản phủ quyết cờ cá nhân VÀ tiêu đề không có chút dấu hiệu
+    doanh nghiệp nào — tức mẫu không phục vụ đối tượng nào đang theo dõi, và tầng
+    2 sẽ kết luận đúng như vậy sau khi tải xong.
+
+    Đo trên 201 mẫu hiệu chuẩn: bỏ 119/201 (59%), MẤT 0 mẫu cá nhân và 7 mẫu
+    doanh nghiệp. Trên 11.639 mẫu của 18 lĩnh vực, tức bỏ khoảng 6.890 lượt tải —
+    chừng bốn giờ đồng hồ và ngần ấy lượt qua Cloudflare.
+
+    Đây là đánh đổi có ý thức, không phải tối ưu miễn phí: 3,5% mẫu doanh nghiệp
+    trong các lĩnh vực này sẽ không vào kho. Chấp nhận được vì các lĩnh vực này
+    vốn chưa từng được cào cho phía doanh nghiệp — không có gì thụt lùi, chỉ là
+    không thu thêm.
+    """
+    from src.forms.relevance import (
+        LOAI_KHONG_PHAI_CA_NHAN,
+        loai_van_ban,
+        quyet_dinh_quy_tac,
+    )
+
+    td = tieu_de or ""
+    if loai_van_ban(td) not in LOAI_KHONG_PHAI_CA_NHAN:
+        return True
+    return quyet_dinh_quy_tac(td).diem_giu > 0
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Cào biểu mẫu pháp lý từ TVPL")
     ap.add_argument("--source", choices=[SOURCE_HOP_DONG, SOURCE_BIEU_MAU],
@@ -279,6 +313,10 @@ def main() -> None:
                     help="Cào ở chế độ vãng lai; bị Cloudflare chặn sau ~40-70 trang")
     ap.add_argument("--chi-hang-doi", action="store_true",
                     help="Chỉ liệt kê và nạp hàng đợi vào DB, không tải chi tiết")
+    ap.add_argument("--loc-tieu-de", action="store_true",
+                    help="Bỏ qua mẫu mà TIÊU ĐỀ đã cho thấy không phục vụ đối "
+                         "tượng nào (báo cáo, quyết định… của cơ quan). Đo trên "
+                         "bộ hiệu chuẩn: bỏ 59% lượt tải, mất 0 mẫu cá nhân")
     ap.add_argument("--tiep-tuc", action="store_true",
                     help="Lấy hàng đợi từ DB, bỏ giai đoạn liệt kê (nên dùng "
                          "cho mọi lượt sau lượt đầu)")
@@ -293,7 +331,7 @@ def main() -> None:
 
     kq = asyncio.run(_cao(args.source, args.field, args.limit, args.dry_run,
                           args.lam_lai, args.tiep_tuc, args.chi_hang_doi,
-                          not args.khong_dang_nhap))
+                          not args.khong_dang_nhap, args.loc_tieu_de))
     if not args.dry_run:
         print(f"\nXong: {kq.tom_tat()}")
 
