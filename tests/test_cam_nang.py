@@ -1062,3 +1062,44 @@ class TestChiMucMeo:
         from src.camnang.kho import KhoKhongDoc
         with pytest.raises(KhoKhongDoc):
             doc_kho(tmp_path / "khong-ton-tai")
+
+
+class TestBienMoiTruongRong:
+    """Biến môi trường RỖNG phải rơi về mặc định, y như khi nó vắng mặt.
+
+    `os.getenv(ten, mac_dinh)` chỉ trả mặc định khi biến KHÔNG TỒN TẠI. Nhưng
+    GitHub Actions đặt `FOO: ${{ secrets.FOO }}` thành chuỗi rỗng khi secret
+    chưa khai — và đó là chuyện bình thường với secret cố ý để trống vì code đã
+    có mặc định. Lỗi này đã làm hỏng lượt chạy thật đầu tiên.
+    """
+
+    @pytest.mark.parametrize("bien,ham,mong_doi", [
+        ("OPENAI_API_BASE", "openai_api_base", "https://cheapkeyai.shop/v1"),
+        ("REPORT_MODEL", "report_model", "claude-sonnet-5"),
+        ("CAM_NANG_MAX_TOKENS", "cam_nang_max_tokens", 8000),
+        ("REPORT_MAX_TOKENS", "report_max_tokens", 16000),
+    ])
+    def test_rong_thi_dung_mac_dinh(self, bien, ham, mong_doi, monkeypatch):
+        import src.config as cfg
+        monkeypatch.setenv(bien, "")
+        assert getattr(cfg, ham)() == mong_doi
+
+    def test_chi_co_khoang_trang_cung_la_rong(self, monkeypatch):
+        import src.config as cfg
+        monkeypatch.setenv("OPENAI_API_BASE", "   ")
+        assert cfg.openai_api_base() == "https://cheapkeyai.shop/v1"
+
+    def test_gia_tri_that_van_ghi_de_duoc(self, monkeypatch):
+        import src.config as cfg
+        monkeypatch.setenv("OPENAI_API_BASE", "https://vidu.test/v1")
+        monkeypatch.setenv("CAM_NANG_MODEL", "model-khac")
+        assert cfg.openai_api_base() == "https://vidu.test/v1"
+        assert cfg.cam_nang_model() == "model-khac"
+
+    def test_url_meo_KHONG_duoc_thu_lai(self):
+        """URL méo là lỗi cấu hình, không phải nấc mạng — thử lại chỉ đốt 16 giây."""
+        import httpx
+        from src.rag.reports.llm import _is_transient
+        assert not _is_transient(httpx.UnsupportedProtocol("thiếu scheme"))
+        assert not _is_transient(httpx.InvalidURL("URL hỏng"))
+        assert _is_transient(httpx.ConnectError("DNS chập chờn"))   # cái này thì có
