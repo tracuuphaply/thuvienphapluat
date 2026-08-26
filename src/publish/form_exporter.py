@@ -13,7 +13,8 @@ Sở hữu trí tuệ loại khỏi đối tượng bảo hộ; phần không t�
 của bên biên tập, và bản dựng lại không dùng phần đó. Mỗi trang đều mang khối ghi
 nguồn kèm link ngược.
 
-CHỈ ĐĂNG MẪU `is_business = 1`. Trang này là mục lục cho chủ doanh nghiệp; đăng
+CHỈ ĐĂNG MẪU PHỤC VỤ NGƯỜI ĐỌC THẬT — doanh nghiệp hoặc cá nhân, qua
+`loc_dang_cong_khai()`. Trang này là mục lục cho người phải điền giấy tờ; đăng
 cả biểu quyết toán ngân sách của Kho bạc Nhà nước là phá đúng thứ phễu ba tầng
 vừa lọc ra.
 """
@@ -29,6 +30,7 @@ from src.legal.form_taxonomy import NGHIEP_VU, ten_nhom_hop_dong
 from src.publish.site_exporter import content_hash, remove_orphan_pages
 from src.sources.tvpl_forms_parse import SOURCE_HOP_DONG
 from src.storage.public_slug import slugify_doc_num
+from src.forms.store import loc_dang_cong_khai
 from src.storage.models import LegalForm, LegalFormRef
 
 logger = logging.getLogger(__name__)
@@ -350,8 +352,7 @@ def export_forms(session, out_dir: Path,
     da_dang: list[LegalForm] = []
 
     forms = (
-        session.query(LegalForm)
-        .filter(LegalForm.is_business.is_(True))
+        loc_dang_cong_khai(session.query(LegalForm))
         .filter(LegalForm.crawl_status == "OK")
         .order_by(LegalForm.form_key)
         .all()
@@ -408,8 +409,7 @@ def sao_chep_file_tai_ve(session, out_dir: Path) -> int:
     forms_dir = Path(out_dir) / THU_MUC
     forms_dir.mkdir(parents=True, exist_ok=True)
     n = 0
-    for form in (session.query(LegalForm)
-                 .filter(LegalForm.is_business.is_(True)).all()):
+    for form in loc_dang_cong_khai(session.query(LegalForm)).all():
         for duong_dan in (form.docx_path, form.pdf_path):
             if not duong_dan:
                 continue

@@ -77,6 +77,13 @@ def dung_lai_chi_muc(session, db_path: Path | None = None) -> int:
     CHỈ nạp mẫu `is_business = 1`. Chỉ mục này phục vụ lệnh tra cứu của chủ doanh
     nghiệp; nạp cả mẫu báo cáo ngân sách của Kho bạc vào đây là phá đúng thứ mà
     phễu ba tầng vừa lọc ra.
+
+    CỐ Ý KHÔNG DÙNG `loc_dang_cong_khai()`. Hàm đó gộp doanh nghiệp và cá nhân
+    cho TRANG CÔNG KHAI — nơi người đọc tự chọn phần mình cần. Chỉ mục này thì
+    chỉ có một bên tiêu thụ là bot Telegram của chủ doanh nghiệp, và ở đó không
+    có chỗ nào để chọn: đổ thêm hàng nghìn mẫu cá nhân vào là mỗi lần gõ
+    `/bieumau hợp đồng` lại lẫn mẫu ly hôn với mẫu thừa kế. Muốn phục vụ cá nhân
+    trên Telegram thì thêm lệnh riêng, không trộn vào đây.
     """
     from src.storage.models import LegalForm
 

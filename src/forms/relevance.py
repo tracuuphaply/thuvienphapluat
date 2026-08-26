@@ -32,7 +32,7 @@ import os
 from dataclasses import dataclass, field
 
 from src.analysis.lexicon import count_matches
-from src.legal.form_taxonomy import CO_QUAN_NHA_NUOC, DOANH_NGHIEP
+from src.legal.form_taxonomy import CA_NHAN, CO_QUAN_NHA_NUOC, DOANH_NGHIEP
 
 # ──────────────────────────────────────────────
 # Tầng 1 — whitelist lĩnh vực /bieumau
@@ -123,13 +123,80 @@ DAU_HIEU_LOAI: tuple[str, ...] = (
     "quốc phòng",
     "công an nhân dân",
     "thi đua khen thưởng",
-    "học sinh",
-    "sinh viên",
     "cơ sở giáo dục",
+    # TÊN LOẠI CƠ QUAN, không phải tên đối tượng phục vụ. Đây là chỗ phân biệt
+    # "cá nhân điền" với "cơ quan phục vụ cá nhân điền": mẫu nhắc "học sinh" có
+    # thể do phụ huynh điền, nhưng mẫu mà một BÊN KÝ là "Trường THCS Đồng Tiến"
+    # thì bên đó là nhà trường.
+    # Đo được: bỏ bốn từ "học sinh/sinh viên/hộ nghèo/người có công" khỏi danh
+    # sách này làm "HỢP ĐỒNG SỬA CHỮA BÀN GHẾ HỌC SINH" — hợp đồng giữa trường
+    # và nhà thầu — bị xếp thành mẫu cá nhân.
+    "nhà trường",
+    "trường thcs",
+    "trường thpt",
+    "trường tiểu học",
+    "trường trung học",
+    "trường mầm non",
+    "phòng giáo dục",
+    "sở giáo dục",
     "bệnh viện",
     "trạm y tế",
+)
+
+#: BỐN TỪ ĐÃ RỜI KHỎI DANH SÁCH TRÊN, và đây là thay đổi đáng kể nhất của đợt mở
+#: sang cá nhân: "học sinh", "sinh viên", "hộ nghèo", "người có công".
+#:
+#: Chúng từng là dấu hiệu LOẠI vì mẫu nhắc tới học sinh thì không phải mẫu doanh
+#: nghiệp điền — đúng với câu hỏi cũ. Nhưng câu hỏi cũ là "có phải doanh nghiệp
+#: không", còn câu hỏi mới là "AI điền", và với câu hỏi mới thì chính bốn từ đó
+#: là chỉ dấu MẠNH NHẤT rằng người điền là một cá nhân.
+#:
+#: Giữ chúng ở danh sách loại là tự tay vứt đúng phần kho định đi tìm.
+DAU_HIEU_CA_NHAN: tuple[str, ...] = (
+    "cá nhân",
+    "công dân",
+    "người dân",
+    "hộ gia đình",
+    "chủ hộ",
+    "học sinh",
+    "sinh viên",
+    "phụ huynh",
     "hộ nghèo",
+    "hộ cận nghèo",
     "người có công",
+    "thương binh",
+    "người khuyết tật",
+    "người cao tuổi",
+    "trẻ em",
+    "vợ chồng",
+    "cha mẹ",
+    "con đẻ",
+    "con nuôi",
+    "kết hôn",
+    "ly hôn",
+    "khai sinh",
+    "khai tử",
+    "hộ tịch",
+    "hộ khẩu",
+    "thường trú",
+    "tạm trú",
+    "căn cước công dân",
+    "chứng minh nhân dân",
+    "hộ chiếu",
+    "di chúc",
+    "thừa kế",
+    "di sản",
+    "cấp dưỡng",
+    "trợ cấp",
+    "lương hưu",
+    "thai sản",
+    "bảo hiểm y tế",
+    "khám chữa bệnh",
+    "học phí",
+    "học bổng",
+    "nguyên đơn",
+    "bị đơn",
+    "người khởi kiện",
 )
 
 # Dấu hiệu GIỮ: chỉ dấu doanh nghiệp là bên điền.
@@ -182,13 +249,23 @@ CAN_HOI_LLM = "can_hoi_llm"
 
 @dataclass
 class KetQuaQuyTac:
-    """Kết luận của tầng 2. `audience` rỗng nghĩa là phải hỏi tầng 3."""
+    """Kết luận của tầng 2. `audience` rỗng nghĩa là phải hỏi tầng 3.
+
+    `audience` là phân loại CHÍNH, còn `cho_doanh_nghiep` / `cho_ca_nhan` là hai
+    cờ độc lập — một biểu mẫu phục vụ được cả hai bên. Hợp đồng thuê nhà, hợp
+    đồng vay, giấy uỷ quyền: doanh nghiệp dùng, cá nhân cũng dùng. Ép chọn một
+    phía là mất mẫu ở phía kia.
+    """
 
     audience: str | None = None
     diem_giu: int = 0
     diem_loai: int = 0
+    diem_ca_nhan: int = 0
     dau_hieu_giu: list[str] = field(default_factory=list)
     dau_hieu_loai: list[str] = field(default_factory=list)
+    dau_hieu_ca_nhan: list[str] = field(default_factory=list)
+    cho_doanh_nghiep: bool = False
+    cho_ca_nhan: bool = False
 
     @property
     def chac_chan(self) -> bool:
@@ -200,9 +277,15 @@ class KetQuaQuyTac:
         if self.audience == CO_QUAN_NHA_NUOC:
             return "quy tắc — dấu hiệu cơ quan nhà nước: " + ", ".join(
                 self.dau_hieu_loai[:4])
+        if self.audience == CA_NHAN:
+            if self.cho_doanh_nghiep:
+                return ("quy tắc — phục vụ cả hai bên: "
+                        + ", ".join((self.dau_hieu_ca_nhan + self.dau_hieu_giu)[:4]))
+            return "quy tắc — dấu hiệu cá nhân: " + ", ".join(
+                self.dau_hieu_ca_nhan[:4])
         return (
-            f"quy tắc không chắc (giữ {self.diem_giu} / loại {self.diem_loai}) "
-            f"— chuyển sang mô hình"
+            f"quy tắc không chắc (doanh nghiệp {self.diem_giu} / cá nhân "
+            f"{self.diem_ca_nhan} / nhà nước {self.diem_loai}) — chuyển sang mô hình"
         )
 
 
@@ -223,30 +306,49 @@ def _cham_diem(tu_khoa: tuple[str, ...], tieu_de: str,
 
 
 def quyet_dinh_quy_tac(tieu_de: str, ruot_text: str = "") -> KetQuaQuyTac:
-    """Tầng 2. Chỉ kết luận khi một bên có điểm còn bên kia bằng 0.
+    """Tầng 2, ba bộ dấu hiệu: doanh nghiệp · cá nhân · cơ quan nhà nước.
 
-    "Một bên bằng 0" là điều kiện khắt khe có chủ đích. Mẫu vừa nhắc "doanh
-    nghiệp" vừa nhắc "cơ quan nhà nước" là mẫu thật sự nhập nhằng — ví dụ mẫu báo
-    cáo mà cơ quan gửi VỀ doanh nghiệp. Đoán ở đó là đoán sai, phải để mô hình
-    đọc.
+    ĐIỀU KIỆN VẪN LÀ "PHÍA KIA BẰNG 0", giữ nguyên từ bản hai bộ. Đó là điều kiện
+    khắt khe có chủ đích: mẫu vừa nhắc "doanh nghiệp" vừa nhắc "cơ quan nhà nước"
+    là mẫu thật sự nhập nhằng — ví dụ mẫu báo cáo mà cơ quan gửi VỀ doanh nghiệp.
+    Đoán ở đó là đoán sai, phải để mô hình đọc.
+
+    KHÁC BIỆT DUY NHẤT khi thêm bộ thứ ba: doanh nghiệp và cá nhân KHÔNG loại trừ
+    nhau. Hai bên cùng có điểm là chuyện bình thường và có nghĩa rõ ràng — mẫu
+    phục vụ cả hai — chứ không phải nhập nhằng. Chỉ dấu hiệu NHÀ NƯỚC mới làm cả
+    hai bên kia mất hiệu lực, vì "cơ quan điền" và "dân điền" thì đúng là loại
+    trừ nhau.
+
+    `audience` ghi phía NẶNG hơn để giữ một phân loại chính đọc được; hai cờ mới
+    mang thông tin đầy đủ.
     """
     td = (tieu_de or "").lower()
     ruot = (ruot_text or "")[:KY_TU_DAU_RUOT].lower()
 
     diem_loai, dh_loai = _cham_diem(DAU_HIEU_LOAI, td, ruot)
     diem_giu, dh_giu = _cham_diem(DAU_HIEU_GIU, td, ruot)
+    diem_cn, dh_cn = _cham_diem(DAU_HIEU_CA_NHAN, td, ruot)
 
-    kq = KetQuaQuyTac(diem_giu=diem_giu, diem_loai=diem_loai,
-                      dau_hieu_giu=dh_giu, dau_hieu_loai=dh_loai)
-    if diem_loai >= NGUONG_CHAC and diem_giu == 0:
+    kq = KetQuaQuyTac(diem_giu=diem_giu, diem_loai=diem_loai, diem_ca_nhan=diem_cn,
+                      dau_hieu_giu=dh_giu, dau_hieu_loai=dh_loai,
+                      dau_hieu_ca_nhan=dh_cn)
+
+    if diem_loai >= NGUONG_CHAC and diem_giu == 0 and diem_cn == 0:
         kq.audience = CO_QUAN_NHA_NUOC
-    elif diem_giu >= NGUONG_CHAC and diem_loai == 0:
-        kq.audience = DOANH_NGHIEP
+        return kq
+    if diem_loai:
+        return kq          # có mùi nhà nước mà không sạch → để mô hình đọc
+
+    kq.cho_doanh_nghiep = diem_giu >= NGUONG_CHAC
+    kq.cho_ca_nhan = diem_cn >= NGUONG_CHAC
+    if kq.cho_doanh_nghiep or kq.cho_ca_nhan:
+        kq.audience = DOANH_NGHIEP if diem_giu >= diem_cn else CA_NHAN
     return kq
 
 
 __all__ = [
     "BIEU_MAU_BUSINESS_FIELDS", "DAU_HIEU_LOAI", "DAU_HIEU_GIU",
+    "DAU_HIEU_CA_NHAN",
     "NGUONG_CHAC", "KY_TU_DAU_RUOT", "QUY_TAC", "CAN_HOI_LLM",
     "KetQuaQuyTac", "linh_vuc_bieu_mau_kinh_doanh", "la_linh_vuc_kinh_doanh",
     "quyet_dinh_quy_tac",

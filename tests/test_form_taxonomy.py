@@ -160,3 +160,42 @@ class TestNghiepVu:
         assert chuan_hoa_nghiep_vu([]) == [MA_NGHIEP_VU_KHAC]
         assert chuan_hoa_nghiep_vu(None) == [MA_NGHIEP_VU_KHAC]
         assert chuan_hoa_nghiep_vu(["không có thật"]) == [MA_NGHIEP_VU_KHAC]
+
+
+class TestNhomSuKienDoiNguoi:
+    """15 nhóm cá nhân — trục KHÁC HẲN 12 nhóm nghiệp vụ doanh nghiệp.
+
+    Doanh nghiệp tra theo NGHIỆP VỤ ĐỊNH KỲ: đến kỳ thì khai thuế, đến hạn thì
+    nộp báo cáo. Cá nhân tra theo SỰ KIỆN xảy ra với mình: sinh con, mất việc,
+    người thân qua đời. Ép cá nhân vào trục doanh nghiệp là bắt người vừa mất
+    việc đi tìm mục "Lao động, tiền lương, bảo hiểm xã hội" — đúng chữ mà sai
+    hoàn toàn cách họ nghĩ về việc đang xảy ra với mình.
+    """
+
+    def test_tap_dong_va_khong_giao_voi_tap_doanh_nghiep(self):
+        from src.legal.form_taxonomy import NGHIEP_VU, NGHIEP_VU_CA_NHAN
+
+        assert len(NGHIEP_VU_CA_NHAN) == 15
+        assert not (set(NGHIEP_VU) & set(NGHIEP_VU_CA_NHAN)), (
+            "hai tập dùng chung mã thì chuẩn hoá nhầm tập vẫn 'hợp lệ' trong im lặng")
+
+    def test_mot_ham_chuan_hoa_cho_ca_hai_tap(self):
+        """MỘT hàm, không phải hai: bài học "rỗng thì trả nhóm khác" phải đúng
+        cho cả hai tập, mà nhân đôi hàm là nhân đôi chỗ để quên nó."""
+        from src.legal.form_taxonomy import chuan_hoa_nghiep_vu
+
+        assert chuan_hoa_nghiep_vu([], ca_nhan=True) == ["khac_ca_nhan"]
+        assert chuan_hoa_nghiep_vu([]) == ["khac"]
+
+    def test_ma_cua_tap_nay_khong_lot_qua_tap_kia(self):
+        from src.legal.form_taxonomy import chuan_hoa_nghiep_vu
+
+        assert chuan_hoa_nghiep_vu(["dkkd"], ca_nhan=True) == ["khac_ca_nhan"]
+        assert chuan_hoa_nghiep_vu(["ho_tich"]) == ["khac"]
+
+    def test_khu_trung_va_giu_thu_tu(self):
+        from src.legal.form_taxonomy import chuan_hoa_nghiep_vu
+
+        assert chuan_hoa_nghiep_vu(
+            ["thua_ke_di_chuc", "ho_tich", "thua_ke_di_chuc"], ca_nhan=True
+        ) == ["thua_ke_di_chuc", "ho_tich"]

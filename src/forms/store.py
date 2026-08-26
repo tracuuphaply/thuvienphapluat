@@ -23,7 +23,7 @@ import logging
 from dataclasses import dataclass
 from datetime import date
 
-from sqlalchemy import text
+from sqlalchemy import or_, text
 
 from src.legal.form_taxonomy import (
     sang_ma_van_ban,
@@ -56,6 +56,23 @@ class KetQuaLuu:
             f"{self.can_cu_noi_duoc} nối được / "
             f"{self.can_cu_chua_co_trong_kho} chưa có trong kho"
         )
+
+
+def loc_dang_cong_khai(q):
+    """Lọc biểu mẫu ĐỦ ĐIỀU KIỆN LÊN TRANG CÔNG KHAI: doanh nghiệp HOẶC cá nhân.
+
+    MỘT hàm cho mọi bên tiêu thụ, không phải mỗi bên tự viết `is_business == 1`.
+    Trước đây điều kiện đó nằm rải ở sáu chỗ — trang công khai, bộ dữ liệu trợ lý,
+    chỉ mục tìm kiếm, lệnh Telegram — và mở sang cá nhân nghĩa là sửa đúng sáu
+    chỗ. Sót một chỗ thì mẫu cá nhân có trong kho, có trang, mà tìm không ra;
+    không có gì hỏng, không có gì báo.
+
+    KHÔNG dùng cho Telegram: bot `/bieumau` là công cụ của chủ doanh nghiệp, đổ
+    thêm mẫu cá nhân vào là làm hỏng cái đang dùng được. Nó lọc `is_business`
+    thẳng, có chủ đích.
+    """
+    return q.filter(or_(LegalForm.is_business.is_(True),
+                        LegalForm.is_individual.is_(True)))
 
 
 def _ten_loai(source: str, ma: int | None) -> str | None:
@@ -332,6 +349,7 @@ def noi_lai_can_cu(session) -> int:
 
 
 __all__ = [
+    "loc_dang_cong_khai",
     "KetQuaLuu", "TRANG_THAI_CHO", "tim_doc_key", "luu_bieu_mau",
     "ghi_hang_doi", "hang_doi_con_lai", "danh_dau_bi_go",
     "so_hieu_can_cu_chua_co", "noi_lai_can_cu",

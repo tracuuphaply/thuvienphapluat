@@ -21,11 +21,19 @@ from src.forms import pheu
 from src.forms.classifier import KetQuaPhanLoai, dung_prompt, phan_loai
 from src.forms.relevance import (
     BIEU_MAU_BUSINESS_FIELDS,
+    DAU_HIEU_CA_NHAN,
+    DAU_HIEU_LOAI,
     NGUONG_CHAC,
     la_linh_vuc_kinh_doanh,
     quyet_dinh_quy_tac,
 )
-from src.legal.form_taxonomy import CO_QUAN_NHA_NUOC, DOANH_NGHIEP, KHAC, NGHIEP_VU
+from src.legal.form_taxonomy import (
+    CA_NHAN,
+    CO_QUAN_NHA_NUOC,
+    DOANH_NGHIEP,
+    KHAC,
+    NGHIEP_VU,
+)
 from src.rag.reports.llm import LLMResult
 from src.sources.tvpl_forms_parse import chu_trong_ruot, tach_chi_tiet
 from src.storage.models import LegalForm
@@ -382,3 +390,151 @@ class TestMacDinhTheoKho:
         form_tho("hopdong-9004", "hopdong", "HỢP ĐỒNG KHOÁN VIỆC", THAN_TRUNG_TINH)
         pheu.chay_pheu(master_session, dung_mo_hinh=False)
         assert master_session.query(LegalForm).one().audience_confidence == 0.0
+
+
+class TestDoiTuongCaNhan:
+    """Mở phễu sang cá nhân — bộ dấu hiệu thứ ba.
+
+    VÌ SAO PHẢI CÓ BỘ THỨ BA CHỨ KHÔNG ĐẢO BỘ CŨ. Câu hỏi cũ là "có phải doanh
+    nghiệp không", nên mọi thứ không-phải-doanh-nghiệp đều bị gom vào một rọ:
+    Kho bạc Nhà nước nằm chung rọ với người dân đi xin xác nhận hộ nghèo. Câu hỏi
+    mới là "AI điền", và ở câu hỏi mới thì hai thứ đó ngược nhau hoàn toàn.
+    """
+
+    def test_bon_tu_da_chuyen_khoi_danh_sach_loai(self):
+        """Đây là thay đổi đáng kể nhất của đợt này, chốt lại để không quay đầu.
+
+        "học sinh", "sinh viên", "hộ nghèo", "người có công" từng là dấu hiệu
+        LOẠI — đúng với câu hỏi cũ, sai hoàn toàn với câu hỏi mới. Giữ chúng ở
+        danh sách loại là tự tay vứt đúng phần kho định đi tìm.
+        """
+        for tu in ("học sinh", "sinh viên", "hộ nghèo", "người có công"):
+            assert tu not in DAU_HIEU_LOAI, f"{tu!r} vẫn còn ở danh sách loại"
+            assert tu in DAU_HIEU_CA_NHAN, f"{tu!r} chưa vào danh sách cá nhân"
+
+    def test_don_xac_nhan_ho_ngheo_la_ca_nhan_khong_phai_bi_loai(self):
+        kq = quyet_dinh_quy_tac("Đơn đề nghị xác nhận hộ nghèo")
+        assert kq.audience == CA_NHAN
+        assert kq.cho_ca_nhan is True and kq.cho_doanh_nghiep is False
+
+    def test_ho_tich_la_ca_nhan(self):
+        for td in ("Tờ khai đăng ký kết hôn",
+                   "Tờ khai đăng ký khai sinh",
+                   "Đơn yêu cầu công nhận thuận tình ly hôn"):
+            assert quyet_dinh_quy_tac(td).audience == CA_NHAN, td
+
+    def test_mot_mau_phuc_vu_CA_HAI_ben(self):
+        """Hợp đồng thuê nhà, hợp đồng vay, giấy uỷ quyền — cả hai bên đều dùng.
+
+        `audience` chỉ giữ được một giá trị nên ép mẫu chọn một phía là mất nó ở
+        phía kia. Hai cờ độc lập thì không phải chọn.
+        """
+        kq = quyet_dinh_quy_tac(
+            "HỢP ĐỒNG THUÊ NHÀ Ở giữa doanh nghiệp và cá nhân",
+            "Bên cho thuê: công ty trách nhiệm hữu hạn … "
+            "Bên thuê: hộ gia đình, cá nhân …")
+        assert kq.cho_doanh_nghiep is True and kq.cho_ca_nhan is True
+        assert "cả hai bên" in kq.ly_do()
+
+    def test_dau_hieu_nha_nuoc_van_lam_ca_hai_ben_kia_mat_hieu_luc(self):
+        """"Cơ quan điền" và "dân điền" thì đúng là loại trừ nhau — khác với
+        doanh nghiệp và cá nhân, hai bên đó cùng đúng được."""
+        kq = quyet_dinh_quy_tac(
+            "Báo cáo quyết toán ngân sách nhà nước của Kho bạc Nhà nước")
+        assert kq.audience == CO_QUAN_NHA_NUOC
+        assert kq.cho_doanh_nghiep is False and kq.cho_ca_nhan is False
+
+    def test_co_mui_nha_nuoc_ma_khong_sach_thi_de_mo_hinh_doc(self):
+        """Mẫu mà cơ quan gửi VỀ cá nhân là ca thật sự nhập nhằng. Đoán ở đó là
+        đoán sai — giữ nguyên điều kiện khắt khe của bản hai bộ."""
+        kq = quyet_dinh_quy_tac(
+            "Thông báo của Ủy ban nhân dân xã về hộ nghèo",
+            "Ủy ban nhân dân … cơ quan nhà nước … hộ nghèo … hộ gia đình …")
+        assert kq.audience is None
+
+    def test_mau_doanh_nghiep_thuan_khong_bi_gan_them_co_ca_nhan(self):
+        kq = quyet_dinh_quy_tac("Giấy đề nghị đăng ký doanh nghiệp")
+        assert kq.cho_doanh_nghiep is True and kq.cho_ca_nhan is False
+
+
+class TestGhiHaiCoVaoKho:
+    def test_mau_ca_nhan_khong_bi_ghi_ly_do_loai(self, master_session, form_tho):
+        """`excluded_reason` chỉ có nghĩa khi mẫu KHÔNG phục vụ ai trong hai bên.
+
+        Trước đây nó ghi "không phải doanh nghiệp" cho cả mẫu cá nhân — mà mẫu cá
+        nhân đâu có bị loại, nó chỉ phục vụ bên khác.
+        """
+        form_tho("hopdong-9101", "hopdong", "Tờ khai đăng ký kết hôn",
+                 THAN_TRUNG_TINH)
+        pheu.chay_pheu(master_session, dung_mo_hinh=False)
+        f = master_session.query(LegalForm).one()
+        assert f.is_individual is True
+        assert f.excluded_reason is None
+
+    def test_mau_nha_nuoc_van_ghi_ly_do_loai(self, master_session, form_tho):
+        form_tho("hopdong-9102", "hopdong",
+                 "HỢP ĐỒNG LÀM VIỆC ĐỐI VỚI VIÊN CHỨC", THAN_TRUNG_TINH)
+        pheu.chay_pheu(master_session, dung_mo_hinh=False)
+        f = master_session.query(LegalForm).one()
+        assert f.is_business is False and f.is_individual is False
+        assert f.excluded_reason == pheu.LY_DO_KHONG_PHAI_DN
+
+
+class TestSanMacDinhVaChayLai:
+    """Hai lỗi tìm được khi chạy phễu lại trên 662 mẫu thật, chốt để không tái diễn."""
+
+    def test_chay_lai_phai_GO_DUOC_co_da_gan_sai(self, master_session, form_tho):
+        """Nhánh "không kết luận được" vốn `continue` thẳng, không đụng vào mẫu.
+
+        Hệ quả: sửa quy tắc rồi chạy lại mà kho KHÔNG ĐỔI — mẫu giữ nguyên nhãn
+        của lần trước và mọi lần chạy lại sau đều vô hiệu. Đây là loại lỗi im
+        lặng tệ nhất: nó làm người sửa tin rằng quy tắc mới không có tác dụng.
+        """
+        form_tho("bieumau-9201", "bieumau", "MẪU ĐƠN KHÔNG RÕ AI ĐIỀN",
+                 THAN_TRUNG_TINH)
+        f = master_session.query(LegalForm).one()
+        f.is_business = True                    # nhãn sai từ lần chạy trước
+        f.audience = DOANH_NGHIEP
+        master_session.commit()
+
+        pheu.chay_pheu(master_session, chay_lai=True, dung_mo_hinh=False)
+        f = master_session.query(LegalForm).one()
+        assert f.is_business is None, "chạy lại không gỡ được nhãn cũ"
+        assert f.audience is None
+
+    def test_mot_lan_nhac_co_quan_KHONG_chan_mac_dinh_theo_kho(self, master_session,
+                                                               form_tho):
+        """47/662 mẫu hợp đồng có đúng MỘT lần nhắc tên cơ quan — gần như luôn là
+        dòng chứng thực ("Chứng thực tại Uỷ ban nhân dân xã…"), không phải cơ
+        quan là một bên ký. Chặn ở mức một là loại nhầm hợp đồng dân sự thuần."""
+        form_tho("hopdong-9202", "hopdong", "HỢP ĐỒNG HUỶ BỎ HỢP ĐỒNG UỶ QUYỀN",
+                 THAN_TRUNG_TINH + " Chứng thực tại Uỷ ban nhân dân xã. ")
+        pheu.chay_pheu(master_session, dung_mo_hinh=False)
+        assert master_session.query(LegalForm).one().is_business is True
+
+    def test_hai_lan_nhac_co_quan_thi_CHAN(self, master_session, form_tho):
+        """Hai tên cơ quan khác nhau trong ruột thì cơ quan là một BÊN KÝ.
+
+        Đo trên kho thật: 10 mẫu đạt mức này và cả 10 đều đúng là việc nhà nước —
+        chi trả trợ cấp qua Kho bạc, dịch vụ sự nghiệp dùng ngân sách, hợp đồng
+        của nhà trường.
+        """
+        form_tho("hopdong-9203", "hopdong", "HỢP ĐỒNG CHI TRẢ TRỢ CẤP",
+                 THAN_TRUNG_TINH
+                 + " Kho bạc Nhà nước chuyển kinh phí. Uỷ ban nhân dân huyện ký. ")
+        pheu.chay_pheu(master_session, dung_mo_hinh=False)
+        f = master_session.query(LegalForm).one()
+        assert not f.is_business and not f.is_individual
+
+    def test_ten_loai_co_quan_phan_biet_voi_ten_doi_tuong_phuc_vu(self):
+        """"học sinh" là đối tượng được phục vụ; "trường THCS" là bên ký.
+
+        Bỏ "học sinh" khỏi danh sách nhà nước là đúng — nhưng nếu không thêm tên
+        loại cơ quan thì "HỢP ĐỒNG SỬA CHỮA BÀN GHẾ HỌC SINH" (giữa trường và
+        nhà thầu) bị xếp thành mẫu cá nhân.
+        """
+        kq = quyet_dinh_quy_tac(
+            "HỢP ĐỒNG SỬA CHỮA BÀN GHẾ HỌC SINH",
+            "Trường THCS Đồng Tiến … nhà trường … học sinh …")
+        assert kq.cho_ca_nhan is False
+        assert "trường thcs" in kq.dau_hieu_loai

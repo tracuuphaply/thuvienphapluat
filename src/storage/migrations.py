@@ -541,6 +541,37 @@ def _m015_form_gdrive(conn: Connection) -> None:
     ])
 
 
+def _m016_form_ca_nhan(conn: Connection) -> None:
+    """Biểu mẫu phục vụ CÁ NHÂN — cờ riêng, không thay `is_business`.
+
+    MỘT BIỂU MẪU PHỤC VỤ ĐƯỢC CẢ HAI BÊN. Hợp đồng thuê nhà, hợp đồng vay, giấy
+    uỷ quyền — doanh nghiệp dùng, cá nhân cũng dùng. Cột `audience` chỉ giữ được
+    một giá trị, nên ép mẫu chọn một phía là mất nó ở phía kia. Hai cờ độc lập
+    cùng bật được thì không phải chọn.
+
+    `audience` GIỮ NGUYÊN ngữ nghĩa: phân loại chính mà quy tắc kết luận, đi kèm
+    `audience_reason` để soi lại vì sao. Biến nó thành cột suy diễn từ hai cờ là
+    mất dấu vết — mà dấu vết đó đã cứu được vụ 548 mẫu rơi vào hư vô khi tầng 3
+    bị tắt.
+
+    `nghiep_vu_ca_nhan` tách khỏi `nghiep_vu`: nhóm doanh nghiệp chia theo NGHIỆP
+    VỤ ĐỊNH KỲ (thuế, kế toán, hải quan), nhóm cá nhân chia theo SỰ KIỆN ĐỜI
+    NGƯỜI (kết hôn, thừa kế, mất việc). Hai trục khác nhau, nhét chung một cột là
+    ép một mẫu phục vụ cả hai bên phải bỏ một nửa cách phân loại.
+    """
+    _add_columns(conn, "legal_forms", [
+        ("is_individual", "BOOLEAN"),
+        ("nghiep_vu_ca_nhan", "VARCHAR(300)"),
+    ])
+    # Đường truy xuất chính của trang cá nhân là "mẫu cá nhân theo nhóm sự kiện";
+    # thiếu chỉ mục thì mỗi lần lọc phải quét toàn bảng, đúng lý do đã đặt
+    # idx_legal_forms_eff ở _m014.
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS idx_legal_forms_ca_nhan "
+        "ON legal_forms(is_individual, audience)"
+    ))
+
+
 MIGRATIONS: list[Migration] = [
     Migration("001_legacy_document_columns",
               "Các cột documents từng thêm bằng vòng lặp hardcode",
@@ -587,6 +618,9 @@ MIGRATIONS: list[Migration] = [
     Migration("015_form_gdrive",
               "Liên kết Google Drive cho bản .docx của biểu mẫu",
               _m015_form_gdrive),
+    Migration("016_form_ca_nhan",
+              "Cờ biểu mẫu phục vụ cá nhân và nhóm sự kiện đời người",
+              _m016_form_ca_nhan),
 ]
 
 

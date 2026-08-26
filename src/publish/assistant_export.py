@@ -133,10 +133,11 @@ def _van_ban(session) -> tuple[list[dict], dict[str, int]]:
 
 
 def _bieu_mau(session) -> list[dict]:
-    """Biểu mẫu doanh nghiệp đã đăng, kèm tên file tải về và số hiệu căn cứ."""
+    """Biểu mẫu đã đăng (doanh nghiệp hoặc cá nhân), kèm tên file và căn cứ."""
+    from src.forms.store import loc_dang_cong_khai
+
     forms = (
-        session.query(LegalForm)
-        .filter(LegalForm.is_business.is_(True))
+        loc_dang_cong_khai(session.query(LegalForm))
         .filter(LegalForm.public_slug.isnot(None))
         .order_by(LegalForm.form_key)
         .all()

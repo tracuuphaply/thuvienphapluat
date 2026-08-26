@@ -276,6 +276,44 @@ MA_NGHIEP_VU_KHAC = "khac"
 
 
 # ──────────────────────────────────────────────
+# Nhóm sự kiện đời người — trục của CÁ NHÂN
+# ──────────────────────────────────────────────
+# Trục KHÁC HẲN nhóm nghiệp vụ doanh nghiệp, không phải bản dịch của nó.
+# Doanh nghiệp tra theo NGHIỆP VỤ ĐỊNH KỲ: đến kỳ thì khai thuế, đến hạn thì nộp
+# báo cáo tài chính — việc lặp lại, biết trước, gắn với bộ máy.
+# Cá nhân tra theo SỰ KIỆN xảy ra với mình: sinh con, kết hôn, mua nhà, mất
+# việc, bị phạt, người thân qua đời — việc đến bất ngờ, thường chỉ gặp một vài
+# lần trong đời, và lúc gặp thì không biết bắt đầu từ đâu.
+#
+# Ép cá nhân vào 12 nhóm nghiệp vụ doanh nghiệp là bắt người vừa mất việc đi tìm
+# mục "Lao động, tiền lương, bảo hiểm xã hội" — đúng chữ mà sai hoàn toàn cách
+# họ nghĩ về việc đang xảy ra với mình.
+#
+# Tập ĐÓNG, cùng lý do với 12 nhóm doanh nghiệp: nó là mục lục trang công khai,
+# biên trôi thì mục lục vỡ.
+
+NGHIEP_VU_CA_NHAN: dict[str, str] = {
+    "ho_tich":            "Hộ tịch, giấy tờ tuỳ thân, cư trú",
+    "hon_nhan_gia_dinh":  "Kết hôn, ly hôn, con cái, cấp dưỡng",
+    "thua_ke_di_chuc":    "Di chúc, thừa kế, tặng cho tài sản",
+    "nha_dat_ca_nhan":    "Nhà ở, đất đai, sổ đỏ của cá nhân",
+    "lao_dong_nguoi_lam": "Việc làm, hợp đồng, nghỉ việc — phía người lao động",
+    "bhxh_bhyt_huu_tri":  "Bảo hiểm xã hội, y tế, thai sản, thất nghiệp, hưu trí",
+    "thue_tncn":          "Thuế thu nhập cá nhân, giảm trừ gia cảnh",
+    "vay_no_giao_dich":   "Vay mượn, đặt cọc, uỷ quyền, bồi thường dân sự",
+    "khieu_nai_to_tung":  "Khiếu nại, tố cáo, khởi kiện, thi hành án",
+    "vi_pham_hanh_chinh": "Xử phạt hành chính, khiếu nại quyết định phạt",
+    "giao_duc_hoc_tap":   "Nhập học, học phí, học bổng, vay vốn sinh viên",
+    "y_te_kham_benh":     "Khám chữa bệnh, giám định y khoa, hồ sơ bệnh án",
+    "chinh_sach_xa_hoi":  "Hộ nghèo, người có công, khuyết tật, người cao tuổi",
+    "xuat_nhap_canh":     "Hộ chiếu, thị thực, tạm trú, tạm vắng",
+    "khac_ca_nhan":       "Việc cá nhân khác",
+}
+
+MA_NGHIEP_VU_CA_NHAN_KHAC = "khac_ca_nhan"
+
+
+# ──────────────────────────────────────────────
 # Đối tượng điền biểu mẫu
 # ──────────────────────────────────────────────
 # Trục quyết định của phễu lọc. Lĩnh vực KHÔNG phân biệt được: "Kế toán – Kiểm
@@ -325,22 +363,29 @@ def sang_ma_van_ban(ma_bieu_mau: int | None) -> tuple[int, DoTinCay]:
     return _ANH_XA.get(ma_bieu_mau or 0, (_MA_KHAC_VAN_BAN, "suy_dien"))
 
 
-def la_nghiep_vu_hop_le(ma: str) -> bool:
-    return ma in NGHIEP_VU
+def la_nghiep_vu_hop_le(ma: str, ca_nhan: bool = False) -> bool:
+    return ma in (NGHIEP_VU_CA_NHAN if ca_nhan else NGHIEP_VU)
 
 
-def chuan_hoa_nghiep_vu(ma_list) -> list[str]:
+def chuan_hoa_nghiep_vu(ma_list, ca_nhan: bool = False) -> list[str]:
     """Giữ lại các mã nghiệp vụ hợp lệ, khử trùng, giữ nguyên thứ tự.
 
-    Danh sách rỗng sau khi lọc trả về ["khac"] chứ không trả rỗng: biểu mẫu
+    Danh sách rỗng sau khi lọc trả về nhóm "khác" chứ không trả rỗng: biểu mẫu
     không nhóm được vẫn phải tra được, để trong hư vô là mất luôn.
+
+    `ca_nhan=True` chấm theo tập 15 nhóm sự kiện đời người thay vì 12 nhóm nghiệp
+    vụ doanh nghiệp. MỘT hàm cho cả hai tập, không phải hai hàm: bài học "rỗng thì
+    trả nhóm khác" ở trên phải đúng cho cả hai, mà nhân đôi hàm là nhân đôi chỗ
+    để quên nó.
     """
+    hop_le = NGHIEP_VU_CA_NHAN if ca_nhan else NGHIEP_VU
+    mac_dinh = MA_NGHIEP_VU_CA_NHAN_KHAC if ca_nhan else MA_NGHIEP_VU_KHAC
     out: list[str] = []
     for ma in ma_list or ():
         key = str(ma).strip().lower()
-        if key in NGHIEP_VU and key not in out:
+        if key in hop_le and key not in out:
             out.append(key)
-    return out or [MA_NGHIEP_VU_KHAC]
+    return out or [mac_dinh]
 
 
 __all__ = [
@@ -350,6 +395,7 @@ __all__ = [
     "HOP_DONG_ROOT_CODES",
     "TONG_MAU_HOP_DONG",
     "NGHIEP_VU", "MA_NGHIEP_VU_KHAC",
+    "NGHIEP_VU_CA_NHAN", "MA_NGHIEP_VU_CA_NHAN_KHAC",
     "DOI_TUONG_DIEN", "DOANH_NGHIEP", "CO_QUAN_NHA_NUOC", "CA_NHAN", "KHAC",
     "ten_linh_vuc_bieu_mau", "ten_loai_mau", "ten_nhom_hop_dong",
     "sang_ma_van_ban", "la_nghiep_vu_hop_le", "chuan_hoa_nghiep_vu",
