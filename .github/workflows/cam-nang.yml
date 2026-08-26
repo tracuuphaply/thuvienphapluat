@@ -89,7 +89,7 @@ jobs:
 
       - name: Đối chiếu kho
         run: |
-          python -m scripts.sinh_cam_nang --vault legal-vault-public --soi
+          python -u -m scripts.sinh_cam_nang --vault legal-vault-public --soi
 
       - name: Kiểm khoá API và tên model
         # Chặn TRƯỚC khi tải toàn văn và gọi sinh bài. Sai tên model hay hết hạn
@@ -101,7 +101,7 @@ jobs:
           OPENAI_API_BASE: ${{ secrets.OPENAI_API_BASE }}
           CAM_NANG_MODEL: ${{ vars.CAM_NANG_MODEL }}
         run: |
-          python -m scripts.sinh_cam_nang --vault legal-vault-public --kiem-khoa
+          python -u -m scripts.sinh_cam_nang --vault legal-vault-public --kiem-khoa
 
       - name: Sinh bai.json
         env:
@@ -123,7 +123,11 @@ jobs:
           co=()
           if [ "$CO_TOAN_VAN" != "false" ]; then co+=(--co-toan-van); fi
           if [ "$TAT_CA" = "true" ]; then co+=(--tat-ca); fi
-          python -m scripts.sinh_cam_nang \
+          # -u: stdout KHÔNG đệm. Không có nó thì thông báo lỗi (stderr,
+          # vốn không đệm) nhảy lên trước các dòng tiến độ (stdout, đệm
+          # khối khi không phải TTY) — đọc log tưởng biểu mẫu im lặng
+          # biến mất, trong khi nó chỉ bị bỏ và đã báo ở chỗ khác.
+          python -u -m scripts.sinh_cam_nang \
             --vault legal-vault-public \
             --out bai.json \
             --limit "${LIMIT:-20}" \

@@ -1205,6 +1205,10 @@ class TestSoGiayToKhongPhaiSoHieu:
     @pytest.mark.parametrize("token", [
         "01/HĐ-BHXH-2025", "15/HĐLĐ/2026", "03/BB-KT", "07/PLHĐ-2025",
         "22/HĐKT", "09/GXN-UBND",
+        # Mã hợp đồng là tập MỞ — mỗi ngành tự đặt thêm. Khớp chính xác từng mã
+        # để sót đúng hai cái này ở hai lượt chạy thật liên tiếp.
+        "01/2027/HĐQLVH-SXD", "15/HĐDV-2026", "07/HĐXD", "03/HĐTV-2026",
+        "11/GUQ-CT", "05/TTr-BQL",
     ])
     def test_giay_to_giao_dich_khong_bi_coi_la_trich_dan(self, token):
         from src.rag.citation_check import extract_doc_nums
