@@ -250,8 +250,12 @@ class TestChayPheu:
 
     def test_ngoai_linh_vuc_bi_cat_o_tang_1_khong_doc_ruot(
             self, master_session, form_that):
+        # 12 = Đảng: ngoài CẢ HAI whitelist. Trước đây test này dùng 18 (Giáo
+        # dục) và nó ngừng đúng khi mở phạm vi sang cá nhân — Giáo dục là lĩnh
+        # vực cá nhân thật, 805 mẫu. Ví dụ cho "ngoài phạm vi" phải là lĩnh vực
+        # không đối tượng nào đọc, không phải lĩnh vực chưa đến lượt.
         form_that("bieumau_detail_47131_doi_nguoi_dai_dien", "bieumau", "47131",
-                  "MẪU ĐƠN GÌ ĐÓ", field_code=18)   # 18 = Giáo dục
+                  "MẪU ĐƠN GÌ ĐÓ", field_code=12)
         tk = pheu.chay_pheu(master_session, dung_mo_hinh=False)
         assert tk.tang1_loai == 1
         f = master_session.query(LegalForm).one()

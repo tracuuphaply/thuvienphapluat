@@ -18,7 +18,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from src.forms import classifier
-from src.forms.relevance import KetQuaQuyTac, la_linh_vuc_kinh_doanh, quyet_dinh_quy_tac
+from src.forms.relevance import (
+    KetQuaQuyTac,
+    la_linh_vuc_theo_doi,
+    quyet_dinh_quy_tac,
+)
 from src.legal.form_taxonomy import (
     CA_NHAN,
     CO_QUAN_NHA_NUOC,
@@ -277,7 +281,7 @@ def chay_pheu(session, gioi_han: int | None = None, chay_lai: bool = False,
 
         # Tầng 1 — chỉ áp cho /bieumau. Mẫu hợp đồng không có lĩnh vực và gần
         # như toàn bộ phục vụ giao dịch kinh doanh, nên vào thẳng tầng 2.
-        if form.source != SOURCE_HOP_DONG and not la_linh_vuc_kinh_doanh(form.field_code):
+        if form.source != SOURCE_HOP_DONG and not la_linh_vuc_theo_doi(form.field_code):
             form.audience = None
             form.is_business = False
             form.is_individual = False

@@ -92,6 +92,66 @@ def la_linh_vuc_kinh_doanh(ma: int | None) -> bool:
     return ma in linh_vuc_bieu_mau_kinh_doanh()
 
 
+#: Whitelist lĩnh vực cho ĐỐI TƯỢNG CÁ NHÂN — tập RIÊNG, không mở rộng tập trên.
+#:
+#: Hai đối tượng đọc hai phần khác nhau của kho, và phần lớn không giao nhau:
+#: chủ doanh nghiệp không tra "Hôn nhân – Gia đình", người dân không tra "Chứng
+#: khoán". Nhập hai tập làm một thì mỗi lần chỉnh phạm vi của bên này lại đổi
+#: luôn phạm vi bên kia — mà bên doanh nghiệp đang chạy ổn, không nên đụng.
+#:
+#: 12/18 lĩnh vực dưới đây KHÔNG có trong tập doanh nghiệp và đã bị tầng 1 loại
+#: thẳng: 4, 8, 10, 17, 18, 20, 22, 32, 38, 39, 45, 47 — tức 7.761 mẫu, 67% phần
+#: định đi tìm. Trong đó có đúng ba nhóm việc cá nhân gặp nhiều nhất: Hôn nhân –
+#: Gia đình, Tư pháp – Hộ tịch, Dân sự.
+#: Số mẫu đo trực tiếp trên TVPL ngày 24/08/2026, tổng 11.639.
+BIEU_MAU_CA_NHAN_FIELDS: tuple[int, ...] = (
+    2,   # Bảo hiểm                        644
+    4,   # Bổ trợ Tư pháp                  365
+    8,   # Chính sách xã hội               762
+    10,  # Dân sự                          286
+    13,  # Đất đai – Nhà ở                 593
+    17,  # Giao thông vận tải            1.728
+    18,  # Giáo dục                        805
+    20,  # Hôn nhân – Gia đình – Thừa kế    28
+    22,  # Khiếu nại – Tố cáo              163
+    24,  # Lao động – Tiền lương         1.108
+    32,  # Thủ tục tố tụng               1.520
+    33,  # Thủ tục hành chính              150
+    35,  # Thuế – Phí – Lệ phí           1.214
+    38,  # Trách nhiệm hình sự             327
+    39,  # Tư pháp – Hộ tịch               186
+    42,  # Vi phạm hành chính              269
+    45,  # Xuất nhập cảnh                  131
+    47,  # Y tế                          1.860
+)
+
+
+def linh_vuc_bieu_mau_ca_nhan() -> frozenset[int]:
+    """Whitelist lĩnh vực cá nhân, sau khi áp biến `FORM_FIELD_CODES_CA_NHAN`."""
+    raw = (os.getenv("FORM_FIELD_CODES_CA_NHAN", "") or "").strip()
+    if not raw:
+        return frozenset(BIEU_MAU_CA_NHAN_FIELDS)
+    try:
+        codes = {int(x) for x in raw.replace(";", ",").split(",") if x.strip()}
+    except ValueError:
+        return frozenset(BIEU_MAU_CA_NHAN_FIELDS)
+    return frozenset(codes) or frozenset(BIEU_MAU_CA_NHAN_FIELDS)
+
+
+def la_linh_vuc_ca_nhan(ma: int | None) -> bool:
+    return ma in linh_vuc_bieu_mau_ca_nhan()
+
+
+def la_linh_vuc_theo_doi(ma: int | None) -> bool:
+    """Tầng 1: lĩnh vực có phục vụ ÍT NHẤT MỘT trong hai đối tượng không.
+
+    Cổng vào duy nhất của tầng 1. Gộp ở đây chứ không để mỗi bên gọi riêng: tầng
+    1 chỉ có một câu hỏi — "có đáng đọc tiếp không" — và trả lời nó ở hai chỗ là
+    hai chỗ để lệch nhau.
+    """
+    return la_linh_vuc_kinh_doanh(ma) or la_linh_vuc_ca_nhan(ma)
+
+
 # ──────────────────────────────────────────────
 # Tầng 2 — quy tắc từ khoá
 # ──────────────────────────────────────────────
@@ -418,7 +478,9 @@ def quyet_dinh_quy_tac(tieu_de: str, ruot_text: str = "") -> KetQuaQuyTac:
 
 
 __all__ = [
-    "BIEU_MAU_BUSINESS_FIELDS", "DAU_HIEU_LOAI", "DAU_HIEU_GIU",
+    "BIEU_MAU_BUSINESS_FIELDS", "BIEU_MAU_CA_NHAN_FIELDS",
+    "la_linh_vuc_ca_nhan", "la_linh_vuc_theo_doi",
+    "DAU_HIEU_LOAI", "DAU_HIEU_GIU",
     "DAU_HIEU_CA_NHAN", "LOAI_KHONG_PHAI_CA_NHAN", "LOAI_GIAY_TO_CA_NHAN",
     "loai_van_ban",
     "NGUONG_CHAC", "KY_TU_DAU_RUOT", "QUY_TAC", "CAN_HOI_LLM",
