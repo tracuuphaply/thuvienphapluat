@@ -1148,3 +1148,82 @@ class TestChotCheDoViet:
         t = load_cam_nang_prompt()
         assert "không viết ĐOẠN nào đánh giá căn cứ còn hay hết hiệu lực" in t
         assert "tờ mẫu này còn dùng được không" in t
+
+
+class TestJSONMeoThiSinhLai:
+    """JSON méo phải SINH LẠI, không được mất bài.
+
+    Lượt chạy thật thứ hai mất trắng một bài 7.000 chữ vì mô hình quên escape
+    một dấu ngoặc kép trong thân bài markdown. Mô hình sửa được ngay khi bị chỉ
+    mặt — y như cổng tiêu đề đã làm từ đầu.
+    """
+
+    def _goi_hong_roi_tot(self, so_lan_hong=1):
+        ds = []
+
+        def goi(he_thong, nguoi_dung, model="", max_tokens=0):
+            ds.append(nguoi_dung)
+            if len(ds) <= so_lan_hong:
+                return LLMResult(                       # ngoặc kép chưa escape
+                    text='{"tieu_de":"Hợp đồng gia sư: 7 chỗ hở","mo_ta":"x",'
+                         '"than_bai":"## A\n\nBên A nói "xin chào" rồi ký."}',
+                    truncated=False, model="t")
+            return LLMResult(
+                text=json.dumps({"tieu_de": "Hợp đồng gia sư: 7 chỗ hở",
+                                 "mo_ta": "x", "than_bai": "## A\n\nB"},
+                                ensure_ascii=False),
+                truncated=False, model="t")
+
+        goi.loi_goi = ds
+        return goi
+
+    def test_json_meo_lan_dau_thi_sinh_lai_va_cuu_duoc_bai(self, vault, docs_db):
+        goi = self._goi_hong_roi_tot(so_lan_hong=1)
+        kho = doc_kho(vault)
+        bai = sinh_bai(chon_ung_vien(kho)[0], kho, tai_toan_van_ve=False,
+                       db_path=docs_db, goi_llm=goi)
+        assert bai.sinh_lai and len(goi.loi_goi) == 2
+        assert "LƯU Ý SỬA LỖI" in goi.loi_goi[1]
+        assert "escape" in goi.loi_goi[1]        # chỉ đúng chỗ sai
+
+    def test_meo_ca_hai_lan_thi_moi_bo(self, vault, docs_db):
+        goi = self._goi_hong_roi_tot(so_lan_hong=2)
+        kho = doc_kho(vault)
+        with pytest.raises(SinhThatBai):
+            sinh_bai(chon_ung_vien(kho)[0], kho, tai_toan_van_ve=False,
+                     db_path=docs_db, goi_llm=goi)
+        assert len(goi.loi_goi) == 2             # đúng hai lượt, không hơn
+
+
+class TestSoGiayToKhongPhaiSoHieu:
+    """Số hợp đồng / biên bản không phải số hiệu VBQPPL — chặn nó là chặn oan.
+
+    Bài hướng dẫn ĐIỀN biểu mẫu đương nhiên nêu ví dụ cách ghi số hợp đồng. Một
+    bài thật đã bị loại cả bài vì nêu "Số 01/HĐ-BHXH-2025".
+    """
+
+    @pytest.mark.parametrize("token", [
+        "01/HĐ-BHXH-2025", "15/HĐLĐ/2026", "03/BB-KT", "07/PLHĐ-2025",
+        "22/HĐKT", "09/GXN-UBND",
+    ])
+    def test_giay_to_giao_dich_khong_bi_coi_la_trich_dan(self, token):
+        from src.rag.citation_check import extract_doc_nums
+        assert extract_doc_nums(f"Ghi số: {token} vào ô đầu tiên.") == []
+
+    @pytest.mark.parametrize("token", [
+        "112/2025/QH15", "85/2020/NĐ-CP", "23/VBHN-VPQH", "1468/QĐ-TTg",
+        "95/2026/TT-BTC", "47/2026/QĐ-UBND",
+    ])
+    def test_VBQPPL_that_van_phai_qua_cong(self, token):
+        from src.rag.citation_check import extract_doc_nums
+        assert extract_doc_nums(f"Căn cứ {token}.") == [token]
+
+    def test_bai_neu_so_hop_dong_van_qua_cong(self, vault, docs_db):
+        kho = doc_kho(vault)
+        bai = sinh_bai(
+            chon_ung_vien(kho)[0], kho, tai_toan_van_ve=False, db_path=docs_db,
+            goi_llm=_llm_gia(than_bai="## Cách ghi số\n\nGhi 'Số: 01/HĐ-BHXH-2025' "
+                                      "vào ô đầu, căn cứ 91/2015/QH13."),
+        )
+        assert bai.citation_ok is True
+        assert cong.cong_hop_dong(bai.ban_ghi(), ruot_mau_len=5000)

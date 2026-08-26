@@ -237,6 +237,14 @@ def dung_ngu_canh(
     return "\n".join(phan), nguon
 
 
+_NHAC_JSON = (
+    "\n\nLƯU Ý SỬA LỖI — lượt trước KHÔNG parse được: {ly_do}.\n"
+    "Trả về ĐÚNG một đối tượng JSON hợp lệ. Chỗ hay sai nhất: dấu ngoặc kép "
+    'bên trong `than_bai` phải escape thành \\", và mọi xuống dòng phải là \\n '
+    "chứ không phải ký tự xuống dòng thật. Nội dung bài giữ nguyên chất lượng, "
+    "không rút ngắn."
+)
+
 _NHAC_TIEU_DE = (
     "\n\nLƯU Ý SỬA LỖI — lượt trước bị cổng chặn tiêu đề loại, lý do: {ly_do}.\n"
     "Viết lại tiêu đề theo §5: lấy tên biểu mẫu, chuyển về chữ thường có dấu như "
@@ -273,7 +281,12 @@ def sinh_bai(
     sinh_lai = False
 
     for lan in (1, 2):
-        them = "" if lan == 1 else _NHAC_TIEU_DE.format(ly_do=kq_tieu_de.ly_do)
+        if lan == 1:
+            them = ""
+        elif "JSON" in kq_tieu_de.ly_do:
+            them = _NHAC_JSON.format(ly_do=kq_tieu_de.ly_do)
+        else:
+            them = _NHAC_TIEU_DE.format(ly_do=kq_tieu_de.ly_do)
         ket_qua = goi_llm(he_thong, nguoi_dung + them, model=model,
                           max_tokens=max_tokens)
         # Kiểm "bị cắt" TRƯỚC khi bóc JSON: khi chạm trần token,
@@ -285,7 +298,20 @@ def sinh_bai(
                 f"bài bị cắt do chạm trần token — tăng CAM_NANG_MAX_TOKENS "
                 f"(hiện {max_tokens or 'mặc định'})"
             )
-        goi = _doc_json(ket_qua.text)
+        try:
+            goi = _doc_json(ket_qua.text)
+        except SinhThatBai as e:
+            # JSON méo cũng SINH LẠI, không bỏ bài. Nguyên nhân hay gặp là dấu
+            # ngoặc kép chưa escape giữa thân bài markdown — mô hình sửa được
+            # ngay khi bị chỉ mặt, y như cổng tiêu đề. Đã gặp thật: một lượt
+            # chạy mất trắng bài dài 7.000 chữ chỉ vì một ký tự.
+            if lan == 2:
+                raise
+            logger.warning("[%s] %s — sinh lại lần 2", bm.form_key, e)
+            kq_tieu_de = cong.KetQuaCong(False, f"đầu ra không phải JSON hợp lệ ({e})")
+            sinh_lai = True
+            continue
+
         kq_tieu_de = cong.cong_tieu_de(goi.get("tieu_de") or "")
         if kq_tieu_de:
             break
