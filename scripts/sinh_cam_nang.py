@@ -37,7 +37,7 @@ from src.camnang.kho import KhoKhongDoc, chon_ung_vien, db_so_hieu_tu_kho, doc_k
 from src.camnang.sinh import SinhThatBai, sinh_bai
 from src.camnang.trang_thai import DUONG_DAN_MAC_DINH, SoTrangThai
 from src.config import PROJECT_ROOT, cam_nang_max_tokens, cam_nang_model
-from src.rag.reports.llm import LLMUnavailable
+from src.rag.reports.llm import LLMUnavailable, call_report_llm
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +62,38 @@ def _ghi_dau_ra(duong_dan: Path, ban_ghi: list[dict]) -> Path:
         json.dumps(ban_ghi, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
     return duong_dan
+
+
+def _kiem_khoa(model: str) -> int:
+    """Gọi mô hình một lượt CỰC NGẮN để biết khoá và tên model có dùng được không.
+
+    VÌ SAO ĐÁNG MỘT LƯỢT GỌI: sai tên model hay hết hạn khoá đều chỉ lộ ra ở
+    lượt gọi đầu tiên — mà lượt đó nằm giữa một lượt chạy đã tải xong toàn văn
+    và đang viết bài thứ nhất. Biết trước bằng 5 token rẻ hơn nhiều so với biết
+    sau khi đã đốt vài lượt sinh bài, nhất là khi gateway đổi danh mục model.
+    """
+    from src.config import openai_api_base
+
+    print(f"Gateway : {openai_api_base()}")
+    print(f"Model   : {model}")
+    try:
+        kq = call_report_llm(
+            "Trả lời đúng một từ.", "Nói: xong", model=model, max_tokens=16,
+        )
+    except LLMUnavailable as e:
+        print(f"\n✗ KHÔNG DÙNG ĐƯỢC: {e}", file=sys.stderr)
+        print("\nKiểm lại theo thứ tự:", file=sys.stderr)
+        print("  1. Khoá đã khai chưa (V98_API_KEY hoặc OPENAI_API_KEY)?",
+              file=sys.stderr)
+        print("  2. Tên model có đúng danh mục gateway không? Đặt lại bằng",
+              file=sys.stderr)
+        print("     CAM_NANG_MODEL=<tên đúng> hoặc cờ --model.", file=sys.stderr)
+        print("  3. OPENAI_API_BASE có trỏ đúng gateway không?", file=sys.stderr)
+        return 2
+
+    print(f"\n✓ Gọi được. Mô hình trả về: {kq.text.strip()[:80]!r}")
+    print(f"  model thật gateway dùng: {kq.model}")
+    return 0
 
 
 def _bang_soi(kho, ung_vien) -> None:
@@ -100,6 +132,9 @@ def main() -> int:
                     help=f"Số bài tối đa một lượt (mặc định {MAC_DINH_LIMIT})")
     ap.add_argument("--soi", action="store_true",
                     help="Đối chiếu kho và in bảng, KHÔNG gọi mô hình")
+    ap.add_argument("--kiem-khoa", action="store_true",
+                    help="Gọi mô hình MỘT lượt cực ngắn để kiểm khoá + tên model, "
+                         "rồi dừng. Dùng trước khi chạy thật.")
     ap.add_argument("--co-toan-van", action="store_true",
                     help="Chỉ biểu mẫu có căn cứ kèm toàn văn trên Drive")
     ap.add_argument("--nghiep-vu", default="",
@@ -151,6 +186,9 @@ def main() -> int:
     if args.soi:
         _bang_soi(kho, ung_vien)
         return 0
+
+    if args.kiem_khoa:
+        return _kiem_khoa(args.model or cam_nang_model())
 
     so = SoTrangThai(Path(args.trang_thai))
     if not args.tat_ca:
