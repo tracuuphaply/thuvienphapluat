@@ -1308,3 +1308,25 @@ class TestMotBaiHongKhongGietCaLuot:
         thu_tu, ban_ghi = self._chay(tmp_path, monkeypatch, hong_o={0, 2, 4})
         assert len(thu_tu) == 5
         assert len(ban_ghi) == 2
+
+
+class TestSoViDuPhaiLaChoTrong:
+    """Mô hình bịa số ví dụ để minh hoạ cách điền — gốc rễ của việc bị loại bài.
+
+    Ba lượt chạy thật liên tiếp bị cổng loại vì `05/2027/QLHT`,
+    `01/2024/QLVH-CONGCAP`, `123/QĐ-UBND` — số trông y như thật do mô hình nghĩ
+    ra để làm ví dụ. Nới cổng cho từng mã là chạy theo đuôi; bảo mô hình dùng
+    dấu `…` mới là sửa gốc.
+    """
+
+    def test_prompt_day_dung_dang_cho_trong(self):
+        t = load_cam_nang_prompt()
+        assert "Số ví dụ phải trông RÕ RÀNG là chỗ trống" in t
+        assert "…/…/QLHT" in t or "…/…/HĐDV" in t
+        assert "chỉ được viết ra khi nó có thật trong phần VĂN BẢN" in t
+
+    def test_ngu_canh_nhac_lai_khi_co_can_cu(self, vault):
+        kho = doc_kho(vault)
+        u = next(u for u in chon_ung_vien(kho) if u.can_cu_khop)
+        ngu_canh, _ = dung_ngu_canh(u, kho, tai_toan_van_ve=False)
+        assert "KHÔNG bịa số cụ thể" in ngu_canh

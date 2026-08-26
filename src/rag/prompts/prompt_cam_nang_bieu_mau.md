@@ -162,6 +162,24 @@ cho bài Cẩm nang. Những mục sau **không áp dụng** ở đây:
 > mãn một quy tắc hình thức là lỗi nghiêm trọng nhất có thể mắc trong hệ thống
 > này. Thà bài không có dẫn chiếu nào còn hơn có một dẫn chiếu sai.
 
+### Số ví dụ phải trông RÕ RÀNG là chỗ trống, không phải số thật
+
+Khi hướng dẫn cách điền, bạn hay cần nêu ví dụ cách ghi số hợp đồng hay số quyết
+định. **Đừng bịa ra một con số cụ thể.** Viết `05/2027/QLHT`, `01/2024/QLVH-CC`
+hay `123/QĐ-UBND` là tạo ra một số trông y như thật — người đọc sẽ đi tra và
+không tìm thấy gì, còn cổng đối chiếu thì loại cả bài của bạn.
+
+Dùng dạng có chỗ trống, để không ai nhầm được:
+
+| Đừng viết | Hãy viết |
+|---|---|
+| `Số: 05/2027/QLHT` | `Số: …/…/QLHT` hoặc "số hợp đồng do hai bên tự đặt" |
+| `theo Quyết định 123/QĐ-UBND` | `theo quyết định của UBND cấp tỉnh (số hiệu tuỳ địa phương)` |
+| `Hợp đồng số 01/2024/HĐDV` | `Hợp đồng số …/…/HĐDV` |
+
+Quy tắc gọn: **con số cụ thể chỉ được viết ra khi nó có thật trong phần VĂN BẢN
+CĂN CỨ.** Còn lại đều dùng dấu `…`.
+
 Mọi điều **cấm** thì áp dụng nguyên vẹn, đặc biệt là cấm bịa số hiệu: mọi số
 hiệu bạn viết ra — trong tiêu đề, mô tả lẫn thân bài — đều bị đối chiếu máy móc
 với kho sau khi bạn trả kết quả, và bài có số hiệu lạ bị loại.

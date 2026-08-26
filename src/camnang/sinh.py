@@ -202,6 +202,9 @@ def dung_ngu_canh(
             "> nói về điều luật'.** Những câu đó dành riêng cho nhóm không có căn",
             "> cứ; viết ra ở đây là tự mâu thuẫn với chính phần bạn trích bên dưới.",
             "> Cứ trích Điều/khoản từ mục Toàn văn một cách bình thường.",
+            "> Nhưng SỐ VÍ DỤ (số hợp đồng, số quyết định của địa phương) thì viết",
+            "> dạng có chỗ trống — `…/…/HĐDV` — chứ KHÔNG bịa số cụ thể. Số cụ thể",
+            "> chỉ được viết khi nó có thật trong phần VĂN BẢN CĂN CỨ trên.",
             "",
         ]
 
