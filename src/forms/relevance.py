@@ -230,6 +230,41 @@ DAU_HIEU_GIU: tuple[str, ...] = (
     "kinh doanh",
 )
 
+#: LOẠI VĂN BẢN Ở ĐẦU TIÊU ĐỀ — tầng phủ quyết, mạnh hơn mọi từ khoá chủ đề.
+#:
+#: Hiệu chuẩn 201 mẫu ngẫu nhiên trên 18 lĩnh vực liên quan cá nhân (26/08/2026)
+#: cho thấy từ khoá CHỦ ĐỀ không phân biệt được ai điền, vì văn bản do cơ quan
+#: phát hành cũng nói về đúng chủ đề đó:
+#:     "MẪU BÁO CÁO HOẠT ĐỘNG BẢO HIỂM Y TẾ"        ← không phải mẫu của người bệnh
+#:     "MẪU QUYẾT ĐỊNH VỀ VIỆC HƯỞNG TRỢ CẤP"       ← không phải mẫu của người hưởng
+#:     "MẪU BÁO CÁO TUỔI LY HÔN TRUNG BÌNH CỦA TAND"← không phải mẫu của người ly hôn
+#: Cả 17 ca dương tính giả của nhãn "cá nhân" đều đúng dạng này.
+#:
+#: Nhưng LOẠI VĂN BẢN thì phân biệt được, và phân biệt gần như tuyệt đối. Đo trên
+#: cùng 201 mẫu, tỉ lệ phục vụ cá nhân theo loại:
+#:     BÁO CÁO 0/37 · QUYẾT ĐỊNH 0/21 · THÔNG BÁO 0/17 · BIÊN BẢN 0/13 ·
+#:     CÔNG VĂN 0/5 · PHIẾU KIỂM SÁT 0/4 · TRÍCH LỤC 0/3 · SỔ THEO DÕI 0/3
+#: Tổng 93 mẫu thuộc các loại này, KHÔNG MỘT MẪU NÀO do cá nhân điền.
+#:
+#: Lý do bản chất: đây là công cụ một tổ chức PHÁT HÀNH, không phải giấy tờ một
+#: người NỘP VÀO. Doanh nghiệp vẫn nộp báo cáo, nên đây chỉ phủ quyết cờ cá nhân
+#: chứ không phủ quyết cờ doanh nghiệp.
+LOAI_KHONG_PHAI_CA_NHAN: tuple[str, ...] = (
+    "báo cáo", "quyết định", "thông báo", "biên bản", "công văn",
+    "phiếu kiểm sát", "sổ theo dõi", "trích lục", "danh sách", "bảng tổng hợp",
+    "kế hoạch", "đề án", "quy chế", "lời chứng", "phát biểu", "kiến nghị",
+    "giấy phép", "giấy chứng nhận", "giấy biên nhận", "giấy đăng ký",
+    "chứng chỉ", "yêu cầu", "phương án", "biểu tổng hợp",
+)
+
+#: Loại giấy tờ mà một NGƯỜI nộp vào cho cơ quan. Đo trên 201 mẫu: BẢN KHAI 5/5,
+#: ĐƠN XIN 3/3, TỜ KHAI 2/2, PHIẾU KHAI BÁO 1/1, BẢN TƯỜNG TRÌNH 1/1 — 12/12 đều
+#: phục vụ cá nhân. Cỡ mẫu nhỏ nên đây là BẰNG CHỨNG CỘNG THÊM, không phải kết
+#: luận: "đơn đề nghị" cũng hay do doanh nghiệp nộp (5/12 trong mẫu).
+LOAI_GIAY_TO_CA_NHAN: tuple[str, ...] = (
+    "bản khai", "đơn xin", "tờ khai", "phiếu khai báo", "bản tường trình",
+)
+
 #: Tiêu đề nói lên chủ đề rõ hơn nhiều so với một lần xuất hiện đâu đó trong
 #: ruột mẫu — cùng tỉ lệ trọng số mà industry_classifier.py đã dùng.
 TRONG_SO_TIEU_DE = 3
@@ -261,6 +296,7 @@ class KetQuaQuyTac:
     diem_giu: int = 0
     diem_loai: int = 0
     diem_ca_nhan: int = 0
+    loai_van_ban: str = ""
     dau_hieu_giu: list[str] = field(default_factory=list)
     dau_hieu_loai: list[str] = field(default_factory=list)
     dau_hieu_ca_nhan: list[str] = field(default_factory=list)
@@ -305,6 +341,24 @@ def _cham_diem(tu_khoa: tuple[str, ...], tieu_de: str,
     return diem, trung
 
 
+def loai_van_ban(tieu_de: str) -> str:
+    """Loại văn bản đứng đầu tiêu đề, đã bỏ tiền tố "MẪU".
+
+    Xét ĐẦU tiêu đề chứ không tìm từ khoá ở bất kỳ đâu: "Đơn đề nghị cấp bản sao
+    QUYẾT ĐỊNH ly hôn" là đơn của người dân, không phải quyết định của toà. Chữ
+    quyết định ở đó là tân ngữ, không phải loại của chính tờ giấy này.
+    """
+    t = (tieu_de or "").strip().lower()
+    for tien_to in ("mẫu ", "mẫu:"):
+        if t.startswith(tien_to):
+            t = t[len(tien_to):].lstrip()
+    for loai in sorted(LOAI_KHONG_PHAI_CA_NHAN + LOAI_GIAY_TO_CA_NHAN,
+                       key=len, reverse=True):
+        if t.startswith(loai):
+            return loai
+    return ""
+
+
 def quyet_dinh_quy_tac(tieu_de: str, ruot_text: str = "") -> KetQuaQuyTac:
     """Tầng 2, ba bộ dấu hiệu: doanh nghiệp · cá nhân · cơ quan nhà nước.
 
@@ -339,8 +393,25 @@ def quyet_dinh_quy_tac(tieu_de: str, ruot_text: str = "") -> KetQuaQuyTac:
     if diem_loai:
         return kq          # có mùi nhà nước mà không sạch → để mô hình đọc
 
+    lvb = loai_van_ban(tieu_de)
+    kq.loai_van_ban = lvb
     kq.cho_doanh_nghiep = diem_giu >= NGUONG_CHAC
-    kq.cho_ca_nhan = diem_cn >= NGUONG_CHAC
+    # PHỦ QUYẾT, không phải trừ điểm. Một công cụ do tổ chức phát hành thì không
+    # có mức chủ đề nào làm nó thành giấy tờ của người dân được.
+    kq.cho_ca_nhan = (diem_cn >= NGUONG_CHAC
+                      and lvb not in LOAI_KHONG_PHAI_CA_NHAN)
+    # LOẠI GIẤY TỜ TỰ NÓ ĐÃ ĐỦ, không cần thêm từ khoá chủ đề. Hiệu chuẩn cho
+    # thấy 22/23 ca bỏ sót đều có điểm chủ đề BẰNG 0: "Bản khai để giải quyết chế
+    # độ Bà mẹ Việt Nam anh hùng", "Phiếu khai báo tạm vắng", "Bản tường trình" —
+    # không tiêu đề nào chứa từ khoá nào, mà cả ba đều rõ ràng do một người điền.
+    # Đòi thêm bằng chứng chủ đề ở đây là đòi thứ mà chính loại giấy tờ đã nói.
+    #
+    # Nhưng CHỈ KHI KHÔNG CÓ dấu hiệu doanh nghiệp: "tờ khai thuế GTGT" và "tờ
+    # khai hải quan" cũng là "tờ khai", và chúng là giấy tờ doanh nghiệp nộp hằng
+    # kỳ. Mẫu 201 mẫu có TỜ KHAI 2/2 cá nhân, nhưng cỡ mẫu đó không đủ để bỏ qua
+    # điều đã biết chắc từ kho doanh nghiệp.
+    if lvb in LOAI_GIAY_TO_CA_NHAN and diem_giu == 0:
+        kq.cho_ca_nhan = True
     if kq.cho_doanh_nghiep or kq.cho_ca_nhan:
         kq.audience = DOANH_NGHIEP if diem_giu >= diem_cn else CA_NHAN
     return kq
@@ -348,7 +419,8 @@ def quyet_dinh_quy_tac(tieu_de: str, ruot_text: str = "") -> KetQuaQuyTac:
 
 __all__ = [
     "BIEU_MAU_BUSINESS_FIELDS", "DAU_HIEU_LOAI", "DAU_HIEU_GIU",
-    "DAU_HIEU_CA_NHAN",
+    "DAU_HIEU_CA_NHAN", "LOAI_KHONG_PHAI_CA_NHAN", "LOAI_GIAY_TO_CA_NHAN",
+    "loai_van_ban",
     "NGUONG_CHAC", "KY_TU_DAU_RUOT", "QUY_TAC", "CAN_HOI_LLM",
     "KetQuaQuyTac", "linh_vuc_bieu_mau_kinh_doanh", "la_linh_vuc_kinh_doanh",
     "quyet_dinh_quy_tac",

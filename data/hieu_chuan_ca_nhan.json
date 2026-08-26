@@ -1,0 +1,3935 @@
+[
+ {
+  "form_key": "bieumau-8598",
+  "url": "https://thuvienphapluat.vn/bieumau/8598/MAU-BAO-CAO-TINH-HINH-BENH-KHONG-LAY-NHIEM-DUNG-TRONG-BAO-CAO-THONG-KE-Y-TE-TUYEN-TRUNG-UONG",
+  "title": "MẪU BÁO CÁO TÌNH HÌNH BỆNH KHÔNG LÂY NHIỄM (DÙNG TRONG BÁO CÁO THỐNG KÊ Y TẾ TUYẾN TRUNG ƯƠNG)",
+  "field_code": 47,
+  "linh_vuc": "Y tế",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-9365",
+  "url": "https://thuvienphapluat.vn/bieumau/9365/MAU-DON-DE-NGHI-CHO-PHEP-KHAM-BENH-CHUA-BENH-NHAN-DAO",
+  "title": "MẪU ĐƠN ĐỀ NGHỊ CHO PHÉP KHÁM BỆNH, CHỮA BỆNH NHÂN ĐẠO",
+  "field_code": 47,
+  "linh_vuc": "Y tế",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-8604",
+  "url": "https://thuvienphapluat.vn/bieumau/8604/MAU-BAO-CAO-KET-QUA-DIEU-TRI-BENH-NHAN-LAO-MOI-CO-BANG-CHUNG-VI-KHUAN-HOC-DUNG-TRONG-BAO-CAO-THONG-KE-Y-TE-TUYEN-TRUNG-UONG",
+  "title": "MẪU BÁO CÁO KẾT QUẢ ĐIỀU TRỊ BỆNH NHÂN LAO MỚI CÓ BẰNG CHỨNG VI KHUẨN HỌC (DÙNG TRONG BÁO CÁO THỐNG KÊ Y TẾ TUYẾN TRUNG ƯƠNG)",
+  "field_code": 47,
+  "linh_vuc": "Y tế",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-9420",
+  "url": "https://thuvienphapluat.vn/bieumau/9420/MAU-DON-DE-NGHI-CAP-GIAY-PHEP-HOAT-DONG-CHO-TRAM-DIEM-SO-CAP-CUU-CHU-THAP-DO",
+  "title": "MẪU ĐƠN ĐỀ NGHỊ CẤP GIẤY PHÉP HOẠT ĐỘNG CHO TRẠM, ĐIỂM SƠ CẤP CỨU CHỮ THẬP ĐỎ",
+  "field_code": 47,
+  "linh_vuc": "Y tế",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-9436",
+  "url": "https://thuvienphapluat.vn/bieumau/9436/MAU-BAO-CAO-CONG-TAC-CHUYEN-TUYEN-DINH-KY-HANG-QUY-6-THANG-HANG-NAM",
+  "title": "MẪU BÁO CÁO CÔNG TÁC CHUYỂN TUYẾN (ĐỊNH KỲ HẰNG QUÝ/6 THÁNG/ HẰNG NĂM)",
+  "field_code": 47,
+  "linh_vuc": "Y tế",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-8588",
+  "url": "https://thuvienphapluat.vn/bieumau/8588/MAU-BAO-CAO-KE-HOACH-HOA-GIA-DINH-DUNG-TRONG-BAO-CAO-THONG-KE-Y-TE-TUYEN-TRUNG-UONG",
+  "title": "MẪU BÁO CÁO KẾ HOẠCH HÓA GIA ĐÌNH (DÙNG TRONG BÁO CÁO THỐNG KÊ Y TẾ TUYẾN TRUNG ƯƠNG)",
+  "field_code": 47,
+  "linh_vuc": "Y tế",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-8602",
+  "url": "https://thuvienphapluat.vn/bieumau/8602/MAU-BAO-CAO-PHONG-CHONG-SOT-RET-DUNG-TRONG-BAO-CAO-THONG-KE-Y-TE-TUYEN-TRUNG-UONG",
+  "title": "MẪU BÁO CÁO PHÒNG CHỐNG SỐT RÉT (DÙNG TRONG BÁO CÁO THỐNG KÊ Y TẾ TUYẾN TRUNG ƯƠNG)",
+  "field_code": 47,
+  "linh_vuc": "Y tế",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-8605",
+  "url": "https://thuvienphapluat.vn/bieumau/8605/MAU-BAO-CAO-KET-QUA-DIEU-TRI-BENH-NHAN-LAO-CO-HIV-DUNG-TRONG-BAO-CAO-THONG-KE-Y-TE-TUYEN-TRUNG-UONG",
+  "title": "MẪU BÁO CÁO KẾT QUẢ ĐIỀU TRỊ BỆNH NHÂN LAO CÓ HIV (DÙNG TRONG BÁO CÁO THỐNG KÊ Y TẾ TUYẾN TRUNG ƯƠNG)",
+  "field_code": 47,
+  "linh_vuc": "Y tế",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-8606",
+  "url": "https://thuvienphapluat.vn/bieumau/8606/MAU-BAO-CAO-HOAT-DONG-PHONG-CHONG-HIV-AIDS-VA-CAN-THIEP-DIEU-TRI-CHO-NGUOI-NGHIEN-CAC-CHAT-MA-TUY-DUNG-TRONG-BAO-CAO-THONG-KE-Y-TE-TUYEN-TRUNG-UONG",
+  "title": "MẪU BÁO CÁO HOẠT ĐỘNG PHÒNG CHỐNG HIV/AIDS VÀ CAN THIỆP ĐIỀU TRỊ CHO NGƯỜI NGHIỆN CÁC CHẤT MA TÚY (DÙNG TRONG BÁO CÁO THỐNG KÊ Y TẾ TUYẾN TRUNG ƯƠNG)",
+  "field_code": 47,
+  "linh_vuc": "Y tế",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-8600",
+  "url": "https://thuvienphapluat.vn/bieumau/8600/MAU-BAO-CAO-KIEM-TRA-SUC-KHOE-DINH-KY-QUAN-LY-BENH-KHONG-LAY-NHIEM-TAI-TRAM-Y-TE-DUNG-TRONG-BAO-CAO-THONG-KE-Y-TE-TUYEN-TRUNG-UONG",
+  "title": "MẪU BÁO CÁO KIỂM TRA SỨC KHỎE ĐỊNH KỲ, QUẢN LÝ BỆNH KHÔNG LÂY NHIỄM TẠI TRẠM Y TẾ (DÙNG TRONG BÁO CÁO THỐNG KÊ Y TẾ TUYẾN TRUNG ƯƠNG)",
+  "field_code": 47,
+  "linh_vuc": "Y tế",
+  "may_doan": {
+   "audience": "co_quan_nha_nuoc",
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    3
+   ],
+   "dau_hieu": [
+    "trạm y tế"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-9366",
+  "url": "https://thuvienphapluat.vn/bieumau/9366/MAU-DANH-SACH-THANH-VIEN-KHAM-BENH-CHUA-BENH-NHAN-DAO",
+  "title": "MẪU DANH SÁCH THÀNH VIÊN KHÁM BỆNH, CHỮA BỆNH NHÂN ĐẠO",
+  "field_code": 47,
+  "linh_vuc": "Y tế",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-8589",
+  "url": "https://thuvienphapluat.vn/bieumau/8589/MAU-BAO-CAO-HOAT-DONG-SAN-XUAT-KINH-DOANH-DUOC-VA-NHAN-LUC-DUOC-DUNG-TRONG-BAO-CAO-THONG-KE-Y-TE-TUYEN-TRUNG-UONG",
+  "title": "MẪU BÁO CÁO HOẠT ĐỘNG SẢN XUẤT KINH DOANH DƯỢC VÀ NHÂN LỰC DƯỢC (DÙNG TRONG BÁO CÁO THỐNG KÊ Y TẾ TUYẾN TRUNG ƯƠNG)",
+  "field_code": 47,
+  "linh_vuc": "Y tế",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": true,
+   "cn": false,
+   "diem": [
+    3,
+    0,
+    0
+   ],
+   "dau_hieu": [
+    "kinh doanh"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-9422",
+  "url": "https://thuvienphapluat.vn/bieumau/9422/MAU-DON-DE-NGHI-CAP-LAI-GIAY-PHEP-HOAT-DONG-CHO-TRAM-DIEM-SO-CAP-CUU-CHU-THAP-DO",
+  "title": "MẪU ĐƠN ĐỀ NGHỊ CẤP LẠI GIẤY PHÉP HOẠT ĐỘNG CHO TRẠM, ĐIỂM SƠ CẤP CỨU CHỮ THẬP ĐỎ",
+  "field_code": 47,
+  "linh_vuc": "Y tế",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-8590",
+  "url": "https://thuvienphapluat.vn/bieumau/8590/MAU-BAO-CAO-TINH-HINH-NHAN-LUC-Y-TE-DUNG-TRONG-BAO-CAO-THONG-KE-Y-TE-TUYEN-TRUNG-UONG",
+  "title": "MẪU BÁO CÁO TÌNH HÌNH NHÂN LỰC Y TẾ (DÙNG TRONG BÁO CÁO THỐNG KÊ Y TẾ TUYẾN TRUNG ƯƠNG)",
+  "field_code": 47,
+  "linh_vuc": "Y tế",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-9369",
+  "url": "https://thuvienphapluat.vn/bieumau/9369/MAU-PHIEU-TIEP-NHAN-HO-SO-DE-NGHI-DE-NGHI-KHAM-BENH-CHUA-BENH-NHAN-DAO",
+  "title": "MẪU PHIẾU TIẾP NHẬN HỒ SƠ ĐỀ NGHỊ ĐỀ NGHỊ KHÁM BỆNH, CHỮA BỆNH NHÂN ĐẠO",
+  "field_code": 47,
+  "linh_vuc": "Y tế",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-8603",
+  "url": "https://thuvienphapluat.vn/bieumau/8603/MAU-BAO-CAO-TINH-HINH-PHONG-CHONG-LAO-DUNG-TRONG-BAO-CAO-THONG-KE-Y-TE-TUYEN-TRUNG-UONG",
+  "title": "MẪU BÁO CÁO TÌNH HÌNH PHÒNG CHỐNG LAO (DÙNG TRONG BÁO CÁO THỐNG KÊ Y TẾ TUYẾN TRUNG ƯƠNG)",
+  "field_code": 47,
+  "linh_vuc": "Y tế",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-8593",
+  "url": "https://thuvienphapluat.vn/bieumau/8593/MAU-BAO-CAO-HOAT-DONG-BAO-HIEM-Y-TE-DUNG-TRONG-BAO-CAO-THONG-KE-Y-TE-TUYEN-TRUNG-UONG",
+  "title": "MẪU BÁO CÁO HOẠT ĐỘNG BẢO HIỂM Y TẾ (DÙNG TRONG BÁO CÁO THỐNG KÊ Y TẾ TUYẾN TRUNG ƯƠNG)",
+  "field_code": 47,
+  "linh_vuc": "Y tế",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    3,
+    0
+   ],
+   "dau_hieu": [
+    "bảo hiểm y tế"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-9368",
+  "url": "https://thuvienphapluat.vn/bieumau/9368/MAU-KE-HOACH-TO-CHUC-KHAM-BENH-CHUA-BENH-NHAN-DAO",
+  "title": "MẪU KẾ HOẠCH TỔ CHỨC KHÁM BỆNH, CHỮA BỆNH NHÂN ĐẠO",
+  "field_code": 47,
+  "linh_vuc": "Y tế",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-8594",
+  "url": "https://thuvienphapluat.vn/bieumau/8594/MAU-BAO-CAO-TINH-HINH-NGO-DOC-THUC-PHAM-DUNG-TRONG-BAO-CAO-THONG-KE-Y-TE-TUYEN-TRUNG-UONG",
+  "title": "MẪU BÁO CÁO TÌNH HÌNH NGỘ ĐỘC THỰC PHẨM (DÙNG TRONG BÁO CÁO THỐNG KÊ Y TẾ TUYẾN TRUNG ƯƠNG)",
+  "field_code": 47,
+  "linh_vuc": "Y tế",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-9363",
+  "url": "https://thuvienphapluat.vn/bieumau/9363/MAU-PHIEU-XAC-NHAN-DONG-Y-XET-NGHIEM-HIV",
+  "title": "MẪU PHIẾU XÁC NHẬN ĐỒNG Ý XÉT NGHIỆM HIV",
+  "field_code": 47,
+  "linh_vuc": "Y tế",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "ca_nhan"
+ },
+ {
+  "form_key": "bieumau-1622",
+  "url": "https://thuvienphapluat.vn/bieumau/1622/MAU-GIAY-DE-NGHI-CAP-CAP-LAI-GIAY-PHEP-LIEN-VAN-GIUA-VIET-NAM-LAO-VA-CAMPUCHIA-CHO-PHUONG-TIEN-THUONG-MAI",
+  "title": "MẪU GIẤY ĐỀ NGHỊ CẤP, CẤP LẠI GIẤY PHÉP LIÊN VẬN GIỮA VIỆT NAM, LÀO VÀ CAMPUCHIA CHO PHƯƠNG TIỆN THƯƠNG MẠI",
+  "field_code": 17,
+  "linh_vuc": "Giao thông vận tải",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-1612",
+  "url": "https://thuvienphapluat.vn/bieumau/1612/MAU-GIAY-DANG-KY-BO-SUNG-THAY-THE-PHUONG-TIEN-KHAI-THAC-TUYEN-VAN-TAI-HANH-KHACH-CO-DINH-GIUA-VIET-NAM-VA-CAMPUCHIA",
+  "title": "MẪU GIẤY ĐĂNG KÝ/BỔ SUNG/THAY THẾ PHƯƠNG TIỆN KHAI THÁC TUYẾN VẬN TẢI HÀNH KHÁCH CỐ ĐỊNH GIỮA VIỆT NAM VÀ CAMPUCHIA",
+  "field_code": 17,
+  "linh_vuc": "Giao thông vận tải",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-42339",
+  "url": "https://thuvienphapluat.vn/bieumau/42339/MAU-DON-XIN-TAM-DUNG-THAM-GIA-GIAO-THONG-DOI-VOI-XE-O-TO",
+  "title": "MẪU ĐƠN XIN TẠM DỪNG THAM GIA GIAO THÔNG (ĐỐI VỚI XE Ô TÔ)",
+  "field_code": 17,
+  "linh_vuc": "Giao thông vận tải",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": false,
+   "cn": true,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "ca_hai"
+ },
+ {
+  "form_key": "bieumau-1626",
+  "url": "https://thuvienphapluat.vn/bieumau/1626/MAU-GIAY-DE-NGHI-GIA-HAN-THOI-GIAN-LUU-HANH-CUA-PHUONG-TIEN-TAI-VIET-NAM-VIET-NAM-LAO-VA-CAMPUCHIA",
+  "title": "MẪU GIẤY ĐỀ NGHỊ GIA HẠN THỜI GIAN LƯU HÀNH CỦA PHƯƠNG TIỆN TẠI VIỆT NAM (VIỆT NAM, LÀO VÀ CAMPUCHIA)",
+  "field_code": 17,
+  "linh_vuc": "Giao thông vận tải",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "ca_hai"
+ },
+ {
+  "form_key": "bieumau-1607",
+  "url": "https://thuvienphapluat.vn/bieumau/1607/MAU-GIAY-DE-NGHI-CAP-CAP-LAI-GIAY-PHEP-LIEN-VAN-GIUA-VIET-NAM-VA-CAMPUCHIA-CHO-PHUONG-TIEN-THUONG-MAI",
+  "title": "MẪU GIẤY ĐỀ NGHỊ CẤP, CẤP LẠI GIẤY PHÉP LIÊN VẬN GIỮA VIỆT NAM VÀ CAMPUCHIA CHO PHƯƠNG TIỆN THƯƠNG MẠI",
+  "field_code": 17,
+  "linh_vuc": "Giao thông vận tải",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-41789",
+  "url": "https://thuvienphapluat.vn/bieumau/41789/MAU-BAO-CAO-THONG-KE-TINH-HINH-DANG-KY-PHUONG-TIEN-GIAO-THONG-DUONG-SAT",
+  "title": "MẪU BÁO CÁO THỐNG KÊ TÌNH HÌNH ĐĂNG KÝ PHƯƠNG TIỆN GIAO THÔNG ĐƯỜNG SẮT",
+  "field_code": 17,
+  "linh_vuc": "Giao thông vận tải",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-1608",
+  "url": "https://thuvienphapluat.vn/bieumau/1608/MAU-GIAY-DE-NGHI-CAP-CAP-LAI-GIAY-PHEP-LIEN-VAN-GIUA-VIET-NAM-VA-CAMPUCHIA-CHO-PHUONG-TIEN-PHI-THUONG-MAI",
+  "title": "MẪU GIẤY ĐỀ NGHỊ CẤP, CẤP LẠI GIẤY PHÉP LIÊN VẬN GIỮA VIỆT NAM VÀ CAMPUCHIA CHO PHƯƠNG TIỆN PHI THƯƠNG MẠI",
+  "field_code": 17,
+  "linh_vuc": "Giao thông vận tải",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "ca_hai"
+ },
+ {
+  "form_key": "bieumau-1605",
+  "url": "https://thuvienphapluat.vn/bieumau/1605/MAU-PHUONG-AN-KINH-DOANH-VAN-TAI-DUONG-BO-QUOC-TE-GIUA-VIET-NAM-VA-CAMPUCHIA",
+  "title": "MẪU PHƯƠNG ÁN KINH DOANH VẬN TẢI ĐƯỜNG BỘ QUỐC TẾ GIỮA VIỆT NAM VÀ CAMPUCHIA",
+  "field_code": 17,
+  "linh_vuc": "Giao thông vận tải",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": true,
+   "cn": false,
+   "diem": [
+    3,
+    0,
+    0
+   ],
+   "dau_hieu": [
+    "kinh doanh"
+   ]
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-42337",
+  "url": "https://thuvienphapluat.vn/bieumau/42337/MAU-QUYET-DINH-VE-VIEC-TRA-LAI-HOAC-BU-TRU-PHI-SU-DUNG-DUONG-BO",
+  "title": "MẪU QUYẾT ĐỊNH VỀ VIỆC TRẢ LẠI HOẶC BÙ TRỪ PHÍ SỬ DỤNG ĐƯỜNG BỘ",
+  "field_code": 17,
+  "linh_vuc": "Giao thông vận tải",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-1624",
+  "url": "https://thuvienphapluat.vn/bieumau/1624/MAU-GIAY-PHEP-LIEN-VAN-GIUA-VIET-NAM-LAO-VA-CAMPUCHIA-CHO-PHUONG-TIEN-THUONG-MAI",
+  "title": "MẪU GIẤY PHÉP LIÊN VẬN GIỮA VIỆT NAM, LÀO VÀ CAMPUCHIA CHO PHƯƠNG TIỆN THƯƠNG MẠI",
+  "field_code": 17,
+  "linh_vuc": "Giao thông vận tải",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-1625",
+  "url": "https://thuvienphapluat.vn/bieumau/1625/MAU-GIAY-PHEP-LIEN-VAN-GIUA-VIET-NAM-LAO-VA-CAMPUCHIA-CHO-PHUONG-TIEN-PHI-THUONG-MAI",
+  "title": "MẪU GIẤY PHÉP LIÊN VẬN GIỮA VIỆT NAM, LÀO VÀ CAMPUCHIA CHO PHƯƠNG TIỆN PHI THƯƠNG MẠI",
+  "field_code": 17,
+  "linh_vuc": "Giao thông vận tải",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-1614",
+  "url": "https://thuvienphapluat.vn/bieumau/1614/MAU-THONG-BAO-KHAI-THAC-TUYEN-VAN-TAI-HANH-KHACH-CO-DINH-GIUA-VIET-NAM-VA-CAMPUCHIA",
+  "title": "MẪU THÔNG BÁO KHAI THÁC TUYẾN VẬN TẢI HÀNH KHÁCH CỐ ĐỊNH GIỮA VIỆT NAM VÀ CAMPUCHIA",
+  "field_code": 17,
+  "linh_vuc": "Giao thông vận tải",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-41786",
+  "url": "https://thuvienphapluat.vn/bieumau/41786/MAU-BAO-CAO-CUA-NHAN-VIEN-DUONG-SAT-CO-LIEN-QUAN-VE-VU-TAI-NAN-GIAO-THONG-DUONG-SAT",
+  "title": "MẪU BÁO CÁO CỦA NHÂN VIÊN ĐƯỜNG SẮT CÓ LIÊN QUAN VỀ VỤ TAI NẠN GIAO THÔNG ĐƯỜNG SẮT",
+  "field_code": 17,
+  "linh_vuc": "Giao thông vận tải",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-1619",
+  "url": "https://thuvienphapluat.vn/bieumau/1619/MAU-GIAY-DE-NGHI-TANG-GIAM-TAN-SUAT-CHAY-XE-TUYEN-VAN-TAI-HANH-KHACH-CO-DINH-GIUA-VIET-NAM-VA-CAMPUCHIA",
+  "title": "MẪU GIẤY ĐỀ NGHỊ TĂNG/GIẢM TẦN SUẤT CHẠY XE TUYẾN VẬN TẢI HÀNH KHÁCH CỐ ĐỊNH GIỮA VIỆT NAM VÀ CAMPUCHIA",
+  "field_code": 17,
+  "linh_vuc": "Giao thông vận tải",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-41785",
+  "url": "https://thuvienphapluat.vn/bieumau/41785/MAU-BIEN-BAN-VU-TAI-NAN-GIAO-THONG-DUONG-SAT",
+  "title": "MẪU BIÊN BẢN VỤ TAI NẠN GIAO THÔNG ĐƯỜNG SẮT",
+  "field_code": 17,
+  "linh_vuc": "Giao thông vận tải",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-1623",
+  "url": "https://thuvienphapluat.vn/bieumau/1623/MAU-GIAY-DE-NGHI-CAP-CAP-LAI-GIAY-PHEP-LIEN-VAN-GIUA-VIET-NAM-LAO-VA-CAMPUCHIA-CHO-PHUONG-TIEN-PHI-THUONG-MAI",
+  "title": "MẪU GIẤY ĐỀ NGHỊ CẤP, CẤP LẠI GIẤY PHÉP LIÊN VẬN GIỮA VIỆT NAM, LÀO VÀ CAMPUCHIA CHO PHƯƠNG TIỆN PHI THƯƠNG MẠI",
+  "field_code": 17,
+  "linh_vuc": "Giao thông vận tải",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "ca_hai"
+ },
+ {
+  "form_key": "bieumau-42340",
+  "url": "https://thuvienphapluat.vn/bieumau/42340/MAU-DON-XIN-XAC-NHAN-XE-O-TO-KHONG-THAM-GIA-GIAO-THONG-KHONG-SU-DUNG-DUONG-DANH-CHO-GIAO-THONG-CONG-CONG",
+  "title": "MẪU ĐƠN XIN XÁC NHẬN XE Ô TÔ KHÔNG THAM GIA GIAO THÔNG, KHÔNG SỬ DỤNG ĐƯỜNG DÀNH CHO GIAO THÔNG CÔNG CỘNG",
+  "field_code": 17,
+  "linh_vuc": "Giao thông vận tải",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": false,
+   "cn": true,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "ca_hai"
+ },
+ {
+  "form_key": "bieumau-1609",
+  "url": "https://thuvienphapluat.vn/bieumau/1609/MAU-GIAY-PHEP-LIEN-VAN-GIUA-VIET-NAM-VA-CAMPUCHIA-CHO-PHUONG-TIEN-THUONG-MAI",
+  "title": "MẪU GIẤY PHÉP LIÊN VẬN GIỮA VIỆT NAM VÀ CAMPUCHIA CHO PHƯƠNG TIỆN THƯƠNG MẠI",
+  "field_code": 17,
+  "linh_vuc": "Giao thông vận tải",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-41791",
+  "url": "https://thuvienphapluat.vn/bieumau/41791/MAU-BAO-CAO-SAN-LUONG-VAN-TAI-HANH-KHACH-BANG-DUONG-SAT",
+  "title": "MẪU BÁO CÁO SẢN LƯỢNG VẬN TẢI HÀNH KHÁCH BẰNG ĐƯỜNG SẮT",
+  "field_code": 17,
+  "linh_vuc": "Giao thông vận tải",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-42336",
+  "url": "https://thuvienphapluat.vn/bieumau/42336/MAU-BIEN-BAN-THU-TEM-KIEM-DINH-VA-GIAY-CHUNG-NHAN-KIEM-DINH-AN-TOAN-KY-THUAT-VA-BAO-VE-MOI-TRUONG-DOI-VOI-XE-O-TO",
+  "title": "MẪU BIÊN BẢN THU TEM KIỂM ĐỊNH VÀ GIẤY CHỨNG NHẬN KIỂM ĐỊNH AN TOÀN KỸ THUẬT VÀ BẢO VỆ MÔI TRƯỜNG ĐỐI VỚI XE Ô TÔ",
+  "field_code": 17,
+  "linh_vuc": "Giao thông vận tải",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-22878",
+  "url": "https://thuvienphapluat.vn/bieumau/22878/MAU-PHAT-BIEU-CUA-VIEN-TRUONG-VIEN-KIEM-SAT-NHAN-DAN-TOI-CAO-TAI-PHIEN-HOP-XEM-XET-KIEN-NGHI-CUA-UY-BAN-TU-PHAP-CUA-QUOC-HOI-DE-NGHI-CUA-CHANH-AN-TOA-AN-NHAN-DAN-TOI-CAO-THEO-THU-TUC-DAC-BIET-VU-VIEC-DAN-SU",
+  "title": "MẪU PHÁT BIỂU CỦA VIỆN TRƯỞNG VIỆN KIỂM SÁT NHÂN DÂN TỐI CAO TẠI PHIÊN HỌP XEM XÉT KIẾN NGHỊ CỦA ỦY BAN TƯ PHÁP CỦA QUỐC HỘI (ĐỀ NGHỊ CỦA CHÁNH ÁN TÒA ÁN NHÂN DÂN TỐI CAO) THEO THỦ TỤC ĐẶC BIỆT VỤ VIỆC DÂN SỰ",
+  "field_code": 32,
+  "linh_vuc": "Thủ tục tố tụng",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-46453",
+  "url": "https://thuvienphapluat.vn/bieumau/46453/MAU-YEU-CAU-QUA-CANH-NGUOI-BI-DAN-DO-QUA-LANH-THO-CUA-NUOC-NGOAI",
+  "title": "MẪU YÊU CẦU QUÁ CẢNH NGƯỜI BỊ DẪN ĐỘ QUA LÃNH THỔ CỦA NƯỚC NGOÀI",
+  "field_code": 32,
+  "linh_vuc": "Thủ tục tố tụng",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-46466",
+  "url": "https://thuvienphapluat.vn/bieumau/46466/MAU-BIEN-BAN-TIEP-NHAN-NGUOI-DANG-CHAP-HANH-AN-PHAT-TU-O-NUOC-NGOAI-VE-VIET-NAM-DE-TIEP-TUC-CHAP-HANH-AN-PHAT-TU",
+  "title": "MẪU BIÊN BẢN TIẾP NHẬN NGƯỜI ĐANG CHẤP HÀNH ÁN PHẠT TÙ Ở NƯỚC NGOÀI VỀ VIỆT NAM ĐỂ TIẾP TỤC CHẤP HÀNH ÁN PHẠT TÙ",
+  "field_code": 32,
+  "linh_vuc": "Thủ tục tố tụng",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-46452",
+  "url": "https://thuvienphapluat.vn/bieumau/46452/MAU-YEU-CAU-DAN-DO-LAI-CUA-VIET-NAM-GUI-DI-NUOC-NGOAI",
+  "title": "MẪU YÊU CẦU DẪN ĐỘ LẠI CỦA VIỆT NAM GỬI ĐI NƯỚC NGOÀI",
+  "field_code": 32,
+  "linh_vuc": "Thủ tục tố tụng",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-22856",
+  "url": "https://thuvienphapluat.vn/bieumau/22856/MAU-QUYET-DINH-KHANG-NGHI-GIAM-DOC-THAM-TAI-THAM-VU-VIEC-DAN-SU",
+  "title": "MẪU QUYẾT ĐỊNH KHÁNG NGHỊ GIÁM ĐỐC THẨM (TÁI THẨM) VỤ VIỆC DÂN SỰ",
+  "field_code": 32,
+  "linh_vuc": "Thủ tục tố tụng",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-22689",
+  "url": "https://thuvienphapluat.vn/bieumau/22689/MAU-PHIEU-KIEM-SAT-THONG-BAO-VE-VIEC-THU-LY-VU-AN-VU-VIEC-DE-XET-XU-GIAI-QUYET-PHUC-THAM-VU-VIEC-DAN-SU",
+  "title": "MẪU PHIẾU KIỂM SÁT THÔNG BÁO VỀ VIỆC THỤ LÝ VỤ ÁN (VỤ VIỆC) ĐỂ XÉT XỬ (GIẢI QUYẾT) PHÚC THẨM VỤ VIỆC DÂN SỰ",
+  "field_code": 32,
+  "linh_vuc": "Thủ tục tố tụng",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-22864",
+  "url": "https://thuvienphapluat.vn/bieumau/22864/MAU-PHIEU-KIEM-SAT-QUYET-DINH-GIAM-DOC-THAM-TAI-THAM-VU-VIEC-DAN-SU",
+  "title": "MẪU PHIẾU KIỂM SÁT QUYẾT ĐỊNH GIÁM ĐỐC THẨM (TÁI THẨM) VỤ VIỆC DÂN SỰ",
+  "field_code": 32,
+  "linh_vuc": "Thủ tục tố tụng",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-22873",
+  "url": "https://thuvienphapluat.vn/bieumau/22873/MAU-KIEN-NGHI-VE-VIEC-XEM-XET-LAI-QUYET-DINH-GIAM-DOC-THAM-TAI-THAM-CUA-HOI-DONG-THAM-PHAN-TOA-AN-NHAN-DAN-TOI-CAO-VU-VIEC-DAN-SU",
+  "title": "MẪU KIẾN NGHỊ VỀ VIỆC XEM XÉT LẠI QUYẾT ĐỊNH GIÁM ĐỐC THẨM (TÁI THẨM) CỦA HỘI ĐỒNG THẨM PHÁN TÒA ÁN NHÂN DÂN TỐI CAO VỤ VIỆC DÂN SỰ",
+  "field_code": 32,
+  "linh_vuc": "Thủ tục tố tụng",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-47099",
+  "url": "https://thuvienphapluat.vn/bieumau/47099/MAU-THONG-BAO-NOP-TIEN-TAM-UNG-CHI-PHI-TONG-DAT-THONG-BAO-VAN-BAN-TO-TUNG-DOI-VOI-DUONG-SU-O-VIET-NAM",
+  "title": "MẪU THÔNG BÁO NỘP TIỀN TẠM ỨNG CHI PHÍ TỐNG ĐẠT, THÔNG BÁO VĂN BẢN TỐ TỤNG (ĐỐI VỚI ĐƯƠNG SỰ Ở VIỆT NAM)",
+  "field_code": 32,
+  "linh_vuc": "Thủ tục tố tụng",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-22706",
+  "url": "https://thuvienphapluat.vn/bieumau/22706/MAU-THONG-BAO-VE-VIEC-KHONG-KHANG-NGHI-GIAM-DOC-THAM-TAI-THAM-VU-VIEC-DAN-SU",
+  "title": "MẪU THÔNG BÁO VỀ VIỆC KHÔNG KHÁNG NGHỊ GIÁM ĐỐC THẨM (TÁI THẨM) VỤ VIỆC DÂN SỰ",
+  "field_code": 32,
+  "linh_vuc": "Thủ tục tố tụng",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-22698",
+  "url": "https://thuvienphapluat.vn/bieumau/22698/MAU-PHIEU-KIEM-SAT-BAN-AN-QUYET-DINH-CUA-TOA-AN-CAP-PHUC-THAM-VU-VIEC-DAN-SU",
+  "title": "MẪU PHIẾU KIỂM SÁT BẢN ÁN (QUYẾT ĐỊNH) CỦA TÒA ÁN CẤP PHÚC THẨM VỤ VIỆC DÂN SỰ",
+  "field_code": 32,
+  "linh_vuc": "Thủ tục tố tụng",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-46463",
+  "url": "https://thuvienphapluat.vn/bieumau/46463/MAU-VAN-BAN-TU-NGUYEN-DONG-GOP-CHI-PHI-CHO-VIEC-CHUYEN-GIAO-PHAM-NHAN-O-NUOC-NGOAI-VE-VIET-NAM-DE-TIEP-TUC-CHAP-HANH-AN-PHAT-TU",
+  "title": "MẪU VĂN BẢN TỰ NGUYỆN ĐÓNG GÓP CHI PHÍ CHO VIỆC CHUYỂN GIAO PHẠM NHÂN Ở NƯỚC NGOÀI VỀ VIỆT NAM ĐỂ TIẾP TỤC CHẤP HÀNH ÁN PHẠT TÙ",
+  "field_code": 32,
+  "linh_vuc": "Thủ tục tố tụng",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "ca_nhan"
+ },
+ {
+  "form_key": "bieumau-22861",
+  "url": "https://thuvienphapluat.vn/bieumau/22861/MAU-PHAT-BIEU-CUA-KIEM-SAT-VIEN-TAI-PHIEN-TOA-GIAM-DOC-THAM-TAI-THAM-TRUONG-HOP-VIEN-TRUONG-VIEN-KIEM-SAT-NHAN-DAN-CAP-CAO-TOI-CAO-KHANG-NGHI-VU-VIEC-DAN-SU",
+  "title": "MẪU PHÁT BIỂU CỦA KIỂM SÁT VIÊN TẠI PHIÊN TÒA GIÁM ĐỐC THẨM (TÁI THẨM) (TRƯỜNG HỢP VIỆN TRƯỞNG VIỆN KIỂM SÁT NHÂN DÂN CẤP CAO (TỐI CAO) KHÁNG NGHỊ) VỤ VIỆC DÂN SỰ",
+  "field_code": 32,
+  "linh_vuc": "Thủ tục tố tụng",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-46451",
+  "url": "https://thuvienphapluat.vn/bieumau/46451/MAU-YEU-CAU-CHUYEN-GIAO-DO-VAT-VAT-CHUNG-LIEN-QUAN-DEN-NGUOI-BI-YEU-CAU-DAN-DO",
+  "title": "MẪU YÊU CẦU CHUYỂN GIAO ĐỒ VẬT, VẬT CHỨNG LIÊN QUAN ĐẾN NGƯỜI BỊ YÊU CẦU DẪN ĐỘ",
+  "field_code": 32,
+  "linh_vuc": "Thủ tục tố tụng",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-46456",
+  "url": "https://thuvienphapluat.vn/bieumau/46456/MAU-YEU-CAU-CHUYEN-GIAO-NGUOI-DANG-CHAP-HANH-AN-PHAT-TU-O-NUOC-NGOAI-VE-VIET-NAM",
+  "title": "MẪU YÊU CẦU CHUYỂN GIAO NGƯỜI ĐANG CHẤP HÀNH ÁN PHẠT TÙ Ở NƯỚC NGOÀI VỀ VIỆT NAM",
+  "field_code": 32,
+  "linh_vuc": "Thủ tục tố tụng",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-22858",
+  "url": "https://thuvienphapluat.vn/bieumau/22858/MAU-QUYET-DINH-RUT-TOAN-BO-MOT-PHAN-QUYET-DINH-KHANG-NGHI-GIAM-DOC-THAM-TAI-THAM-VU-VIEC-DAN-SU",
+  "title": "MẪU QUYẾT ĐỊNH RÚT TOÀN BỘ (MỘT PHẦN) QUYẾT ĐỊNH KHÁNG NGHỊ GIÁM ĐỐC THẨM (TÁI THẨM) VỤ VIỆC DÂN SỰ",
+  "field_code": 32,
+  "linh_vuc": "Thủ tục tố tụng",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-22685",
+  "url": "https://thuvienphapluat.vn/bieumau/22685/MAU-PHIEU-KIEM-SAT-QUYET-DINH-CHAP-NHAN-KHONG-CHAP-NHAN-VIEC-CHAM-NOP-BIEN-LAI-TAM-UNG-AN-PHI-PHUC-THAM-VU-VIEC-DAN-SU",
+  "title": "MẪU PHIẾU KIỂM SÁT QUYẾT ĐỊNH CHẤP NHẬN (KHÔNG CHẤP NHẬN) VIỆC CHẬM NỘP BIÊN LAI TẠM ỨNG ÁN PHÍ PHÚC THẨM VỤ VIỆC DÂN SỰ",
+  "field_code": 32,
+  "linh_vuc": "Thủ tục tố tụng",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-46458",
+  "url": "https://thuvienphapluat.vn/bieumau/46458/MAU-DON-DE-NGHI-DUOC-CHUYEN-GIAO-O-NUOC-NGOAI-VE-VIET-NAM-DE-TIEP-TUC-CHAP-HANH-AN-PHAT-TU",
+  "title": "MẪU ĐƠN ĐỀ NGHỊ ĐƯỢC CHUYỂN GIAO Ở NƯỚC NGOÀI VỀ VIỆT NAM ĐỂ TIẾP TỤC CHẤP HÀNH ÁN PHẠT TÙ",
+  "field_code": 32,
+  "linh_vuc": "Thủ tục tố tụng",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "ca_nhan"
+ },
+ {
+  "form_key": "bieumau-31186",
+  "url": "https://thuvienphapluat.vn/bieumau/31186/MAU-THONG-BAO-DOI-CHIEU-NGHIA-VU-THUE-CUA-NGUOI-NOP-THUE",
+  "title": "MẪU THÔNG BÁO ĐỐI CHIẾU NGHĨA VỤ THUẾ CỦA NGƯỜI NỘP THUẾ",
+  "field_code": 35,
+  "linh_vuc": "Thuế – Phí – Lệ phí",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-27546",
+  "url": "https://thuvienphapluat.vn/bieumau/27546/MAU-BAO-CAO-THU-NOI-DIA-LUY-KE-DEN-THANG-AP-DUNG-VOI-CO-QUAN-THUE",
+  "title": "MẪU BÁO CÁO THU NỘI ĐỊA LŨY KẾ ĐẾN THÁNG (ÁP DỤNG VỚI CƠ QUAN THUẾ)",
+  "field_code": 35,
+  "linh_vuc": "Thuế – Phí – Lệ phí",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-28177",
+  "url": "https://thuvienphapluat.vn/bieumau/28177/MAU-BAO-CAO-RA-SOAT-CHI-TIET-HO-KINH-DOANH-THUOC-DIEN-TRIEN-KHAI-NAM-2024-AP-DUNG-DOI-VOI-TRIEN-KHAI-HOA-DON-DIEN-TU-DUOC-KHOI-TAO-TU-MAY-TINH-TIEN",
+  "title": "MẪU BÁO CÁO RÀ SOÁT CHI TIẾT HỘ KINH DOANH THUỘC DIỆN TRIỂN KHAI NĂM 2024 (ÁP DỤNG ĐỐI VỚI TRIỂN KHAI HÓA ĐƠN ĐIỆN TỬ ĐƯỢC KHỞI TẠO TỪ MÁY TÍNH TIỀN)",
+  "field_code": 35,
+  "linh_vuc": "Thuế – Phí – Lệ phí",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": true,
+   "cn": false,
+   "diem": [
+    9,
+    0,
+    0
+   ],
+   "dau_hieu": [
+    "hộ kinh doanh",
+    "hóa đơn",
+    "kinh doanh"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-31169",
+  "url": "https://thuvienphapluat.vn/bieumau/31169/MAU-DANH-SACH-THEO-DOI-KET-QUA-AN-DINH-THUE-DOI-VOI-NGUOI-NOP-THUE-KHONG-NOP-HO-SO-KHAI-THUE",
+  "title": "MẪU DANH SÁCH THEO DÕI KẾT QUẢ ẤN ĐỊNH THUẾ ĐỐI VỚI NGƯỜI NỘP THUẾ KHÔNG NỘP HỒ SƠ KHAI THUẾ",
+  "field_code": 35,
+  "linh_vuc": "Thuế – Phí – Lệ phí",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-28178",
+  "url": "https://thuvienphapluat.vn/bieumau/28178/MAU-BAO-CAO-RA-SOAT-CO-SO-KINH-DOANH-HOAT-DONG-PHU-THUOC-CO-TRU-SO-CHINH-NGOAI-TINH-AP-DUNG-DOI-VOI-TRIEN-KHAI-HOA-DON-DIEN-TU-DUOC-KHOI-TAO-TU-MAY-TINH-TIEN",
+  "title": "MẪU BÁO CÁO RÀ SOÁT CƠ SỞ KINH DOANH HOẠT ĐỘNG PHỤ THUỘC CÓ TRỤ SỞ CHÍNH NGOÀI TỈNH (ÁP DỤNG ĐỐI VỚI TRIỂN KHAI HÓA ĐƠN ĐIỆN TỬ ĐƯỢC KHỞI TẠO TỪ MÁY TÍNH TIỀN)",
+  "field_code": 35,
+  "linh_vuc": "Thuế – Phí – Lệ phí",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": true,
+   "cn": false,
+   "diem": [
+    6,
+    0,
+    0
+   ],
+   "dau_hieu": [
+    "hóa đơn",
+    "kinh doanh"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-28176",
+  "url": "https://thuvienphapluat.vn/bieumau/28176/MAU-BAO-CAO-RA-SOAT-CHI-TIET-DOANH-NGHIEP-TO-CHUC-THUOC-DIEN-TRIEN-KHAI-NAM-2024-AP-DUNG-DOI-VOI-TRIEN-KHAI-HOA-DON-DIEN-TU-DUOC-KHOI-TAO-TU-MAY-TINH-TIEN",
+  "title": "MẪU BÁO CÁO RÀ SOÁT CHI TIẾT DOANH NGHIỆP, TỔ CHỨC THUỘC DIỆN TRIỂN KHAI NĂM 2024 (ÁP DỤNG ĐỐI VỚI TRIỂN KHAI HÓA ĐƠN ĐIỆN TỬ ĐƯỢC KHỞI TẠO TỪ MÁY TÍNH TIỀN)",
+  "field_code": 35,
+  "linh_vuc": "Thuế – Phí – Lệ phí",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": true,
+   "cn": false,
+   "diem": [
+    6,
+    0,
+    0
+   ],
+   "dau_hieu": [
+    "doanh nghiệp",
+    "hóa đơn"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-27552",
+  "url": "https://thuvienphapluat.vn/bieumau/27552/MAU-BAO-CAO-THU-NOI-DIA-THEO-DIA-BAN-NAM-AP-DUNG-VOI-TOAN-CUC-THUE",
+  "title": "MẪU BÁO CÁO THU NỘI ĐỊA THEO ĐỊA BÀN NĂM (ÁP DỤNG VỚI TOÀN CỤC THUẾ)",
+  "field_code": 35,
+  "linh_vuc": "Thuế – Phí – Lệ phí",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-31177",
+  "url": "https://thuvienphapluat.vn/bieumau/31177/MAU-THONG-BAO-VE-VIEC-CUNG-CAP-THONG-TIN-THUC-HIEN-NGHIA-VU-THUE",
+  "title": "MẪU THÔNG BÁO VỀ VIỆC CUNG CẤP THÔNG TIN THỰC HIỆN NGHĨA VỤ THUẾ",
+  "field_code": 35,
+  "linh_vuc": "Thuế – Phí – Lệ phí",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-31182",
+  "url": "https://thuvienphapluat.vn/bieumau/31182/MAU-THONG-BAO-GIA-HAN-NOP-HO-SO-KHAI-THUE-CUA-NGUOI-NOP-THUE",
+  "title": "MẪU THÔNG BÁO GIA HẠN NỘP HỒ SƠ KHAI THUẾ CỦA NGƯỜI NỘP THUẾ",
+  "field_code": 35,
+  "linh_vuc": "Thuế – Phí – Lệ phí",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-31175",
+  "url": "https://thuvienphapluat.vn/bieumau/31175/MAU-THONG-BAO-VE-VIEC-YEU-CAU-CHUYEN-DOI-PHUONG-PHAP-TINH-THUE-GIA-TRI-GIA-TANG",
+  "title": "MẪU THÔNG BÁO VỀ VIỆC YÊU CẦU CHUYỂN ĐỔI PHƯƠNG PHÁP TÍNH THUẾ GIÁ TRỊ GIA TĂNG",
+  "field_code": 35,
+  "linh_vuc": "Thuế – Phí – Lệ phí",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-27547",
+  "url": "https://thuvienphapluat.vn/bieumau/27547/MAU-BAO-CAO-THU-NOI-DIA-NAM-AP-DUNG-VOI-CO-QUAN-THUE",
+  "title": "MẪU BÁO CÁO THU NỘI ĐỊA NĂM (ÁP DỤNG VỚI CƠ QUAN THUẾ)",
+  "field_code": 35,
+  "linh_vuc": "Thuế – Phí – Lệ phí",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-27551",
+  "url": "https://thuvienphapluat.vn/bieumau/27551/MAU-BAO-CAO-THU-NOI-DIA-THEO-DIA-BAN-THANG-AP-DUNG-VOI-TOAN-CUC-THUE",
+  "title": "MẪU BÁO CÁO THU NỘI ĐỊA THEO ĐỊA BÀN THÁNG (ÁP DỤNG VỚI TOÀN CỤC THUẾ)",
+  "field_code": 35,
+  "linh_vuc": "Thuế – Phí – Lệ phí",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-31168",
+  "url": "https://thuvienphapluat.vn/bieumau/31168/MAU-DANH-SACH-NGUOI-NOP-THUE-KHONG-NOP-HO-SO-KHAI-THUE-QUA-THOI-HAN-TREN-90-NGAY",
+  "title": "MẪU DANH SÁCH NGƯỜI NỘP THUẾ KHÔNG NỘP HỒ SƠ KHAI THUẾ QUÁ THỜI HẠN TRÊN 90 NGÀY",
+  "field_code": 35,
+  "linh_vuc": "Thuế – Phí – Lệ phí",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-28431",
+  "url": "https://thuvienphapluat.vn/bieumau/28431/MAU-KET-QUA-THUC-HIEN-RA-SOAT-TAI-DIA-BAN-VE-CONG-TAC-QUAN-LY-THUE-DOI-VOI-HO-KINH-DOANH-CA-NHAN-KINH-DOANH",
+  "title": "MẪU KẾT QUẢ THỰC HIỆN RÀ SOÁT TẠI ĐỊA BÀN VỀ CÔNG TÁC QUẢN LÝ THUẾ ĐỐI VỚI HỘ KINH DOANH, CÁ NHÂN KINH DOANH",
+  "field_code": 35,
+  "linh_vuc": "Thuế – Phí – Lệ phí",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": true,
+   "cn": true,
+   "diem": [
+    9,
+    3,
+    0
+   ],
+   "dau_hieu": [
+    "hộ kinh doanh",
+    "kinh doanh",
+    "cá nhân"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-31173",
+  "url": "https://thuvienphapluat.vn/bieumau/31173/MAU-THONG-BAO-TINH-TRANG-KE-KHAI-THUE-CUA-NGUOI-NOP-THUE-CHUYEN-CO-QUAN-THUE-QUAN-LY",
+  "title": "MẪU THÔNG BÁO TÌNH TRẠNG KÊ KHAI THUẾ CỦA NGƯỜI NỘP THUẾ CHUYỂN CƠ QUAN THUẾ QUẢN LÝ",
+  "field_code": 35,
+  "linh_vuc": "Thuế – Phí – Lệ phí",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-31170",
+  "url": "https://thuvienphapluat.vn/bieumau/31170/MAU-DANH-SACH-THEO-DOI-KET-QUA-XU-PHAT-VI-PHAM-DOI-VOI-NGUOI-NOP-THUE-NOP-HO-SO-KHAI-THUE-QUA-THOI-HAN-QUY-DINH",
+  "title": "MẪU DANH SÁCH THEO DÕI KẾT QUẢ XỬ PHẠT VI PHẠM ĐỐI VỚI NGƯỜI NỘP THUẾ NỘP HỒ SƠ KHAI THUẾ QUÁ THỜI HẠN QUY ĐỊNH",
+  "field_code": 35,
+  "linh_vuc": "Thuế – Phí – Lệ phí",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-20374",
+  "url": "https://thuvienphapluat.vn/bieumau/20374/MAU-QUYET-DINH-VE-VIEC-CONG-NHAN-TUOI-NGHE-CO-YEU",
+  "title": "MẪU QUYẾT ĐỊNH VỀ VIỆC CÔNG NHẬN TUỔI NGHỀ CƠ YẾU",
+  "field_code": 24,
+  "linh_vuc": "Lao động – Tiền lương",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-29663",
+  "url": "https://thuvienphapluat.vn/bieumau/29663/MAU-PHIEU-LAY-Y-KIEN-VE-VIEC-BO-NHIEM-CHUC-VU-DANH-CHO-HOI-NGHI-TAP-THE-LANH-DAO-DON-VI-LAN-3-MOT-NHAN-SU",
+  "title": "MẪU PHIẾU LẤY Ý KIẾN VỀ VIỆC BỔ NHIỆM CHỨC VỤ... DÀNH CHO HỘI NGHỊ TẬP THỂ LÃNH ĐẠO ĐƠN VỊ LẦN 3 (MỘT NHÂN SỰ)",
+  "field_code": 24,
+  "linh_vuc": "Lao động – Tiền lương",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-29661",
+  "url": "https://thuvienphapluat.vn/bieumau/29661/MAU-PHIEU-LAY-Y-KIEN-VE-VIEC-BO-NHIEM-CHUC-VU-DANH-CHO-HOI-NGHI-CAN-BO-CHU-CHOT-DON-VI-MOT-NHAN-SU",
+  "title": "MẪU PHIẾU LẤY Ý KIẾN VỀ VIỆC BỔ NHIỆM CHỨC VỤ... DÀNH CHO HỘI NGHỊ CÁN BỘ CHỦ CHỐT ĐƠN VỊ (MỘT NHÂN SỰ)",
+  "field_code": 24,
+  "linh_vuc": "Lao động – Tiền lương",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-20145",
+  "url": "https://thuvienphapluat.vn/bieumau/20145/MAU-BIEN-BAN-KIEM-DINH-KY-THUAT-AN-TOAN-TRAM-AZOT-UGZCIA-DUNG-NAP-CHO-TEN-LUA-SU-DUNG-TRONG-BO-QUOC-PHONG",
+  "title": "MẪU BIÊN BẢN KIỂM ĐỊNH KỸ THUẬT AN TOÀN TRẠM AZỐT UGZCIA DÙNG NẠP CHO TÊN LỬA SỬ DỤNG TRONG BỘ QUỐC PHÒNG",
+  "field_code": 24,
+  "linh_vuc": "Lao động – Tiền lương",
+  "may_doan": {
+   "audience": "co_quan_nha_nuoc",
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    3
+   ],
+   "dau_hieu": [
+    "quốc phòng"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-29657",
+  "url": "https://thuvienphapluat.vn/bieumau/29657/MAU-PHIEU-LAY-Y-KIEN-VE-VIEC-DIEU-DONG-TIEP-NHAN-BO-NHIEM-CHUC-VU-DANH-CHO-TAP-THE-LANH-DAO-DON-VI",
+  "title": "MẪU PHIẾU LẤY Ý KIẾN VỀ VIỆC ĐIỀU ĐỘNG/TIẾP NHẬN/BỔ NHIỆM CHỨC VỤ... (DÀNH CHO TẬP THỂ LÃNH ĐẠO ĐƠN VỊ)",
+  "field_code": 24,
+  "linh_vuc": "Lao động – Tiền lương",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-29988",
+  "url": "https://thuvienphapluat.vn/bieumau/29988/MAU-BANG-TONG-HOP-DOAN-VAO-RA-TRONG-NAM-VA-KE-HOACH-DOAN-VAO-RA-TRONG-NAM-SAU-DO-BO-LAO-DONG-THUONG-BINH-VA-XA-HOI-BAN-HANH",
+  "title": "MẪU BẢNG TỔNG HỢP ĐOÀN VÀO/RA TRONG NĂM VÀ KẾ HOẠCH ĐOÀN VÀO/RA TRONG NĂM SAU DO BỘ LAO ĐỘNG - THƯƠNG BINH VÀ XÃ HỘI BAN HÀNH",
+  "field_code": 24,
+  "linh_vuc": "Lao động – Tiền lương",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    3,
+    0
+   ],
+   "dau_hieu": [
+    "thương binh"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-20148",
+  "url": "https://thuvienphapluat.vn/bieumau/20148/MAU-BAN-GHI-CHEP-TAI-HIEN-TRUONG-KIEM-DINH-KY-THUAT-AN-TOAN-PA-LANG-XICH-KEO-TAY-NANG-HA-BOM-DAN-SU-DUNG-TRONG-BO-QUOC-PHONG",
+  "title": "MẪU BẢN GHI CHÉP TẠI HIỆN TRƯỜNG KIỂM ĐỊNH KỸ THUẬT AN TOÀN PA LĂNG XÍCH KÉO TAY NÂNG, HẠ BOM, ĐẠN SỬ DỤNG TRONG BỘ QUỐC PHÒNG",
+  "field_code": 24,
+  "linh_vuc": "Lao động – Tiền lương",
+  "may_doan": {
+   "audience": "co_quan_nha_nuoc",
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    3
+   ],
+   "dau_hieu": [
+    "quốc phòng"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-20146",
+  "url": "https://thuvienphapluat.vn/bieumau/20146/MAU-BAN-GHI-CHEP-TAI-HIEN-TRUONG-KIEM-DINH-KY-THUAT-AN-TOAN-TRUC-CAP-VAN-CHUYEN-THUOC-PHONG-THUOC-NO-SU-DUNG-TRONG-BO-QUOC-PHONG",
+  "title": "MẪU BẢN GHI CHÉP TẠI HIỆN TRƯỜNG KIỂM ĐỊNH KỸ THUẬT AN TOÀN TRỤC CÁP VẬN CHUYỂN THUỐC PHÓNG, THUỐC NỔ SỬ DỤNG TRONG BỘ QUỐC PHÒNG",
+  "field_code": 24,
+  "linh_vuc": "Lao động – Tiền lương",
+  "may_doan": {
+   "audience": "co_quan_nha_nuoc",
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    3
+   ],
+   "dau_hieu": [
+    "quốc phòng"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-29666",
+  "url": "https://thuvienphapluat.vn/bieumau/29666/MAU-PHIEU-LAY-Y-KIEN-VIEC-BO-NHIEM-LAI-KEO-DAI-THOI-GIAN-GIU-CHUC-VU-DANH-CHO-TAP-THE-LANH-DAO-DON-VI",
+  "title": "MẪU PHIẾU LẤY Ý KIẾN VIỆC BỔ NHIỆM LẠI/KÉO DÀI THỜI GIAN GIỮ CHỨC VỤ... (DÀNH CHO TẬP THỂ LÃNH ĐẠO ĐƠN VỊ)",
+  "field_code": 24,
+  "linh_vuc": "Lao động – Tiền lương",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-20143",
+  "url": "https://thuvienphapluat.vn/bieumau/20143/MAU-BIEN-BAN-KIEM-DINH-KY-THUAT-AN-TOAN-TRAM-NAP-KHI-NEN-YKC-VZ-20-350-SU-DUNG-TRONG-BO-QUOC-PHONG",
+  "title": "MẪU BIÊN BẢN KIỂM ĐỊNH KỸ THUẬT AN TOÀN TRẠM NẠP KHÍ NÉN YKC, VZ 20/350 SỬ DỤNG TRONG BỘ QUỐC PHÒNG",
+  "field_code": 24,
+  "linh_vuc": "Lao động – Tiền lương",
+  "may_doan": {
+   "audience": "co_quan_nha_nuoc",
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    3
+   ],
+   "dau_hieu": [
+    "quốc phòng"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-20427",
+  "url": "https://thuvienphapluat.vn/bieumau/20427/MAU-BAO-CAO-QUY-LUONG-PHU-CAP-TANG-THEM-TRONG-CAC-CO-QUAN-DON-VI-QUAN-DOI",
+  "title": "MẪU BÁO CÁO QUỸ LƯƠNG, PHỤ CẤP TĂNG THÊM TRONG CÁC CƠ QUAN, ĐƠN VỊ QUÂN ĐỘI",
+  "field_code": 24,
+  "linh_vuc": "Lao động – Tiền lương",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-20142",
+  "url": "https://thuvienphapluat.vn/bieumau/20142/MAU-BAN-GHI-CHEP-TAI-HIEN-TRUONG-KIEM-DINH-KY-THUAT-AN-TOAN-TRAM-NAP-KHI-NEN-YKC-VZ-20-350-SU-DUNG-TRONG-BO-QUOC-PHONG",
+  "title": "MẪU BẢN GHI CHÉP TẠI HIỆN TRƯỜNG KIỂM ĐỊNH KỸ THUẬT AN TOÀN TRẠM NẠP KHÍ NÉN YKC, VZ 20/350 SỬ DỤNG TRONG BỘ QUỐC PHÒNG",
+  "field_code": 24,
+  "linh_vuc": "Lao động – Tiền lương",
+  "may_doan": {
+   "audience": "co_quan_nha_nuoc",
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    3
+   ],
+   "dau_hieu": [
+    "quốc phòng"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-29664",
+  "url": "https://thuvienphapluat.vn/bieumau/29664/MAU-PHIEU-LAY-Y-KIEN-VE-VIEC-BO-NHIEM-CHUC-VU-DANH-CHO-HOI-NGHI-TAP-THE-LANH-DAO-DON-VI-LAN-3-NHIEU-NHAN-SU",
+  "title": "MẪU PHIẾU LẤY Ý KIẾN VỀ VIỆC BỔ NHIỆM CHỨC VỤ... DÀNH CHO HỘI NGHỊ TẬP THỂ LÃNH ĐẠO ĐƠN VỊ LẦN 3 (NHIỀU NHÂN SỰ)",
+  "field_code": 24,
+  "linh_vuc": "Lao động – Tiền lương",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-29991",
+  "url": "https://thuvienphapluat.vn/bieumau/29991/MAU-DE-AN-THUC-HIEN-HOAT-DONG-DOI-NGOAI-DO-BO-LAO-DONG-THUONG-BINH-VA-XA-HOI-BAN-HANH",
+  "title": "MẪU ĐỀ ÁN THỰC HIỆN HOẠT ĐỘNG ĐỐI NGOẠI DO BỘ LAO ĐỘNG - THƯƠNG BINH VÀ XÃ HỘI BAN HÀNH",
+  "field_code": 24,
+  "linh_vuc": "Lao động – Tiền lương",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    3,
+    0
+   ],
+   "dau_hieu": [
+    "thương binh"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-29986",
+  "url": "https://thuvienphapluat.vn/bieumau/29986/MAU-BAO-CAO-DOI-NGOAI-HANG-NAM-CUA-DON-VI-DO-BO-LAO-DONG-THUONG-BINH-VA-XA-HOI-BAN-HANH",
+  "title": "MẪU BÁO CÁO ĐỐI NGOẠI HÀNG NĂM CỦA ĐƠN VỊ DO BỘ LAO ĐỘNG - THƯƠNG BINH VÀ XÃ HỘI BAN HÀNH",
+  "field_code": 24,
+  "linh_vuc": "Lao động – Tiền lương",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    3,
+    0
+   ],
+   "dau_hieu": [
+    "thương binh"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-20370",
+  "url": "https://thuvienphapluat.vn/bieumau/20370/MAU-BAN-KHAI-QUA-TRINH-LAM-CONG-TAC-CO-YEU",
+  "title": "MẪU BẢN KHAI QUÁ TRÌNH LÀM CÔNG TÁC CƠ YẾU",
+  "field_code": 24,
+  "linh_vuc": "Lao động – Tiền lương",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": false,
+   "cn": true,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "ca_nhan"
+ },
+ {
+  "form_key": "bieumau-15046",
+  "url": "https://thuvienphapluat.vn/bieumau/15046/MAU-THONG-BAO-CHO-CHA-ME-TRE-EM-MAM-NON",
+  "title": "MẪU THÔNG BÁO CHO CHA MẸ TRẺ EM MẦM NON",
+  "field_code": 18,
+  "linh_vuc": "Giáo dục",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    6,
+    0
+   ],
+   "dau_hieu": [
+    "trẻ em",
+    "cha mẹ"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-14933",
+  "url": "https://thuvienphapluat.vn/bieumau/14933/MAU-PHIEU-THI-DAU-GIAI-THE-THAO-HOC-SINH-PHO-THONG-TOAN-QUOC-NAM-2023",
+  "title": "MẪU PHIẾU THI ĐẤU GIẢI THỂ THAO HỌC SINH PHỔ THÔNG TOÀN QUỐC NĂM 2023",
+  "field_code": 18,
+  "linh_vuc": "Giáo dục",
+  "may_doan": {
+   "audience": "ca_nhan",
+   "dn": false,
+   "cn": true,
+   "diem": [
+    0,
+    3,
+    0
+   ],
+   "dau_hieu": [
+    "học sinh"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-17741",
+  "url": "https://thuvienphapluat.vn/bieumau/17741/MAU-BAN-SAO-CHUNG-CHI-SO-CAP",
+  "title": "MẪU BẢN SAO CHỨNG CHỈ SƠ CẤP",
+  "field_code": 18,
+  "linh_vuc": "Giáo dục",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-14930",
+  "url": "https://thuvienphapluat.vn/bieumau/14930/MAU-DANG-KY-DANH-SACH-DOAN-THAM-DU-GIAI-THE-THAO-HOC-SINH-PHO-THONG-TOAN-QUOC-NAM-2023",
+  "title": "MẪU ĐĂNG KÝ DANH SÁCH ĐOÀN THAM DỰ GIẢI THỂ THAO HỌC SINH PHỔ THÔNG TOÀN QUỐC NĂM 2023",
+  "field_code": 18,
+  "linh_vuc": "Giáo dục",
+  "may_doan": {
+   "audience": "ca_nhan",
+   "dn": false,
+   "cn": true,
+   "diem": [
+    0,
+    3,
+    0
+   ],
+   "dau_hieu": [
+    "học sinh"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-17734",
+  "url": "https://thuvienphapluat.vn/bieumau/17734/MAU-BAO-CAO-DANG-KY-DAO-TAO-MON-HOC-MO-DUN-TIN-CHI-THEO-HINH-THUC-DAO-TAO-TU-XA-TU-HOC-CO-HUONG-DAN",
+  "title": "MẪU BÁO CÁO ĐĂNG KÝ ĐÀO TẠO MÔN HỌC, MÔ-ĐUN, TÍN CHỈ THEO HÌNH THỨC ĐÀO TẠO TỪ XA, TỰ HỌC CÓ HƯỚNG DẪN",
+  "field_code": 18,
+  "linh_vuc": "Giáo dục",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-11740",
+  "url": "https://thuvienphapluat.vn/bieumau/11740/MAU-THONG-BAO-KET-QUA-DANH-GIA-TO-CHUC-KIEM-DINH-CHAT-LUONG-GIAO-DUC",
+  "title": "MẪU THÔNG BÁO KẾT QUẢ ĐÁNH GIÁ TỔ CHỨC KIỂM ĐỊNH CHẤT LƯỢNG GIÁO DỤC",
+  "field_code": 18,
+  "linh_vuc": "Giáo dục",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-14844",
+  "url": "https://thuvienphapluat.vn/bieumau/14844/MAU-QUY-CHE-TO-CHUC-VA-HOAT-DONG-CAU-LAC-BO-THE-THAO-HOC-SINH",
+  "title": "MẪU QUY CHẾ TỔ CHỨC VÀ HOẠT ĐỘNG CÂU LẠC BỘ THỂ THAO HỌC SINH",
+  "field_code": 18,
+  "linh_vuc": "Giáo dục",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    3,
+    0
+   ],
+   "dau_hieu": [
+    "học sinh"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-17737",
+  "url": "https://thuvienphapluat.vn/bieumau/17737/MAU-CHUNG-CHI-SO-CAP",
+  "title": "MẪU CHỨNG CHỈ SƠ CẤP",
+  "field_code": 18,
+  "linh_vuc": "Giáo dục",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-15061",
+  "url": "https://thuvienphapluat.vn/bieumau/15061/MAU-PHIEU-DANH-GIA-XET-CHON-CONG-TRINH-DAT-GIAI-THUONG",
+  "title": "MẪU PHIẾU ĐÁNH GIÁ, XÉT CHỌN CÔNG TRÌNH ĐẠT GIẢI THƯỞNG",
+  "field_code": 18,
+  "linh_vuc": "Giáo dục",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-15058",
+  "url": "https://thuvienphapluat.vn/bieumau/15058/MAU-PHIEU-DANH-GIA-CONG-TRINH-CUA-THANH-VIEN-HOI-DONG-VONG-SO-KHAO",
+  "title": "MẪU PHIẾU ĐÁNH GIÁ CÔNG TRÌNH CỦA THÀNH VIÊN HỘI ĐỒNG VÒNG SƠ KHẢO",
+  "field_code": 18,
+  "linh_vuc": "Giáo dục",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-17630",
+  "url": "https://thuvienphapluat.vn/bieumau/17630/MAU-TAI-LIEU-THUOC-HO-SO-DE-NGHI-CAP-CAP-DOI-BO-SUNG-CAP-LAI-GIAY-CHUNG-NHAN",
+  "title": "MẪU TÀI LIỆU THUỘC HỒ SƠ ĐỀ NGHỊ CẤP, CẤP ĐỔI, BỔ SUNG, CẤP LẠI GIẤY CHỨNG NHẬN",
+  "field_code": 18,
+  "linh_vuc": "Giáo dục",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-11731",
+  "url": "https://thuvienphapluat.vn/bieumau/11731/MAU-BIEN-BAN-DANH-GIA-TO-CHUC-KIEM-DINH-CHAT-LUONG-GIAO-DUC",
+  "title": "MẪU BIÊN BẢN ĐÁNH GIÁ TỔ CHỨC KIỂM ĐỊNH CHẤT LƯỢNG GIÁO DỤC",
+  "field_code": 18,
+  "linh_vuc": "Giáo dục",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-17646",
+  "url": "https://thuvienphapluat.vn/bieumau/17646/MAU-PHIEU-DONG-Y-THAM-GIA-DIEN-DAN-TRE-EM",
+  "title": "MẪU PHIẾU ĐỒNG Ý THAM GIA DIỄN ĐÀN TRẺ EM",
+  "field_code": 18,
+  "linh_vuc": "Giáo dục",
+  "may_doan": {
+   "audience": "ca_nhan",
+   "dn": false,
+   "cn": true,
+   "diem": [
+    0,
+    3,
+    0
+   ],
+   "dau_hieu": [
+    "trẻ em"
+   ]
+  },
+  "nhan_tay": "ca_nhan"
+ },
+ {
+  "form_key": "bieumau-1388",
+  "url": "https://thuvienphapluat.vn/bieumau/1388/MAU-DON-DE-NGHI-GIAI-QUYET-THEM-CHE-DO-TRO-CAP",
+  "title": "MẪU ĐƠN ĐỀ NGHỊ GIẢI QUYẾT THÊM CHẾ ĐỘ TRỢ CẤP",
+  "field_code": 8,
+  "linh_vuc": "Chính sách xã hội",
+  "may_doan": {
+   "audience": "ca_nhan",
+   "dn": false,
+   "cn": true,
+   "diem": [
+    0,
+    3,
+    0
+   ],
+   "dau_hieu": [
+    "trợ cấp"
+   ]
+  },
+  "nhan_tay": "ca_nhan"
+ },
+ {
+  "form_key": "bieumau-1375",
+  "url": "https://thuvienphapluat.vn/bieumau/1375/MAU-BAN-KHAI-DE-BO-SUNG-TINH-HINH-THAN-NHAN-TRONG-HO-SO-LIET-SI",
+  "title": "MẪU BẢN KHAI ĐỂ BỔ SUNG TÌNH HÌNH THÂN NHÂN TRONG HỒ SƠ LIỆT SĨ",
+  "field_code": 8,
+  "linh_vuc": "Chính sách xã hội",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": false,
+   "cn": true,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "ca_nhan"
+ },
+ {
+  "form_key": "bieumau-34391",
+  "url": "https://thuvienphapluat.vn/bieumau/34391/MAU-CONG-VAN-VE-VIEC-XET-DUYET-VA-DE-NGHI-DOI-TUONG-HUONG-CHE-DO-TRO-CAP-HANG-THANG-THEO-QUYET-DINH-SO-62-2011-QD-TTG",
+  "title": "MẪU CÔNG VĂN VỀ VIỆC XÉT DUYỆT VÀ ĐỀ NGHỊ ĐỐI TƯỢNG HƯỞNG CHẾ ĐỘ TRỢ CẤP HÀNG THÁNG THEO QUYẾT ĐỊNH SỐ 62/2011/QĐ-TTG",
+  "field_code": 8,
+  "linh_vuc": "Chính sách xã hội",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    3,
+    0
+   ],
+   "dau_hieu": [
+    "trợ cấp"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-34401",
+  "url": "https://thuvienphapluat.vn/bieumau/34401/MAU-CONG-VAN-VE-VIEC-THUC-HIEN-CHE-DO-HUU-TRI-HANG-THANG-HOAC-CHE-DO-MOT-LAN-TAI-NGHI-DINH-SO-23-2012-ND-CP-DUNG-CHO-CAP-QUAN-KHU-BTL-THU-DO-HA-NOI",
+  "title": "MẪU CÔNG VĂN VỀ VIỆC THỰC HIỆN CHẾ ĐỘ HƯU TRÍ HÀNG THÁNG HOẶC CHẾ ĐỘ MỘT LẦN TẠI NGHỊ ĐỊNH SỐ 23/2012/NĐ-CP (DÙNG CHO CẤP QUÂN KHU, BTL THỦ ĐÔ HÀ NỘI)",
+  "field_code": 8,
+  "linh_vuc": "Chính sách xã hội",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-1389",
+  "url": "https://thuvienphapluat.vn/bieumau/1389/MAU-DON-DE-NGHI-DE-NGHI-GIAI-QUYET-CHE-DO-UU-DAI-TRONG-GIAO-DUC-DAO-TAO-LINH-VUC-NGUOI-CO-CONG-CACH-MANG",
+  "title": "MẪU ĐƠN ĐỀ NGHỊ ĐỀ NGHỊ GIẢI QUYẾT CHẾ ĐỘ ƯU ĐÃI TRONG GIÁO DỤC ĐÀO TẠO (LĨNH VỰC NGƯỜI CÓ CÔNG CÁCH MẠNG)",
+  "field_code": 8,
+  "linh_vuc": "Chính sách xã hội",
+  "may_doan": {
+   "audience": "ca_nhan",
+   "dn": false,
+   "cn": true,
+   "diem": [
+    0,
+    3,
+    0
+   ],
+   "dau_hieu": [
+    "người có công"
+   ]
+  },
+  "nhan_tay": "ca_nhan"
+ },
+ {
+  "form_key": "bieumau-34399",
+  "url": "https://thuvienphapluat.vn/bieumau/34399/MAU-CONG-VAN-VE-VIEC-THUC-HIEN-CHE-DO-HUU-TRI-HANG-THANG-HOAC-CHE-DO-MOT-LAN-TAI-NGHI-DINH-SO-23-2012-ND-CP-DUNG-CHO-CAP-TINH",
+  "title": "MẪU CÔNG VĂN VỀ VIỆC THỰC HIỆN CHẾ ĐỘ HƯU TRÍ HÀNG THÁNG HOẶC CHẾ ĐỘ MỘT LẦN TẠI NGHỊ ĐỊNH SỐ 23/2012/NĐ-CP (DÙNG CHO CẤP TỈNH)",
+  "field_code": 8,
+  "linh_vuc": "Chính sách xã hội",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-1386",
+  "url": "https://thuvienphapluat.vn/bieumau/1386/MAU-DON-DE-NGHI-GIAI-QUYET-CHE-DO-DOI-VOI-VO-HOAC-CHONG-LIET-SI-DI-LAY-CHONG-HOAC-VO-KHAC",
+  "title": "MẪU ĐƠN ĐỀ NGHỊ GIẢI QUYẾT CHẾ ĐỘ ĐỐI VỚI VỢ HOẶC CHỒNG LIỆT SĨ ĐI LẤY CHỒNG HOẶC VỢ KHÁC",
+  "field_code": 8,
+  "linh_vuc": "Chính sách xã hội",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "ca_nhan"
+ },
+ {
+  "form_key": "bieumau-34407",
+  "url": "https://thuvienphapluat.vn/bieumau/34407/MAU-CONG-VAN-VE-VIEC-DE-NGHI-HUONG-CHE-DO-TRO-CAP-MOT-LAN-THEO-QUYET-DINH-SO-49-2015-QD-TTG",
+  "title": "MẪU CÔNG VĂN VỀ VIỆC ĐỀ NGHỊ HƯỞNG CHẾ ĐỘ TRỢ CẤP MỘT LẦN THEO QUYẾT ĐỊNH SỐ 49/2015/QĐ-TTG",
+  "field_code": 8,
+  "linh_vuc": "Chính sách xã hội",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    3,
+    0
+   ],
+   "dau_hieu": [
+    "trợ cấp"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-34404",
+  "url": "https://thuvienphapluat.vn/bieumau/34404/MAU-BAN-KHAI-CA-NHAN-DE-NGHI-HUONG-CHE-DO-TRO-CAP-MOT-LAN-THEO-QUYET-DINH-SO-49-2015-QD-TTG",
+  "title": "MẪU BẢN KHAI CÁ NHÂN ĐỀ NGHỊ HƯỞNG CHẾ ĐỘ TRỢ CẤP MỘT LẦN THEO QUYẾT ĐỊNH SỐ 49/2015/QĐ-TTG",
+  "field_code": 8,
+  "linh_vuc": "Chính sách xã hội",
+  "may_doan": {
+   "audience": "ca_nhan",
+   "dn": false,
+   "cn": true,
+   "diem": [
+    0,
+    6,
+    0
+   ],
+   "dau_hieu": [
+    "cá nhân",
+    "trợ cấp"
+   ]
+  },
+  "nhan_tay": "ca_nhan"
+ },
+ {
+  "form_key": "bieumau-34392",
+  "url": "https://thuvienphapluat.vn/bieumau/34392/MAU-QUYET-DINH-VE-VIEC-THUC-HIEN-CHE-DO-TRO-CAP-MOT-LAN-DOI-VOI-DOI-TUONG-THAM-GIA-CHIEN-TRANH-BAO-VE-TO-QUOC-VA-LAM-NHIEM-VU-QUOC-TE-THEO-QUYET-DINH-SO-62-2011-QD-TTG",
+  "title": "MẪU QUYẾT ĐỊNH VỀ VIỆC THỰC HIỆN CHẾ ĐỘ TRỢ CẤP MỘT LẦN ĐỐI VỚI ĐỐI TƯỢNG THAM GIA CHIẾN TRANH BẢO VỆ TỔ QUỐC VÀ LÀM NHIỆM VỤ QUỐC TẾ THEO QUYẾT ĐỊNH SỐ 62/2011/QĐ-TTG",
+  "field_code": 8,
+  "linh_vuc": "Chính sách xã hội",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    3,
+    0
+   ],
+   "dau_hieu": [
+    "trợ cấp"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-1381",
+  "url": "https://thuvienphapluat.vn/bieumau/1381/MAU-BAN-KHAI-DE-GIAI-QUYET-CHE-DO-UU-DAI-KHI-NGUOI-CO-CONG-TU-TRAN",
+  "title": "MẪU BẢN KHAI ĐỂ GIẢI QUYẾT CHẾ ĐỘ ƯU ĐÃI KHI NGƯỜI CÓ CÔNG TỪ TRẦN",
+  "field_code": 8,
+  "linh_vuc": "Chính sách xã hội",
+  "may_doan": {
+   "audience": "ca_nhan",
+   "dn": false,
+   "cn": true,
+   "diem": [
+    0,
+    3,
+    0
+   ],
+   "dau_hieu": [
+    "người có công"
+   ]
+  },
+  "nhan_tay": "ca_nhan"
+ },
+ {
+  "form_key": "bieumau-34397",
+  "url": "https://thuvienphapluat.vn/bieumau/34397/MAU-DON-DE-NGHI-HUONG-CHE-DO-MOT-LAN-THEO-NGHI-DINH-SO-23-2012-ND-CP",
+  "title": "MẪU ĐƠN ĐỀ NGHỊ HƯỞNG CHẾ ĐỘ MỘT LẦN THEO NGHỊ ĐỊNH SỐ 23/2012/NĐ-CP",
+  "field_code": 8,
+  "linh_vuc": "Chính sách xã hội",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "ca_nhan"
+ },
+ {
+  "form_key": "bieumau-1372",
+  "url": "https://thuvienphapluat.vn/bieumau/1372/MAU-BAN-KHAI-DE-GIAI-QUYET-CHE-DO-BA-ME-VIET-NAM-ANH-HUNG",
+  "title": "MẪU BẢN KHAI ĐỂ GIẢI QUYẾT CHẾ ĐỘ BÀ MẸ VIỆT NAM ANH HÙNG",
+  "field_code": 8,
+  "linh_vuc": "Chính sách xã hội",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": false,
+   "cn": true,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "ca_nhan"
+ },
+ {
+  "form_key": "bieumau-20468",
+  "url": "https://thuvienphapluat.vn/bieumau/20468/MAU-BAO-CAO-NGUON-VON-CHU-SO-HUU-NGUON-CHI-PHI-BAO-HIEM-CUA-DOANH-NGHIEP-CHI-NHANH-DOANH-NGHIEP-BAO-HIEM-PHI-NHAN-THO-NUOC-NGOAI",
+  "title": "MẪU BÁO CÁO NGUỒN VỐN CHỦ SỞ HỮU, NGUỒN CHI PHÍ BẢO HIỂM CỦA DOANH NGHIỆP/CHI NHÁNH DOANH NGHIỆP BẢO HIỂM PHI NHÂN THỌ NƯỚC NGOÀI",
+  "field_code": 2,
+  "linh_vuc": "Bảo hiểm",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": true,
+   "cn": false,
+   "diem": [
+    9,
+    0,
+    0
+   ],
+   "dau_hieu": [
+    "doanh nghiệp",
+    "chi nhánh"
+   ]
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-23162",
+  "url": "https://thuvienphapluat.vn/bieumau/23162/MAU-BAO-CAO-KET-QUA-KINH-DOANH-BAO-HIEM-BAT-BUOC-DOI-VOI-CONG-VIEC-BUC-XA",
+  "title": "MẪU BÁO CÁO KẾT QUẢ KINH DOANH BẢO HIỂM BẮT BUỘC ĐỐI VỚI CÔNG VIỆC BỨC XẠ",
+  "field_code": 2,
+  "linh_vuc": "Bảo hiểm",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": true,
+   "cn": false,
+   "diem": [
+    3,
+    0,
+    0
+   ],
+   "dau_hieu": [
+    "kinh doanh"
+   ]
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-23166",
+  "url": "https://thuvienphapluat.vn/bieumau/23166/MAU-BAO-CAO-BAO-HIEM-TRACH-NHIEM-BOI-THUONG-THIET-HAI-VE-MOI-TRUONG-DOI-VOI-CONG-VIEC-BUC-XA",
+  "title": "MẪU BÁO CÁO BẢO HIỂM TRÁCH NHIỆM BỒI THƯỜNG THIỆT HẠI VỀ MÔI TRƯỜNG ĐỐI VỚI CÔNG VIỆC BỨC XẠ",
+  "field_code": 2,
+  "linh_vuc": "Bảo hiểm",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-39644",
+  "url": "https://thuvienphapluat.vn/bieumau/39644/MAU-QUYET-DINH-VE-VIEC-HUONG-TRO-CAP-HANG-THANG-THEO-QUYET-DINH-SO-613-QD-TTG",
+  "title": "MẪU QUYẾT ĐỊNH VỀ VIỆC HƯỞNG TRỢ CẤP HẰNG THÁNG THEO QUYẾT ĐỊNH SỐ 613/QĐ-TTG",
+  "field_code": 2,
+  "linh_vuc": "Bảo hiểm",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    3,
+    0
+   ],
+   "dau_hieu": [
+    "trợ cấp"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-20466",
+  "url": "https://thuvienphapluat.vn/bieumau/20466/MAU-BAO-CAO-THEO-DOI-RIENG-DOANH-THU-CHI-PHI-TU-HOAT-DONG-KINH-DOANH-BAO-HIEM-THEO-BAO-HIEM-BAT-BUOC-CUA-DOANH-NGHIEP-CHI-NHANH-BAO-HIEM-PHI-NHAN-THO-NUOC-NGOAI",
+  "title": "MẪU BÁO CÁO THEO DÕI RIÊNG DOANH THU, CHI PHÍ TỪ HOẠT ĐỘNG KINH DOANH BẢO HIỂM THEO BẢO HIỂM BẮT BUỘC CỦA DOANH NGHIỆP/CHI NHÁNH BẢO HIỂM PHI NHÂN THỌ NƯỚC NGOÀI",
+  "field_code": 2,
+  "linh_vuc": "Bảo hiểm",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": true,
+   "cn": false,
+   "diem": [
+    9,
+    0,
+    0
+   ],
+   "dau_hieu": [
+    "doanh nghiệp",
+    "chi nhánh",
+    "kinh doanh"
+   ]
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-21664",
+  "url": "https://thuvienphapluat.vn/bieumau/21664/MAU-DON-DANG-KY-SUA-DOI-BO-SUNG-PHUONG-PHAP-CO-SO-TINH-PHI-BAO-HIEM",
+  "title": "MẪU ĐƠN ĐĂNG KÝ, SỬA ĐỔI, BỔ SUNG PHƯƠNG PHÁP, CƠ SỞ TÍNH PHÍ BẢO HIỂM",
+  "field_code": 2,
+  "linh_vuc": "Bảo hiểm",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-20473",
+  "url": "https://thuvienphapluat.vn/bieumau/20473/MAU-BAO-CAO-KHA-NANG-THANH-TOAN-CUA-DOANH-NGHIEP-CHI-NHANH-DOANH-NGHIEP-TAI-BAO-HIEM-PHI-NHAN-THO-NUOC-NGOAI",
+  "title": "MẪU BÁO CÁO KHẢ NĂNG THANH TOÁN CỦA DOANH NGHIỆP/CHI NHÁNH DOANH NGHIỆP TÁI BẢO HIỂM PHI NHÂN THỌ NƯỚC NGOÀI",
+  "field_code": 2,
+  "linh_vuc": "Bảo hiểm",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": true,
+   "cn": false,
+   "diem": [
+    9,
+    0,
+    0
+   ],
+   "dau_hieu": [
+    "doanh nghiệp",
+    "chi nhánh"
+   ]
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-20467",
+  "url": "https://thuvienphapluat.vn/bieumau/20467/MAU-BAO-CAO-KET-QUA-KINH-DOANH-BAO-HIEM-VAT-CHAT-XE-CO-GIOI-CUA-DOANH-NGHIEP-CHI-NHANH-DOANH-NGHIEP-BAO-HIEM-PHI-NHAN-THO-NUOC-NGOAI",
+  "title": "MẪU BÁO CÁO KẾT QUẢ KINH DOANH BẢO HIỂM VẬT CHẤT XE CƠ GIỚI CỦA DOANH NGHIỆP/CHI NHÁNH DOANH NGHIỆP BẢO HIỂM PHI NHÂN THỌ NƯỚC NGOÀI",
+  "field_code": 2,
+  "linh_vuc": "Bảo hiểm",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": true,
+   "cn": false,
+   "diem": [
+    12,
+    0,
+    0
+   ],
+   "dau_hieu": [
+    "doanh nghiệp",
+    "chi nhánh",
+    "kinh doanh"
+   ]
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-39657",
+  "url": "https://thuvienphapluat.vn/bieumau/39657/MAU-THONG-BAO-VE-VIEC-CHI-TRA-LUONG-HUU-TRO-CAP-BAO-HIEM-XA-HOI",
+  "title": "MẪU THÔNG BÁO VỀ VIỆC CHI TRẢ LƯƠNG HƯU, TRỢ CẤP BẢO HIỂM XÃ HỘI",
+  "field_code": 2,
+  "linh_vuc": "Bảo hiểm",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    6,
+    0
+   ],
+   "dau_hieu": [
+    "trợ cấp",
+    "lương hưu"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-39654",
+  "url": "https://thuvienphapluat.vn/bieumau/39654/MAU-THONG-BAO-VE-VIEC-TIEP-NHAN-HO-SO-CHO-HUONG-LUONG-HUU-TRO-CAP-HANG-THANG",
+  "title": "MẪU THÔNG BÁO VỀ VIỆC TIẾP NHẬN HỒ SƠ CHỜ HƯỞNG LƯƠNG HƯU/TRỢ CẤP HẰNG THÁNG",
+  "field_code": 2,
+  "linh_vuc": "Bảo hiểm",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    6,
+    0
+   ],
+   "dau_hieu": [
+    "trợ cấp",
+    "lương hưu"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-20476",
+  "url": "https://thuvienphapluat.vn/bieumau/20476/MAU-BAO-CAO-THAM-GIA-HOAT-DONG-CUNG-CAP-DICH-VU-BAO-HIEM-QUA-BIEN-GIOI-CUA-DOANH-NGHIEP",
+  "title": "MẪU BÁO CÁO THAM GIA HOẠT ĐỘNG CUNG CẤP DỊCH VỤ BẢO HIỂM QUA BIÊN GIỚI CỦA DOANH NGHIỆP",
+  "field_code": 2,
+  "linh_vuc": "Bảo hiểm",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": true,
+   "cn": false,
+   "diem": [
+    3,
+    0,
+    0
+   ],
+   "dau_hieu": [
+    "doanh nghiệp"
+   ]
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-20474",
+  "url": "https://thuvienphapluat.vn/bieumau/20474/MAU-BAO-CAO-HOAT-DONG-MOI-GIOI-BAO-HIEM",
+  "title": "MẪU BÁO CÁO HOẠT ĐỘNG MÔI GIỚI BẢO HIỂM",
+  "field_code": 2,
+  "linh_vuc": "Bảo hiểm",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-25344",
+  "url": "https://thuvienphapluat.vn/bieumau/25344/MAU-BIEU-TONG-HOP-DANH-SACH-DE-NGHI-HO-TRO-KINH-PHI-DE-THANH-TOAN-TIEN-TRUNG-MUA",
+  "title": "MẪU BIỂU TỔNG HỢP DANH SÁCH ĐỀ NGHỊ HỖ TRỢ KINH PHÍ ĐỂ THANH TOÁN TIỀN TRƯNG MUA",
+  "field_code": 13,
+  "linh_vuc": "Đất đai – Nhà ở",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-25475",
+  "url": "https://thuvienphapluat.vn/bieumau/25475/MAU-BIEN-BAN-MO-THAU-DUNG-TRONG-DAU-THAU-DO-DAC-DAT-DAI-PHUC-VU-CAP-GIAY-CHUNG-NHAN-QUYEN-SU-DUNG-DAT-QUYEN-SO-HUU-NHA-O-VA-TAI-SAN-KHAC-GAN-LIEN-VOI-DAT",
+  "title": "MẪU BIÊN BẢN MỞ THẦU (DÙNG TRONG ĐẤU THẦU ĐO ĐẠC ĐẤT ĐAI PHỤC VỤ CẤP GIẤY CHỨNG NHẬN QUYỀN SỬ DỤNG ĐẤT, QUYỀN SỞ HỮU NHÀ Ở VÀ TÀI SẢN KHÁC GẮN LIỀN VỚI ĐẤT)",
+  "field_code": 13,
+  "linh_vuc": "Đất đai – Nhà ở",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-26133",
+  "url": "https://thuvienphapluat.vn/bieumau/26133/MAU-BANG-DANH-MUC-DU-AN-BO-TRI-ON-DINH-DAN-CU-TRONG-KE-HOACH-TRUNG-HAN-AP-DUNG-DOI-VOI-CHUONG-TRINH-BO-TRI-DAN-CU",
+  "title": "MẪU BẢNG DANH MỤC DỰ ÁN BỐ TRÍ ỔN ĐỊNH DÂN CƯ TRONG KẾ HOẠCH TRUNG HẠN (ÁP DỤNG ĐỐI VỚI CHƯƠNG TRÌNH BỐ TRÍ DÂN CƯ)",
+  "field_code": 13,
+  "linh_vuc": "Đất đai – Nhà ở",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-33286",
+  "url": "https://thuvienphapluat.vn/bieumau/33286/MAU-QUYET-DINH-VE-VIEC-CHO-THUE-DAT-DONG-THOI-GIAO-KHU-VUC-BIEN-DE-LAN-BIEN",
+  "title": "MẪU QUYẾT ĐỊNH VỀ VIỆC CHO THUÊ ĐẤT ĐỒNG THỜI GIAO KHU VỰC BIỂN ĐỂ LẤN BIỂN",
+  "field_code": 13,
+  "linh_vuc": "Đất đai – Nhà ở",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-25215",
+  "url": "https://thuvienphapluat.vn/bieumau/25215/MAU-THONG-BAO-THU-HOI-DAT-DE-THUC-HIEN-DU-AN",
+  "title": "MẪU THÔNG BÁO THU HỒI ĐẤT ĐỂ THỰC HIỆN DỰ ÁN",
+  "field_code": 13,
+  "linh_vuc": "Đất đai – Nhà ở",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-33276",
+  "url": "https://thuvienphapluat.vn/bieumau/33276/MAU-PHIEU-CHUYEN-THONG-TIN-DIA-CHINH-THUA-DAT",
+  "title": "MẪU PHIẾU CHUYỂN THÔNG TIN ĐỊA CHÍNH THỬA ĐẤT",
+  "field_code": 13,
+  "linh_vuc": "Đất đai – Nhà ở",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-33277",
+  "url": "https://thuvienphapluat.vn/bieumau/33277/MAU-DIEU-CHINH-HOP-DONG-THUE-DAT",
+  "title": "MẪU ĐIỀU CHỈNH HỢP ĐỒNG THUÊ ĐẤT",
+  "field_code": 13,
+  "linh_vuc": "Đất đai – Nhà ở",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "ca_hai"
+ },
+ {
+  "form_key": "bieumau-25423",
+  "url": "https://thuvienphapluat.vn/bieumau/25423/MAU-BAO-CAO-SU-DUNG-VON-BOI-THUONG-HO-TRO-VA-TAI-DINH-CU-AP-DUNG-TRONG-BOI-THUONG-HO-TRO-VA-TAI-DINH-CU-DU-AN-THUY-DIEN-SON-LA",
+  "title": "MẪU BÁO CÁO SỬ DỤNG VỐN BỒI THƯỜNG, HỖ TRỢ VÀ TÁI ĐỊNH CƯ (ÁP DỤNG TRONG BỒI THƯỜNG, HỖ TRỢ VÀ TÁI ĐỊNH CƯ DỰ ÁN THỦY ĐIỆN SƠN LA)",
+  "field_code": 13,
+  "linh_vuc": "Đất đai – Nhà ở",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-25343",
+  "url": "https://thuvienphapluat.vn/bieumau/25343/MAU-QUYET-DINH-VE-VIEC-XAC-LAP-SO-HUU-TOAN-DAN-AP-DUNG-CHO-SO-HUU-TOAN-DAN-DOI-VOI-NHA-DAT",
+  "title": "MẪU QUYẾT ĐỊNH VỀ VIỆC XÁC LẬP SỞ HỮU TOÀN DÂN (ÁP DỤNG CHO SỞ HỮU TOÀN DÂN ĐỐI VỚI NHÀ ĐẤT)",
+  "field_code": 13,
+  "linh_vuc": "Đất đai – Nhà ở",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-25141",
+  "url": "https://thuvienphapluat.vn/bieumau/25141/MAU-TO-KHAI-THU-TIEN-CAP-QUYEN-SU-DUNG-DAT-O-VA-XAY-DUNG-CONG-TRINH",
+  "title": "MẪU TỜ KHAI THU TIỀN CẤP QUYỀN SỬ DỤNG ĐẤT Ở VÀ XÂY DỰNG CÔNG TRÌNH",
+  "field_code": 13,
+  "linh_vuc": "Đất đai – Nhà ở",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": false,
+   "cn": true,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "ca_hai"
+ },
+ {
+  "form_key": "bieumau-33281",
+  "url": "https://thuvienphapluat.vn/bieumau/33281/MAU-DON-XIN-XAC-NHAN-LAI-THOI-HAN-SU-DUNG-DAT-NONG-NGHIEP",
+  "title": "MẪU ĐƠN XIN XÁC NHẬN LẠI THỜI HẠN SỬ DỤNG ĐẤT NÔNG NGHIỆP",
+  "field_code": 13,
+  "linh_vuc": "Đất đai – Nhà ở",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": false,
+   "cn": true,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "ca_nhan"
+ },
+ {
+  "form_key": "bieumau-33283",
+  "url": "https://thuvienphapluat.vn/bieumau/33283/MAU-VAN-BAN-VE-VIEC-THAM-DINH-PHE-DUYET-PHUONG-AN-SU-DUNG-DAT",
+  "title": "MẪU VĂN BẢN VỀ VIỆC THẨM ĐỊNH, PHÊ DUYỆT PHƯƠNG ÁN SỬ DỤNG ĐẤT",
+  "field_code": 13,
+  "linh_vuc": "Đất đai – Nhà ở",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-29797",
+  "url": "https://thuvienphapluat.vn/bieumau/29797/MAU-DON-DE-NGHI-CAP-LAI-GIAY-DANG-KY-HOAT-DONG-CUA-TRUNG-TAM-TRONG-TAI-CHI-NHANH-CUA-TRUNG-TAM-TRONG-TAI-CHI-NHANH-CUA-TO-CHUC-TRONG-TAI-NUOC-NGOAI-TAI-VIET-NAM",
+  "title": "MẪU ĐƠN ĐỀ NGHỊ CẤP LẠI GIẤY ĐĂNG KÝ HOẠT ĐỘNG CỦA TRUNG TÂM TRỌNG TÀI/CHI NHÁNH CỦA TRUNG TÂM TRỌNG TÀI, CHI NHÁNH CỦA TỔ CHỨC TRỌNG TÀI NƯỚC NGOÀI TẠI VIỆT NAM",
+  "field_code": 4,
+  "linh_vuc": "Bổ trợ Tư pháp",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": true,
+   "cn": false,
+   "diem": [
+    6,
+    0,
+    0
+   ],
+   "dau_hieu": [
+    "chi nhánh"
+   ]
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-40459",
+  "url": "https://thuvienphapluat.vn/bieumau/40459/MAU-VAN-BAN-DE-NGHI-CHUYEN-DOI-CONG-TY-LUAT-NUOC-NGOAI-THANH-CONG-TY-LUAT-VIET-NAM",
+  "title": "MẪU VĂN BẢN ĐỀ NGHỊ CHUYỂN ĐỔI CÔNG TY LUẬT NƯỚC NGOÀI THÀNH CÔNG TY LUẬT VIỆT NAM",
+  "field_code": 4,
+  "linh_vuc": "Bổ trợ Tư pháp",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-29795",
+  "url": "https://thuvienphapluat.vn/bieumau/29795/MAU-DON-DE-NGHI-THAY-DOI-NOI-DUNG-GIAY-DANG-KY-HOAT-DONG-CUA-TRUNG-TAM-TRONG-TAI-CHI-NHANH-CUA-TO-CHUC-TRONG-TAI-NUOC-NGOAI-TAI-VIET-NAM",
+  "title": "MẪU ĐƠN ĐỀ NGHỊ THAY ĐỔI NỘI DUNG GIẤY ĐĂNG KÝ HOẠT ĐỘNG CỦA TRUNG TÂM TRỌNG TÀI/CHI NHÁNH CỦA TỔ CHỨC TRỌNG TÀI NƯỚC NGOÀI TẠI VIỆT NAM",
+  "field_code": 4,
+  "linh_vuc": "Bổ trợ Tư pháp",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": true,
+   "cn": false,
+   "diem": [
+    3,
+    0,
+    0
+   ],
+   "dau_hieu": [
+    "chi nhánh"
+   ]
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-29792",
+  "url": "https://thuvienphapluat.vn/bieumau/29792/MAU-GIAY-DANG-KY-HOAT-DONG-CHI-NHANH-CUA-TRUNG-TAM-TRONG-TAI-THUONG-MAI",
+  "title": "MẪU GIẤY ĐĂNG KÝ HOẠT ĐỘNG CHI NHÁNH CỦA TRUNG TÂM TRỌNG TÀI THƯƠNG MẠI",
+  "field_code": 4,
+  "linh_vuc": "Bổ trợ Tư pháp",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": true,
+   "cn": false,
+   "diem": [
+    3,
+    0,
+    0
+   ],
+   "dau_hieu": [
+    "chi nhánh"
+   ]
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-40889",
+  "url": "https://thuvienphapluat.vn/bieumau/40889/MAU-LOI-CHUNG-CHUNG-THUC-GIAO-DICH-TAI-TRUNG-TAM-PHUC-VU-HANH-CHINH-CONG",
+  "title": "MẪU LỜI CHỨNG CHỨNG THỰC GIAO DỊCH TẠI TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG",
+  "field_code": 4,
+  "linh_vuc": "Bổ trợ Tư pháp",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-40880",
+  "url": "https://thuvienphapluat.vn/bieumau/40880/MAU-LOI-CHUNG-CHUNG-THUC-BAN-SAO-TU-BAN-CHINH",
+  "title": "MẪU LỜI CHỨNG CHỨNG THỰC BẢN SAO TỪ BẢN CHÍNH",
+  "field_code": 4,
+  "linh_vuc": "Bổ trợ Tư pháp",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-40887",
+  "url": "https://thuvienphapluat.vn/bieumau/40887/MAU-LOI-CHUNG-CHUNG-THUC-CHU-KY-NGUOI-DICH",
+  "title": "MẪU LỜI CHỨNG CHỨNG THỰC CHỮ KÝ NGƯỜI DỊCH",
+  "field_code": 4,
+  "linh_vuc": "Bổ trợ Tư pháp",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-29769",
+  "url": "https://thuvienphapluat.vn/bieumau/29769/MAU-GIAY-DE-NGHI-SAP-NHAP-VAN-PHONG-THUA-PHAT-LAI",
+  "title": "MẪU GIẤY ĐỀ NGHỊ SÁP NHẬP VĂN PHÒNG THỪA PHÁT LẠI",
+  "field_code": 4,
+  "linh_vuc": "Bổ trợ Tư pháp",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-29767",
+  "url": "https://thuvienphapluat.vn/bieumau/29767/MAU-GIAY-DE-NGHI-CHUYEN-DOI-LOAI-HINH-VAN-PHONG-THUA-PHAT-LAI",
+  "title": "MẪU GIẤY ĐỀ NGHỊ CHUYỂN ĐỔI LOẠI HÌNH VĂN PHÒNG THỪA PHÁT LẠI",
+  "field_code": 4,
+  "linh_vuc": "Bổ trợ Tư pháp",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-1337",
+  "url": "https://thuvienphapluat.vn/bieumau/1337/MAU-BIEN-BAN-VE-VIEC-HUY-BO-BIEN-PHAP-KE-BIEN-TAI-SAN",
+  "title": "MẪU BIÊN BẢN VỀ VIỆC HỦY BỎ BIỆN PHÁP KÊ BIÊN TÀI SẢN",
+  "field_code": 38,
+  "linh_vuc": "Trách nhiệm hình sự",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-1323",
+  "url": "https://thuvienphapluat.vn/bieumau/1323/MAU-QUYET-DINH-AP-DUNG-BIEN-PHAP-BAO-QUAN-TAI-SAN-CUA-NGUOI-BI-TAM-GIU-TAM-GIAM",
+  "title": "MẪU QUYẾT ĐỊNH ÁP DỤNG BIỆN PHÁP BẢO QUẢN TÀI SẢN CỦA NGƯỜI BỊ TẠM GIỮ/TẠM GIAM",
+  "field_code": 38,
+  "linh_vuc": "Trách nhiệm hình sự",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-1333",
+  "url": "https://thuvienphapluat.vn/bieumau/1333/MAU-BIEN-BAN-KE-BIEN-TAI-SAN",
+  "title": "MẪU BIÊN BẢN KÊ BIÊN TÀI SẢN",
+  "field_code": 38,
+  "linh_vuc": "Trách nhiệm hình sự",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-1329",
+  "url": "https://thuvienphapluat.vn/bieumau/1329/MAU-BIEN-BAN-DAN-GIAI",
+  "title": "MẪU BIÊN BẢN DẪN GIẢI",
+  "field_code": 38,
+  "linh_vuc": "Trách nhiệm hình sự",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-1006",
+  "url": "https://thuvienphapluat.vn/bieumau/1006/MAU-QUYET-DINH-THAY-DOI-CAN-BO-DIEU-TRA-GIAI-QUYET-NGUON-TIN-VE-TOI-PHAM-DUNG-CHO-CO-QUAN-DUOC-GIAO-NHIEM-VU-TIEN-HANH-MOT-SO-HOAT-DONG-DIEU-TRA",
+  "title": "MẪU QUYẾT ĐỊNH THAY ĐỔI CÁN BỘ ĐIỀU TRA GIẢI QUYẾT NGUỒN TIN VỀ TỘI PHẠM (DÙNG CHO CƠ QUAN ĐƯỢC GIAO NHIỆM VỤ TIẾN HÀNH MỘT SỐ HOẠT ĐỘNG ĐIỀU TRA)",
+  "field_code": 38,
+  "linh_vuc": "Trách nhiệm hình sự",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-1345",
+  "url": "https://thuvienphapluat.vn/bieumau/1345/MAU-THONG-BAO-VE-VIEC-HUY-BO-BIEN-PHAP-KE-BIEN-TAI-SAN-PHONG-TOA-TAI-KHOAN",
+  "title": "MẪU THÔNG BÁO VỀ VIỆC HỦY BỎ BIỆN PHÁP KÊ BIÊN TÀI SẢN, PHONG TỎA TÀI KHOẢN",
+  "field_code": 38,
+  "linh_vuc": "Trách nhiệm hình sự",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-1021",
+  "url": "https://thuvienphapluat.vn/bieumau/1021/MAU-QUYET-DINH-KHONG-KHOI-TO-VU-AN-HINH-SU",
+  "title": "MẪU QUYẾT ĐỊNH KHÔNG KHỞI TỐ VỤ ÁN HÌNH SỰ",
+  "field_code": 38,
+  "linh_vuc": "Trách nhiệm hình sự",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-1324",
+  "url": "https://thuvienphapluat.vn/bieumau/1324/MAU-BIEN-BAN-AP-DUNG-BIEN-PHAP-BAO-QUAN-TAI-SAN-CUA-NGUOI-BI-TAM-GIU-TAM-GIAM",
+  "title": "MẪU BIÊN BẢN ÁP DỤNG BIỆN PHÁP BẢO QUẢN TÀI SẢN CỦA NGƯỜI BỊ TẠM GIỮ, TẠM GIAM",
+  "field_code": 38,
+  "linh_vuc": "Trách nhiệm hình sự",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-1015",
+  "url": "https://thuvienphapluat.vn/bieumau/1015/MAU-BAO-CAO-KET-THUC-GIAI-QUYET-NGUON-TIN-VE-TOI-PHAM",
+  "title": "MẪU BÁO CÁO KẾT THÚC GIẢI QUYẾT NGUỒN TIN VỀ TỘI PHẠM",
+  "field_code": 38,
+  "linh_vuc": "Trách nhiệm hình sự",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-45004",
+  "url": "https://thuvienphapluat.vn/bieumau/45004/MAU-SO-THEO-DOI-GIAO-NHAN-HO-SO-CU-TRU",
+  "title": "MẪU SỔ THEO DÕI GIAO, NHẬN HỒ SƠ CƯ TRÚ",
+  "field_code": 10,
+  "linh_vuc": "Dân sự",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-44994",
+  "url": "https://thuvienphapluat.vn/bieumau/44994/MAU-PHIEU-KHAI-BAO-TAM-VANG",
+  "title": "MẪU PHIẾU KHAI BÁO TẠM VẮNG",
+  "field_code": 10,
+  "linh_vuc": "Dân sự",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": false,
+   "cn": true,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "ca_nhan"
+ },
+ {
+  "form_key": "bieumau-34289",
+  "url": "https://thuvienphapluat.vn/bieumau/34289/MAU-THONG-BAO-Y-KIEN-CUA-CO-QUAN-NHA-NUOC-CO-THAM-QUYEN-VE-VIEC-HOI-DA-TO-CHUC-DAI-HOI-DAM-BAO-THEO-QUY-DINH-CUA-PHAP-LUAT-VA-DIEU-LE-HOI",
+  "title": "MẪU THÔNG BÁO Ý KIẾN CỦA CƠ QUAN NHÀ NƯỚC CÓ THẨM QUYỀN VỀ VIỆC HỘI ĐÃ TỔ CHỨC ĐẠI HỘI ĐẢM BẢO THEO QUY ĐỊNH CỦA PHÁP LUẬT VÀ ĐIỀU LỆ HỘI",
+  "field_code": 10,
+  "linh_vuc": "Dân sự",
+  "may_doan": {
+   "audience": "co_quan_nha_nuoc",
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    3
+   ],
+   "dau_hieu": [
+    "cơ quan nhà nước"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-36807",
+  "url": "https://thuvienphapluat.vn/bieumau/36807/MAU-SO-THEO-DOI-CUNG-CAP-THONG-TIN-THEO-YEU-CAU-CUA-BO-VAN-HOA-THE-THAO-VA-DU-LICH",
+  "title": "MẪU SỔ THEO DÕI CUNG CẤP THÔNG TIN THEO YÊU CẦU CỦA BỘ VĂN HÓA, THỂ THAO VÀ DU LỊCH",
+  "field_code": 10,
+  "linh_vuc": "Dân sự",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-44999",
+  "url": "https://thuvienphapluat.vn/bieumau/44999/MAU-QUYET-DINH-HUY-BO-THU-TUC-VE-CU-TRU",
+  "title": "MẪU QUYẾT ĐỊNH HỦY BỎ THỦ TỤC VỀ CƯ TRÚ",
+  "field_code": 10,
+  "linh_vuc": "Dân sự",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-45003",
+  "url": "https://thuvienphapluat.vn/bieumau/45003/MAU-PHIEU-THONG-BAO-LUU-TRU",
+  "title": "MẪU PHIẾU THÔNG BÁO LƯU TRÚ",
+  "field_code": 10,
+  "linh_vuc": "Dân sự",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "ca_hai"
+ },
+ {
+  "form_key": "bieumau-38387",
+  "url": "https://thuvienphapluat.vn/bieumau/38387/MAU-TO-KHAI-DE-NGHI-CAP-GIA-HAN-HO-CHIEU-NGOAI-GIAO-HO-CHIEU-CONG-VU-CONG-HAM-HO-TRO-XIN-THI-THUC",
+  "title": "MẪU TỜ KHAI ĐỀ NGHỊ CẤP, GIA HẠN HỘ CHIẾU NGOẠI GIAO, HỘ CHIẾU CÔNG VỤ, CÔNG HÀM HỖ TRỢ XIN THỊ THỰC",
+  "field_code": 10,
+  "linh_vuc": "Dân sự",
+  "may_doan": {
+   "audience": "ca_nhan",
+   "dn": false,
+   "cn": true,
+   "diem": [
+    0,
+    6,
+    0
+   ],
+   "dau_hieu": [
+    "hộ chiếu"
+   ]
+  },
+  "nhan_tay": "ca_nhan"
+ },
+ {
+  "form_key": "bieumau-34284",
+  "url": "https://thuvienphapluat.vn/bieumau/34284/MAU-QUYET-DINH-DINH-CHI-HOAT-DONG-CO-THOI-HAN-HOI",
+  "title": "MẪU QUYẾT ĐỊNH ĐÌNH CHỈ HOẠT ĐỘNG CÓ THỜI HẠN HỘI",
+  "field_code": 10,
+  "linh_vuc": "Dân sự",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-3551",
+  "url": "https://thuvienphapluat.vn/bieumau/3551/MAU-QUYET-DINH-VE-VIEC-NOP-TIEN-PHAT-NHIEU-LAN-LINH-VUC-THUE-HOA-DON",
+  "title": "MẪU QUYẾT ĐỊNH VỀ VIỆC NỘP TIỀN PHẠT NHIỀU LẦN (LĨNH VỰC THUẾ, HÓA ĐƠN)",
+  "field_code": 42,
+  "linh_vuc": "Vi phạm hành chính",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": true,
+   "cn": false,
+   "diem": [
+    3,
+    0,
+    0
+   ],
+   "dau_hieu": [
+    "hóa đơn"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-800",
+  "url": "https://thuvienphapluat.vn/bieumau/800/MAU-QUYET-DINH-CUONG-CHE-KE-BIEN-TAI-SAN-CO-GIA-TRI-TUONG-UNG-VOI-SO-TIEN-PHAT-PHAI-HOAN-TRA",
+  "title": "MẪU QUYẾT ĐỊNH CƯỠNG CHẾ KÊ BIÊN TÀI SẢN CÓ GIÁ TRỊ TƯƠNG ỨNG VỚI SỐ TIỀN PHẠT/PHẢI HOÀN TRẢ",
+  "field_code": 42,
+  "linh_vuc": "Vi phạm hành chính",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-2562",
+  "url": "https://thuvienphapluat.vn/bieumau/2562/MAU-THONG-BAO-VE-VIEC-LAP-HO-SO-DE-NGHI-AP-DUNG-BIEN-PHAP-XU-LY-HANH-CHINH-DUA-VAO-CO-SO-CAI-NGHIEN-BAT-BUOC",
+  "title": "MẪU THÔNG BÁO VỀ VIỆC LẬP HỒ SƠ ĐỀ NGHỊ ÁP DỤNG BIỆN PHÁP XỬ LÝ HÀNH CHÍNH ĐƯA VÀO CƠ SỞ CAI NGHIỆN BẮT BUỘC",
+  "field_code": 42,
+  "linh_vuc": "Vi phạm hành chính",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-2560",
+  "url": "https://thuvienphapluat.vn/bieumau/2560/MAU-BAN-TUONG-TRINH",
+  "title": "MẪU BẢN TƯỜNG TRÌNH",
+  "field_code": 42,
+  "linh_vuc": "Vi phạm hành chính",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": false,
+   "cn": true,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "ca_hai"
+ },
+ {
+  "form_key": "bieumau-3534",
+  "url": "https://thuvienphapluat.vn/bieumau/3534/MAU-BIEN-BAN-VE-VIEC-CA-NHAN-TO-CHUC-VI-PHAM-HANH-CHINH-KHONG-NHAN-QUYET-DINH-XU-PHAT-VI-PHAM-HANH-CHINH",
+  "title": "MẪU BIÊN BẢN VỀ VIỆC CÁ NHÂN, TỔ CHỨC VI PHẠM HÀNH CHÍNH KHÔNG NHẬN QUYẾT ĐỊNH XỬ PHẠT VI PHẠM HÀNH CHÍNH",
+  "field_code": 42,
+  "linh_vuc": "Vi phạm hành chính",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    3,
+    0
+   ],
+   "dau_hieu": [
+    "cá nhân"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-799",
+  "url": "https://thuvienphapluat.vn/bieumau/799/MAU-QUYET-DINH-CUONG-CHE-KHAU-TRU-TIEN-TU-TAI-KHOAN",
+  "title": "MẪU QUYẾT ĐỊNH CƯỠNG CHẾ KHẤU TRỪ TIỀN TỪ TÀI KHOẢN",
+  "field_code": 42,
+  "linh_vuc": "Vi phạm hành chính",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-798",
+  "url": "https://thuvienphapluat.vn/bieumau/798/MAU-QUYET-DINH-CUONG-CHE-KHAU-TRU-MOT-PHAN-LUONG-MOT-PHAN-THU-NHAP",
+  "title": "MẪU QUYẾT ĐỊNH CƯỠNG CHẾ KHẤU TRỪ MỘT PHẦN LƯƠNG/MỘT PHẦN THU NHẬP",
+  "field_code": 42,
+  "linh_vuc": "Vi phạm hành chính",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-2563",
+  "url": "https://thuvienphapluat.vn/bieumau/2563/MAU-BIEN-BAN-VE-VIEC-DOC-HO-SO",
+  "title": "MẪU BIÊN BẢN VỀ VIỆC ĐỌC HỒ SƠ",
+  "field_code": 42,
+  "linh_vuc": "Vi phạm hành chính",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-39406",
+  "url": "https://thuvienphapluat.vn/bieumau/39406/MAU-VAN-BAN-THOA-THUAN-THAY-DOI-QUOC-TICH-CHO-CON-CHUA-THANH-NIEN",
+  "title": "MẪU VĂN BẢN THỎA THUẬN THAY ĐỔI QUỐC TỊCH CHO CON CHƯA THÀNH NIÊN",
+  "field_code": 39,
+  "linh_vuc": "Tư pháp – Hộ tịch",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "ca_nhan"
+ },
+ {
+  "form_key": "bieumau-40056",
+  "url": "https://thuvienphapluat.vn/bieumau/40056/MAU-VAN-BAN-YEU-CAU-THUC-HIEN-UY-THAC-TU-PHAP-VE-DAN-SU",
+  "title": "MẪU VĂN BẢN YÊU CẦU THỰC HIỆN ỦY THÁC TƯ PHÁP VỀ DÂN SỰ",
+  "field_code": 39,
+  "linh_vuc": "Tư pháp – Hộ tịch",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-39405",
+  "url": "https://thuvienphapluat.vn/bieumau/39405/MAU-GIAY-XAC-NHAN-LA-NGUOI-GOC-VIET-NAM",
+  "title": "MẪU GIẤY XÁC NHẬN LÀ NGƯỜI GỐC VIỆT NAM",
+  "field_code": 39,
+  "linh_vuc": "Tư pháp – Hộ tịch",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-35429",
+  "url": "https://thuvienphapluat.vn/bieumau/35429/MAU-TRICH-LUC-DANG-KY-GIAM-SAT-VIEC-GIAM-HO-DANH-CHO-PHAP-NHAN",
+  "title": "MẪU TRÍCH LỤC ĐĂNG KÝ GIÁM SÁT VIỆC GIÁM HỘ (DÀNH CHO PHÁP NHÂN)",
+  "field_code": 39,
+  "linh_vuc": "Tư pháp – Hộ tịch",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-35430",
+  "url": "https://thuvienphapluat.vn/bieumau/35430/MAU-TRICH-LUC-DANG-KY-GIAM-SAT-VIEC-GIAM-HO-BAN-SAO-DANH-CHO-CA-NHAN",
+  "title": "MẪU TRÍCH LỤC ĐĂNG KÝ GIÁM SÁT VIỆC GIÁM HỘ (BẢN SAO) (DÀNH CHO CÁ NHÂN)",
+  "field_code": 39,
+  "linh_vuc": "Tư pháp – Hộ tịch",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    3,
+    0
+   ],
+   "dau_hieu": [
+    "cá nhân"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-35435",
+  "url": "https://thuvienphapluat.vn/bieumau/35435/MAU-TRICH-LUC-DANG-KY-CHAM-DUT-GIAM-SAT-VIEC-GIAM-HO-BAN-SAO-DANH-CHO-PHAP-NHAN",
+  "title": "MẪU TRÍCH LỤC ĐĂNG KÝ CHẤM DỨT GIÁM SÁT VIỆC GIÁM HỘ (BẢN SAO) (DÀNH CHO PHÁP NHÂN)",
+  "field_code": 39,
+  "linh_vuc": "Tư pháp – Hộ tịch",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-37458",
+  "url": "https://thuvienphapluat.vn/bieumau/37458/MAU-THONG-BAO-VE-VIEC-THU-LY-TO-CAO-CUA-CONG-DOAN",
+  "title": "MẪU THÔNG BÁO VỀ VIỆC THỤ LÝ TỐ CÁO CỦA CÔNG ĐOÀN",
+  "field_code": 22,
+  "linh_vuc": "Khiếu nại – Tố cáo",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-28456",
+  "url": "https://thuvienphapluat.vn/bieumau/28456/MAU-CONG-VAN-DE-NGHI-XET-TANG-GIAI-THUONG-HO-CHI-MINH-GIAI-THUONG-NHA-NUOC-VE-KHOA-HOC-VA-CONG-NGHE",
+  "title": "MẪU CÔNG VĂN ĐỀ NGHỊ XÉT TẶNG GIẢI THƯỞNG HỒ CHÍ MINH, GIẢI THƯỞNG NHÀ NƯỚC VỀ KHOA HỌC VÀ CÔNG NGHỆ",
+  "field_code": 22,
+  "linh_vuc": "Khiếu nại – Tố cáo",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-37454",
+  "url": "https://thuvienphapluat.vn/bieumau/37454/MAU-QUYET-DINH-VE-VIEC-GIAI-QUYET-KHIEU-NAI-LAN-DAU-CUA-CONG-DOAN",
+  "title": "MẪU QUYẾT ĐỊNH VỀ VIỆC GIẢI QUYẾT KHIẾU NẠI LẦN ĐẦU CỦA CÔNG ĐOÀN",
+  "field_code": 22,
+  "linh_vuc": "Khiếu nại – Tố cáo",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-21607",
+  "url": "https://thuvienphapluat.vn/bieumau/21607/MAU-QUYET-DINH-VE-VIEC-GIAI-QUYET-KHIEU-NAI-TRONG-HOAT-DONG-KIEM-TOAN-NHA-NUOC",
+  "title": "MẪU QUYẾT ĐỊNH VỀ VIỆC GIẢI QUYẾT KHIẾU NẠI TRONG HOẠT ĐỘNG KIỂM TOÁN NHÀ NƯỚC",
+  "field_code": 22,
+  "linh_vuc": "Khiếu nại – Tố cáo",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-31264",
+  "url": "https://thuvienphapluat.vn/bieumau/31264/MAU-GIAY-BIEN-NHAN-CAC-TAI-LIEU-DO-NGUOI-KHIEU-NAI-TO-CAO-KIEN-NGHI-PHAN-ANH-CUNG-CAP-TAI-CO-QUAN-THUE-CAC-CAP",
+  "title": "MẪU GIẤY BIÊN NHẬN CÁC TÀI LIỆU DO NGƯỜI KHIẾU NẠI, TỐ CÁO, KIẾN NGHỊ, PHẢN ÁNH CUNG CẤP TẠI CƠ QUAN THUẾ CÁC CẤP",
+  "field_code": 22,
+  "linh_vuc": "Khiếu nại – Tố cáo",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-37456",
+  "url": "https://thuvienphapluat.vn/bieumau/37456/MAU-QUYET-DINH-THU-LY-TO-CAO-CUA-CONG-DOAN",
+  "title": "MẪU QUYẾT ĐỊNH THỤ LÝ TỐ CÁO CỦA CÔNG ĐOÀN",
+  "field_code": 22,
+  "linh_vuc": "Khiếu nại – Tố cáo",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-42791",
+  "url": "https://thuvienphapluat.vn/bieumau/42791/MAU-VAN-BAN-XIN-LOI-VA-DE-NGHI-GIA-HAN-THOI-GIAN-GIAI-QUYET-THU-TUC-HANH-CHINH-TAI-BO-KHOA-HOC-VA-CONG-NGHE",
+  "title": "MẪU VĂN BẢN XIN LỖI VÀ ĐỀ NGHỊ GIA HẠN THỜI GIAN GIẢI QUYẾT THỦ TỤC HÀNH CHÍNH TẠI BỘ KHOA HỌC VÀ CÔNG NGHỆ",
+  "field_code": 33,
+  "linh_vuc": "Thủ tục hành chính",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-42794",
+  "url": "https://thuvienphapluat.vn/bieumau/42794/MAU-SO-THEO-DOI-HO-SO-THU-TUC-HANH-CHINH-TAI-BO-KHOA-HOC-VA-CONG-NGHE",
+  "title": "MẪU SỔ THEO DÕI HỒ SƠ THỦ TỤC HÀNH CHÍNH TẠI BỘ KHOA HỌC VÀ CÔNG NGHỆ",
+  "field_code": 33,
+  "linh_vuc": "Thủ tục hành chính",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-30921",
+  "url": "https://thuvienphapluat.vn/bieumau/30921/MAU-KE-HOACH-RA-SOAT-DANH-GIA-THU-TUC-HANH-CHINH-LINH-VUC-HAI-QUAN",
+  "title": "MẪU KẾ HOẠCH RÀ SOÁT, ĐÁNH GIÁ THỦ TỤC HÀNH CHÍNH LĨNH VỰC HẢI QUAN",
+  "field_code": 33,
+  "linh_vuc": "Thủ tục hành chính",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-42793",
+  "url": "https://thuvienphapluat.vn/bieumau/42793/MAU-PHIEU-KIEM-SOAT-QUA-TRINH-GIAI-QUYET-HO-SO-THU-TUC-HANH-CHINH-TAI-BO-KHOA-HOC-VA-CONG-NGHE",
+  "title": "MẪU PHIẾU KIỂM SOÁT QUÁ TRÌNH GIẢI QUYẾT HỒ SƠ THỦ TỤC HÀNH CHÍNH TẠI BỘ KHOA HỌC VÀ CÔNG NGHỆ",
+  "field_code": 33,
+  "linh_vuc": "Thủ tục hành chính",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-30915",
+  "url": "https://thuvienphapluat.vn/bieumau/30915/MAU-CHI-PHI-TUAN-THU-THU-TUC-HANH-CHINH-LINH-VUC-HAI-QUAN",
+  "title": "MẪU CHI PHÍ TUÂN THỦ THỦ TỤC HÀNH CHÍNH LĨNH VỰC HẢI QUAN",
+  "field_code": 33,
+  "linh_vuc": "Thủ tục hành chính",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-42789",
+  "url": "https://thuvienphapluat.vn/bieumau/42789/MAU-PHIEU-YEU-CAU-BO-SUNG-HOAN-THIEN-HO-SO-GIAI-QUYET-THU-TUC-HANH-CHINH-TAI-BO-KHOA-HOC-VA-CONG-NGHE",
+  "title": "MẪU PHIẾU YÊU CẦU BỔ SUNG, HOÀN THIỆN HỒ SƠ GIẢI QUYẾT THỦ TỤC HÀNH CHÍNH TẠI BỘ KHOA HỌC VÀ CÔNG NGHỆ",
+  "field_code": 33,
+  "linh_vuc": "Thủ tục hành chính",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-42648",
+  "url": "https://thuvienphapluat.vn/bieumau/42648/MAU-VAN-BAN-DE-NGHI-CAP-LAI-CAP-DIEU-CHINH-GIAY-PHEP-NHAP-KHAU-HOA-CHAT-CAM",
+  "title": "MẪU VĂN BẢN ĐỀ NGHỊ CẤP LẠI/CẤP ĐIỀU CHỈNH GIẤY PHÉP NHẬP KHẨU HÓA CHẤT CẤM",
+  "field_code": 45,
+  "linh_vuc": "Xuất nhập cảnh",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": true,
+   "cn": false,
+   "diem": [
+    3,
+    0,
+    0
+   ],
+   "dau_hieu": [
+    "nhập khẩu"
+   ]
+  },
+  "nhan_tay": "doanh_nghiep"
+ },
+ {
+  "form_key": "bieumau-39326",
+  "url": "https://thuvienphapluat.vn/bieumau/39326/MAU-DON-DE-NGHI-XAC-NHAN-CUNG-CAP-THONG-TIN-TRONG-CO-SO-DU-LIEU-QUOC-GIA-VE-XUAT-NHAP-CANH-DANH-CHO-NGUOI-CHUA-DU-14-TUOI",
+  "title": "MẪU ĐƠN ĐỀ NGHỊ XÁC NHẬN, CUNG CẤP THÔNG TIN TRONG CƠ SỞ DỮ LIỆU QUỐC GIA VỀ XUẤT NHẬP CẢNH (DÀNH CHO NGƯỜI CHƯA ĐỦ 14 TUỔI)",
+  "field_code": 45,
+  "linh_vuc": "Xuất nhập cảnh",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "ca_nhan"
+ },
+ {
+  "form_key": "bieumau-46968",
+  "url": "https://thuvienphapluat.vn/bieumau/46968/MAU-QUYET-DINH-GIAI-TOA-QUYET-DINH-CHUA-CHO-NHAP-CANH",
+  "title": "MẪU QUYẾT ĐỊNH GIẢI TỎA QUYẾT ĐỊNH CHƯA CHO NHẬP CẢNH",
+  "field_code": 45,
+  "linh_vuc": "Xuất nhập cảnh",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-6431",
+  "url": "https://thuvienphapluat.vn/bieumau/6431/MAU-GIAY-PHEP-QUA-CANH-TRONG-HOAT-DONG-HANG-HAI",
+  "title": "MẪU GIẤY PHÉP QUÁ CẢNH (TRONG HOẠT ĐỘNG HÀNG HẢI)",
+  "field_code": 45,
+  "linh_vuc": "Xuất nhập cảnh",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-45924",
+  "url": "https://thuvienphapluat.vn/bieumau/45924/MAU-BAO-CAO-XUAT-CANH-NHAP-CANH-VIET-NAM-THEO-TUYEN-DUONG-HANG-KHONG-CUA-BO-CONG-AN",
+  "title": "MẪU BÁO CÁO XUẤT CẢNH, NHẬP CẢNH VIỆT NAM THEO TUYẾN ĐƯỜNG HÀNG KHÔNG CỦA BỘ CÔNG AN",
+  "field_code": 45,
+  "linh_vuc": "Xuất nhập cảnh",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-20595",
+  "url": "https://thuvienphapluat.vn/bieumau/20595/MAU-GIAY-CHUNG-NHAN-DANG-KY-THANH-LAP-CUA-CO-SO-CUNG-CAP-DICH-VU-TRO-GIUP-PHONG-CHONG-BAO-LUC-GIA-DINH-CAP-LAN-DAU-CAP-DOI-LAN-CAP-LAI-LAN-DO-CHINH-PHU-BAN-HANH",
+  "title": "MẪU GIẤY CHỨNG NHẬN ĐĂNG KÝ THÀNH LẬP CỦA CƠ SỞ CUNG CẤP DỊCH VỤ TRỢ GIÚP PHÒNG, CHỐNG BẠO LỰC GIA ĐÌNH (CẤP LẦN ĐẦU/CẤP ĐỔI LẦN.../CẤP LẠI LẦN...) DO CHÍNH PHỦ BAN HÀNH",
+  "field_code": 20,
+  "linh_vuc": "Hôn nhân – Gia đình – Thừa kế",
+  "may_doan": {
+   "audience": "doanh_nghiep",
+   "dn": true,
+   "cn": false,
+   "diem": [
+    3,
+    0,
+    0
+   ],
+   "dau_hieu": [
+    "giấy chứng nhận đăng ký"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-46014",
+  "url": "https://thuvienphapluat.vn/bieumau/46014/MAU-BAO-CAO-TUOI-LY-HON-TRUNG-BINH-CUA-TOA-AN-NHAN-DAN-TOI-CAO",
+  "title": "MẪU BÁO CÁO TUỔI LY HÔN TRUNG BÌNH CỦA TÒA ÁN NHÂN DÂN TỐI CAO",
+  "field_code": 20,
+  "linh_vuc": "Hôn nhân – Gia đình – Thừa kế",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    3,
+    0
+   ],
+   "dau_hieu": [
+    "ly hôn"
+   ]
+  },
+  "nhan_tay": "co_quan"
+ },
+ {
+  "form_key": "bieumau-20578",
+  "url": "https://thuvienphapluat.vn/bieumau/20578/MAU-VAN-BAN-DONG-Y-CONG-KHAI-THONG-TIN-VE-NGUOI-BAO-TIN-TO-GIAC-HANH-VI-BAO-LUC-GIA-DINH-DO-CHINH-PHU-BAN-HANH",
+  "title": "MẪU VĂN BẢN ĐỒNG Ý CÔNG KHAI THÔNG TIN VỀ NGƯỜI BÁO TIN, TỐ GIÁC HÀNH VI BẠO LỰC GIA ĐÌNH DO CHÍNH PHỦ BAN HÀNH",
+  "field_code": 20,
+  "linh_vuc": "Hôn nhân – Gia đình – Thừa kế",
+  "may_doan": {
+   "audience": null,
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    0
+   ],
+   "dau_hieu": []
+  },
+  "nhan_tay": "ca_nhan"
+ },
+ {
+  "form_key": "bieumau-20583",
+  "url": "https://thuvienphapluat.vn/bieumau/20583/MAU-DON-DE-NGHI-VE-VIEC-CAM-TIEP-XUC-THEO-QUYET-DINH-CUA-CHU-TICH-UY-BAN-NHAN-DAN-CAP-XA-DO-CHINH-PHU-BAN-HANH",
+  "title": "MẪU ĐƠN ĐỀ NGHỊ VỀ VIỆC CẤM TIẾP XÚC THEO QUYẾT ĐỊNH CỦA CHỦ TỊCH ỦY BAN NHÂN DÂN CẤP XÃ DO CHÍNH PHỦ BAN HÀNH",
+  "field_code": 20,
+  "linh_vuc": "Hôn nhân – Gia đình – Thừa kế",
+  "may_doan": {
+   "audience": "co_quan_nha_nuoc",
+   "dn": false,
+   "cn": false,
+   "diem": [
+    0,
+    0,
+    3
+   ],
+   "dau_hieu": [
+    "ủy ban nhân dân"
+   ]
+  },
+  "nhan_tay": "ca_nhan"
+ }
+]

@@ -25,6 +25,7 @@ from src.forms.relevance import (
     DAU_HIEU_LOAI,
     NGUONG_CHAC,
     la_linh_vuc_kinh_doanh,
+    loai_van_ban,
     quyet_dinh_quy_tac,
 )
 from src.legal.form_taxonomy import (
@@ -538,3 +539,79 @@ class TestSanMacDinhVaChayLai:
             "Trường THCS Đồng Tiến … nhà trường … học sinh …")
         assert kq.cho_ca_nhan is False
         assert "trường thcs" in kq.dau_hieu_loai
+
+
+class TestLoaiVanBanPhuQuyet:
+    """Tầng phủ quyết theo LOẠI VĂN BẢN — thứ tìm ra nhờ hiệu chuẩn.
+
+    ĐO TRÊN 201 MẪU NGẪU NHIÊN, 18 lĩnh vực liên quan cá nhân, 26/08/2026.
+
+    Nhãn tay: 144 cơ quan (71,6%) · 28 doanh nghiệp (13,9%) · 20 cá nhân (10,0%)
+    · 9 cả hai (4,5%). Tức chỉ 14,4% số mẫu trong các lĩnh vực "liên quan cá
+    nhân" là do cá nhân điền — phần còn lại nói VỀ cá nhân chứ không DO cá nhân
+    điền.
+
+    Từ khoá chủ đề một mình không phân biệt được, vì văn bản do cơ quan phát hành
+    cũng nói đúng chủ đề đó. Cả 17 ca dương tính giả đều đúng dạng ấy.
+
+    Thêm tầng phủ quyết theo loại văn bản, đo lại trên cùng 201 mẫu:
+        chỉ từ khoá chủ đề     chính xác 26,1%  độ phủ 30,0%
+        + phủ quyết loại VB    chính xác 75,0%  độ phủ 30,0%
+        + loại giấy tờ cá nhân chính xác 83,3%  độ phủ 51,7%  F1 63,8
+    (nhị phân "có phục vụ cá nhân không", chấm trên TIÊU ĐỀ — cận dưới, vì có
+    ruột mẫu thì tầng 2 chỉ tốt lên.)
+    """
+
+    def test_bao_cao_khong_bao_gio_la_giay_to_ca_nhan(self):
+        """0/37 mẫu "BÁO CÁO" trong bộ hiệu chuẩn do cá nhân điền. Cùng thế với
+        QUYẾT ĐỊNH 0/21, THÔNG BÁO 0/17, BIÊN BẢN 0/13 — tổng 93 mẫu, không một
+        mẫu nào."""
+        for td in ("MẪU BÁO CÁO HOẠT ĐỘNG BẢO HIỂM Y TẾ",
+                   "MẪU QUYẾT ĐỊNH VỀ VIỆC HƯỞNG TRỢ CẤP HẰNG THÁNG",
+                   "MẪU THÔNG BÁO VỀ VIỆC CHI TRẢ LƯƠNG HƯU, TRỢ CẤP BẢO HIỂM XÃ HỘI",
+                   "MẪU BÁO CÁO TUỔI LY HÔN TRUNG BÌNH CỦA TÒA ÁN NHÂN DÂN TỐI CAO"):
+            assert quyet_dinh_quy_tac(td).cho_ca_nhan is False, td
+
+    def test_phu_quyet_chu_khong_tru_diem(self):
+        """Một công cụ do tổ chức phát hành thì KHÔNG có mức chủ đề nào làm nó
+        thành giấy tờ của người dân được."""
+        kq = quyet_dinh_quy_tac(
+            "MẪU BÁO CÁO về hộ nghèo, người có công, thương binh, trẻ em")
+        assert kq.diem_ca_nhan >= NGUONG_CHAC   # điểm chủ đề rất cao
+        assert kq.cho_ca_nhan is False          # vẫn bị phủ quyết
+
+    def test_loai_giay_to_ca_nhan_tu_no_da_du(self):
+        """22/23 ca bỏ sót có điểm chủ đề BẰNG 0 — tiêu đề không chứa từ khoá nào.
+
+        "Bản khai để giải quyết chế độ Bà mẹ Việt Nam anh hùng", "Phiếu khai báo
+        tạm vắng", "Bản tường trình": đòi thêm bằng chứng chủ đề ở đây là đòi thứ
+        mà chính loại giấy tờ đã nói.
+        """
+        for td in ("MẪU BẢN KHAI ĐỂ GIẢI QUYẾT CHẾ ĐỘ BÀ MẸ VIỆT NAM ANH HÙNG",
+                   "MẪU PHIẾU KHAI BÁO TẠM VẮNG",
+                   "MẪU BẢN TƯỜNG TRÌNH",
+                   "MẪU ĐƠN XIN XÁC NHẬN LẠI THỜI HẠN SỬ DỤNG ĐẤT NÔNG NGHIỆP"):
+            kq = quyet_dinh_quy_tac(td)
+            assert kq.diem_ca_nhan == 0, f"{td} — mẫu này phải KHÔNG có từ khoá"
+            assert kq.cho_ca_nhan is True, td
+
+    def test_to_khai_co_dau_hieu_doanh_nghiep_thi_khong_gan_co_ca_nhan(self):
+        """"Tờ khai thuế GTGT" và "tờ khai hải quan" cũng là "tờ khai", và chúng
+        là giấy tờ doanh nghiệp nộp hằng kỳ. Bộ 201 mẫu có TỜ KHAI 2/2 cá nhân,
+        nhưng cỡ mẫu đó không đủ để bỏ qua điều đã biết chắc từ kho doanh nghiệp.
+        """
+        kq = quyet_dinh_quy_tac("MẪU TỜ KHAI THUẾ GIÁ TRỊ GIA TĂNG CỦA DOANH NGHIỆP")
+        assert kq.cho_doanh_nghiep is True
+        assert kq.cho_ca_nhan is False
+
+    def test_loai_van_ban_xet_DAU_tieu_de_khong_phai_bat_ky_dau(self):
+        """"Đơn đề nghị cấp bản sao quyết định ly hôn" là đơn của người dân, không
+        phải quyết định của toà. Chữ "quyết định" ở đó là tân ngữ."""
+        assert loai_van_ban("MẪU ĐƠN XIN cấp bản sao QUYẾT ĐỊNH ly hôn") == "đơn xin"
+        assert loai_van_ban("MẪU QUYẾT ĐỊNH về việc ly hôn") == "quyết định"
+
+    def test_hop_dong_khong_bi_tang_nay_dung_toi(self):
+        """662 mẫu hợp đồng đều bắt đầu bằng "HỢP ĐỒNG" — không thuộc bảng nào,
+        nên tầng này không đụng tới kho đang chạy. Đo sau khi thêm: 638 mẫu đăng
+        được, y như trước."""
+        assert loai_van_ban("HỢP ĐỒNG THUÊ NHÀ Ở") == ""
