@@ -18,7 +18,7 @@ from src.camnang.kho import (
 )
 from src.camnang.sinh import SinhThatBai, dung_ngu_canh, sinh_bai
 from src.camnang.trang_thai import SoTrangThai
-from src.rag.reports.llm import LLMResult
+from src.rag.reports.llm import LLMResult, LLMUnavailable
 from src.rag.reports.prompts import load_cam_nang_prompt
 
 RUOT_MAU_MAU = (
@@ -1227,3 +1227,80 @@ class TestSoGiayToKhongPhaiSoHieu:
         )
         assert bai.citation_ok is True
         assert cong.cong_hop_dong(bai.ban_ghi(), ruot_mau_len=5000)
+
+
+class TestMotBaiHongKhongGietCaLuot:
+    """Nấc mạng ở MỘT biểu mẫu không được làm mất những biểu mẫu còn lại.
+
+    Lượt chạy thử thứ ba: gateway trả HTTP 500 cho biểu mẫu ĐẦU TIÊN, và hai
+    biểu mẫu sau không bao giờ được thử dù gateway có thể phục vụ chúng. Một
+    lượt 20 bài mà bài đầu gặp nấc mạng thì mất cả 20.
+    """
+
+    def _chay(self, tmp_path, monkeypatch, hong_o):
+        """hong_o: tập chỉ số (0-based) các biểu mẫu bị LLMUnavailable."""
+        import sys
+        from scripts import sinh_cam_nang as cli
+        from src.camnang.sinh import BaiSinhRa
+
+        vault = tmp_path / "vault"
+        (vault / "tro-ly").mkdir(parents=True)
+        (vault / "content" / "bieu-mau").mkdir(parents=True)
+        (vault / "tro-ly" / "du-lieu.json").write_text(json.dumps({
+            "tao_luc": "x", "nghiep_vu": [], "hieu_luc_bm": {},
+            "van_ban": [{"s": "a", "n": "91/2015/QH13", "t": "B",
+                         "e": "con_hieu_luc"}],
+            "bieu_mau": [
+                {"s": f"bm{i}", "k": f"hd-{i}", "t": f"HỢP ĐỒNG {i}",
+                 "v": ["hop_dong"], "e": "con_hieu_luc", "c": ["91/2015/QH13"]}
+                for i in range(5)],
+        }, ensure_ascii=False), encoding="utf-8")
+        for i in range(5):
+            (vault / "content" / "bieu-mau" / f"bm{i}.md").write_text(
+                "## Nội dung biểu mẫu\n\n" + "Điều 1. Nội dung.\n" * 40
+                + "\n## Nguồn\n", encoding="utf-8")
+
+        thu_tu = []
+
+        def gia(u, kho, **kw):
+            i = len(thu_tu)
+            thu_tu.append(u.bieu_mau.form_key)
+            if i in hong_o:
+                raise LLMUnavailable("gateway trả 500")
+            return BaiSinhRa(form_key=u.bieu_mau.form_key,
+                             tieu_de="Hợp đồng x: bảy chỗ hở cần vá",
+                             mo_ta="Mô tả.", than_bai="## A\n\nB",
+                             citation_ok=True, model="t")
+
+        monkeypatch.setattr(cli, "sinh_bai", gia)
+        monkeypatch.setattr(cli, "DB_DOI_CHIEU", tmp_path / "sh.db")
+        ra = tmp_path / "bai.json"
+        monkeypatch.setattr(sys, "argv", [
+            "x", "--vault", str(vault), "--out", str(ra),
+            "--trang-thai", str(tmp_path / "s.json"), "--khong-toan-van"])
+        cli.main()
+        return thu_tu, json.loads(ra.read_text(encoding="utf-8"))
+
+    def test_bai_dau_hong_thi_cac_bai_sau_van_duoc_thu(self, tmp_path, monkeypatch):
+        thu_tu, ban_ghi = self._chay(tmp_path, monkeypatch, hong_o={0})
+        assert len(thu_tu) == 5, "phải thử hết, không dừng ở bài đầu"
+        assert len(ban_ghi) == 4, "bốn bài còn lại vẫn phải giao được"
+
+    def test_hong_xen_ke_van_chay_het(self, tmp_path, monkeypatch):
+        thu_tu, ban_ghi = self._chay(tmp_path, monkeypatch, hong_o={0, 2})
+        assert len(thu_tu) == 5
+        assert len(ban_ghi) == 3
+
+    def test_hong_ba_lan_LIEN_TIEP_thi_moi_dung(self, tmp_path, monkeypatch):
+        """Ba lượt liên tiếp là nhà cung cấp sập thật — chạy tiếp chỉ đốt thời gian."""
+        from scripts.sinh_cam_nang import TRAN_HONG_LIEN_TIEP
+        assert TRAN_HONG_LIEN_TIEP == 3
+        thu_tu, ban_ghi = self._chay(tmp_path, monkeypatch, hong_o={0, 1, 2, 3, 4})
+        assert len(thu_tu) == 3, "dừng sau 3 lượt hỏng liên tiếp"
+        assert ban_ghi == []
+
+    def test_bai_thanh_cong_dat_lai_bo_dem(self, tmp_path, monkeypatch):
+        """Hỏng-thành-hỏng-thành-hỏng: không lúc nào đủ 3 liên tiếp, chạy hết."""
+        thu_tu, ban_ghi = self._chay(tmp_path, monkeypatch, hong_o={0, 2, 4})
+        assert len(thu_tu) == 5
+        assert len(ban_ghi) == 2

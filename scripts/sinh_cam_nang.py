@@ -48,6 +48,10 @@ MAC_DINH_LIMIT = 20
 #: ra gốc repo cạnh sổ trạng thái.
 DB_DOI_CHIEU = PROJECT_ROOT / "data" / "cam-nang" / "so-hieu-vault.db"
 
+#: Bao nhiêu lượt gọi mô hình hỏng LIÊN TIẾP thì coi là nhà cung cấp sập. Dưới
+#: ngưỡng này là nấc mạng của riêng một biểu mẫu, bỏ nó rồi đi tiếp.
+TRAN_HONG_LIEN_TIEP = 3
+
 
 def _ghi_dau_ra(duong_dan: Path, ban_ghi: list[dict]) -> Path:
     """Ghi ĐÚNG mảng ở gốc, dạng chính của §1 hợp đồng.
@@ -222,6 +226,7 @@ def main() -> int:
 
     ban_ghi: list[dict] = []
     hong: list[tuple[str, str]] = []
+    hong_lien_tiep = 0
     truot_trich_dan: list[str] = []
 
     for i, u in enumerate(ung_vien, 1):
@@ -235,19 +240,44 @@ def main() -> int:
                 model=model,
                 max_tokens=cam_nang_max_tokens(),
             )
-        except (LLMUnavailable, cong.KhoDoiChieuHong) as e:
-            # Không có mô hình, hoặc không mở được kho đối chiếu — cả hai đều là
-            # hỏng TOÀN CỤC: mọi biểu mẫu còn lại sẽ hỏng y hệt, chạy tiếp chỉ in
-            # ra n dòng lỗi giống nhau. Dừng vòng lặp chứ KHÔNG để lỗi thoát ra
-            # ngoài: những bài đã sinh xong trước đó vẫn phải được ghi ra file,
-            # nếu không là đốt tiền mô hình rồi vứt kết quả.
+        except cong.KhoDoiChieuHong as e:
+            # Kho đối chiếu không mở được là hỏng TOÀN CỤC thật: mọi biểu mẫu
+            # còn lại sẽ hỏng y hệt. Dừng, nhưng KHÔNG để lỗi thoát ra ngoài —
+            # bài đã sinh xong vẫn phải được ghi ra file.
             print(f"    DỪNG: {e}", file=sys.stderr)
             hong.append((bm.form_key, str(e)))
             break
+        except LLMUnavailable as e:
+            # KHÔNG dừng cả lượt vì MỘT lượt gọi hỏng.
+            #
+            # Trước đây gộp lỗi này với hỏng toàn cục, dựa trên giả định "không
+            # gọi được mô hình thì biểu mẫu nào cũng thế". Giả định đó SAI với
+            # lỗi tạm thời: lượt chạy thử thứ ba, gateway trả HTTP 500 ba lần
+            # cho biểu mẫu ĐẦU TIÊN, và hai biểu mẫu sau không bao giờ được thử
+            # dù gateway có thể phục vụ chúng bình thường. Một lượt 20 bài mà
+            # bài đầu gặp nấc mạng thì mất cả 20.
+            #
+            # Phân biệt bằng SỐ LẦN HỎNG LIÊN TIẾP, không bằng loại lỗi: một
+            # hai lần là nấc mạng, ba lần liên tiếp mới là nhà cung cấp thật sự
+            # sập hoặc khoá thật sự hỏng — lúc đó chạy tiếp chỉ đốt thời gian.
+            hong_lien_tiep += 1
+            print(f"    BỎ (lỗi gọi mô hình {hong_lien_tiep}/{TRAN_HONG_LIEN_TIEP}): {e}",
+                  file=sys.stderr)
+            hong.append((bm.form_key, str(e)))
+            if hong_lien_tiep >= TRAN_HONG_LIEN_TIEP:
+                print(f"    DỪNG: hỏng {hong_lien_tiep} lượt liên tiếp — "
+                      f"nhà cung cấp đang sập hoặc khoá hỏng.", file=sys.stderr)
+                break
+            continue
         except SinhThatBai as e:
+            # Sinh được nhưng nội dung hỏng — mô hình VẪN trả lời, nên chuỗi
+            # hỏng-liên-tiếp của tầng mạng đứt ở đây.
+            hong_lien_tiep = 0
             print(f"    BỎ: {e}")
             hong.append((bm.form_key, str(e)))
             continue
+
+        hong_lien_tiep = 0
 
         kq = cong.cong_hop_dong(bai.ban_ghi(), ruot_mau_len=len(bm.ruot_mau))
         if not kq:
