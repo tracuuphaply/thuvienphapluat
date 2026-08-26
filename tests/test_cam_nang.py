@@ -397,8 +397,9 @@ class TestSinhBai:
         u = next(u for u in chon_ung_vien(kho)
                  if u.bieu_mau.form_key == "hopdong-102")
         ngu_canh, _ = dung_ngu_canh(u, kho, tai_toan_van_ve=False)
-        assert "KHÔNG CÓ" in ngu_canh
-        assert "KHÔNG trích Điều" in ngu_canh
+        assert "CHẾ ĐỘ VIẾT: **KHÔNG CÓ CĂN CỨ**" in ngu_canh
+        assert "KHÔNG trích" in ngu_canh
+        assert "CÓ CĂN CỨ** — áp dụng §3" not in ngu_canh
 
     def test_ngu_canh_co_ruot_mau_va_can_cu(self, vault):
         kho = doc_kho(vault)
@@ -1103,3 +1104,47 @@ class TestBienMoiTruongRong:
         assert not _is_transient(httpx.UnsupportedProtocol("thiếu scheme"))
         assert not _is_transient(httpx.InvalidURL("URL hỏng"))
         assert _is_transient(httpx.ConnectError("DNS chập chờn"))   # cái này thì có
+
+
+class TestChotCheDoViet:
+    """Ngữ cảnh phải CHỐT chế độ viết ở CẢ HAI nhánh — im lặng không phải chỉ dẫn.
+
+    Lượt chạy thật đầu tiên: 2/3 bài mở đầu bằng câu dành cho nhóm KHÔNG có căn
+    cứ ("lưu hành theo thông lệ, không kèm văn bản quy định bắt buộc") rồi trích
+    Điều 21 lần ngay bên dưới. Cả hai biểu mẫu ĐỀU CÓ căn cứ — ngữ cảnh chỉ nói
+    khi thiếu, còn khi có thì im, nên mô hình tự chọn nhầm mục §4.
+    """
+
+    def test_co_can_cu_thi_ngu_canh_cam_dung_cau_cua_S4(self, vault):
+        kho = doc_kho(vault)
+        u = next(u for u in chon_ung_vien(kho) if u.can_cu_khop)
+        ngu_canh, _ = dung_ngu_canh(u, kho, tai_toan_van_ve=False)
+        assert "CHẾ ĐỘ VIẾT: **CÓ CĂN CỨ**" in ngu_canh
+        assert "KHÔNG áp dụng §4" in ngu_canh
+        assert "lưu hành theo thông lệ" in ngu_canh      # nêu ra để CẤM
+        assert "KHÔNG CÓ CĂN CỨ**" not in ngu_canh
+
+    def test_khong_can_cu_thi_nguoc_lai(self, vault):
+        kho = doc_kho(vault)
+        u = next(u for u in chon_ung_vien(kho) if not u.can_cu_khop)
+        ngu_canh, _ = dung_ngu_canh(u, kho, tai_toan_van_ve=False)
+        assert "CHẾ ĐỘ VIẾT: **KHÔNG CÓ CĂN CỨ**" in ngu_canh
+        assert "CÓ CĂN CỨ** — áp dụng §3" not in ngu_canh
+
+    def test_moi_ung_vien_deu_duoc_chot_che_do(self, vault):
+        """Không biểu mẫu nào được rơi vào khoảng im lặng."""
+        kho = doc_kho(vault)
+        for u in chon_ung_vien(kho):
+            ngu_canh, _ = dung_ngu_canh(u, kho, tai_toan_van_ve=False)
+            assert "CHẾ ĐỘ VIẾT:" in ngu_canh, u.bieu_mau.form_key
+
+    def test_prompt_khong_con_cau_mau_chep_duoc(self):
+        """Câu mẫu trong §4 bị chép nguyên văn sang bài CÓ căn cứ — đã bỏ."""
+        t = load_cam_nang_prompt()
+        assert 'Ví dụ: *"Mẫu này lưu hành theo thông lệ' not in t
+        assert "§4 CHỈ áp dụng khi" in t
+
+    def test_prompt_cam_viet_doan_ve_hieu_luc(self):
+        t = load_cam_nang_prompt()
+        assert "không viết ĐOẠN nào đánh giá căn cứ còn hay hết hiệu lực" in t
+        assert "tờ mẫu này còn dùng được không" in t

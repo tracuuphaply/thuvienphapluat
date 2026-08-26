@@ -38,12 +38,20 @@ bản nào.
 |---|---|---|
 | Slug / đường dẫn bài | Hệ thống, từ dữ liệu kho | Không nhắc tới |
 | Chủ đề / chuyên mục | Hệ thống, từ nhóm nghiệp vụ | Không tự gán |
-| Tình trạng hiệu lực + bảng căn cứ | Hệ thống, dựng thành hộp ĐẦU bài | **Không mở bài bằng "Tình trạng hiệu lực:…"** |
+| Tình trạng hiệu lực + bảng căn cứ | Hệ thống, dựng thành hộp ĐẦU bài | **Không mở bài bằng "Tình trạng hiệu lực:…"**, và không viết ĐOẠN nào đánh giá căn cứ còn hay hết hiệu lực |
 | Ruột tờ mẫu (nội dung biểu mẫu) | Hệ thống, đặt trong khối gập CUỐI bài | **Không chép lại tờ mẫu** |
 | Footer nguồn + miễn trừ trách nhiệm | Hệ thống | Không tự viết mục "Nguồn" hay câu miễn trừ |
 
 Được phép **nhắc tới** chúng bằng lời — ví dụ "tờ mẫu đầy đủ nằm ở cuối bài",
 "kiểm tra hộp hiệu lực ở đầu trang trước khi dùng". Không được **dựng lại** chúng.
+
+**Riêng phần hiệu lực, nói rõ thêm vì đây là chỗ hay bị vi phạm nhất:** hộp hiệu
+lực đầu trang đã liệt kê từng văn bản căn cứ kèm tình trạng của nó. Vì vậy KHÔNG
+viết đoạn nào kiểu *"các văn bản nêu trong mẫu đã hết hiệu lực"*, *"căn cứ vẫn
+còn hiệu lực nhưng đã bị sửa đổi"*, *"kiểm tra lại hiệu lực trước khi áp dụng"*,
+và KHÔNG đặt câu hỏi thường gặp *"tờ mẫu này còn dùng được không"*. Người đọc
+thấy hộp hiệu lực TRƯỚC khi tới thân bài; viết lại là nói hai lần, và hai lần đó
+lệch nhau thì họ không biết tin bản nào.
 
 ---
 
@@ -82,11 +90,15 @@ trích; xem §4.
 Đây là nhóm đông nhất trong kho. Cách viết cho nhóm này khác hẳn, và làm sai là
 tạo ra nội dung sai lệch có thẩm quyền giả:
 
+> ⚠ **§4 CHỈ áp dụng khi dữ liệu đầu vào ghi rõ "CHẾ ĐỘ VIẾT: KHÔNG CÓ CĂN CỨ".**
+> Ghi "CÓ CĂN CỨ" thì bỏ qua toàn bộ mục này và viết theo §3.
+
 - **Thừa nhận thẳng ngay trong bài** rằng nguồn không ghi nhận văn bản căn cứ cho
-  mẫu này — viết bằng lời thường, một câu, không thành một mục riêng, không nói
-  gì về "dữ liệu" hay "hệ thống". Ví dụ: *"Mẫu này lưu hành theo thông lệ, không
-  kèm văn bản quy định bắt buộc — nên phần dưới nói về chính tờ giấy, không nói
-  về điều luật."*
+  mẫu này — bằng lời thường, một câu, **tự bạn đặt câu**, không thành một mục
+  riêng, không nói gì về "dữ liệu" hay "hệ thống". Ý cần truyền đạt: tờ này lưu
+  hành mà không có văn bản nào bắt buộc, nên giá trị của bài nằm ở việc soi
+  chính tờ giấy. (Cố ý không cho câu mẫu ở đây: câu mẫu bị chép nguyên văn sang
+  cả những bài CÓ căn cứ, tạo ra bài tự mâu thuẫn.)
 - **KHÔNG trích Điều, khoản, số hiệu văn bản nào.** Không có căn cứ thì không có
   gì để trích. Bịa một số hiệu ở đây là lỗi nghiêm trọng nhất có thể mắc.
 - **KHÔNG viết mục "Nộp ở đâu, trong bao lâu"** trừ khi chính tờ mẫu ghi rõ nơi

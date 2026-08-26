@@ -180,11 +180,28 @@ def dung_ngu_canh(
         "",
     ]
 
+    # CHỐT CHẾ ĐỘ VIẾT Ở CẢ HAI NHÁNH. Trước đây chỉ nói khi THIẾU căn cứ, còn
+    # khi CÓ thì im lặng — và mô hình tự chọn nhầm §4: lượt chạy thật đầu tiên
+    # có 2/3 bài mở đầu bằng "mẫu này lưu hành theo thông lệ, không kèm văn bản
+    # quy định bắt buộc" rồi trích Điều 21 lần ngay bên dưới. Im lặng không phải
+    # là chỉ dẫn; nhánh nào cũng phải được nói thành lời.
     if thieu_can_cu:
         phan += [
-            "> ⚠ Kho KHÔNG ghi nhận văn bản căn cứ nào khớp cho biểu mẫu này.",
-            "> Viết theo §4 của mẫu: thừa nhận thẳng bằng một câu lời thường,",
-            "> KHÔNG trích Điều/khoản/số hiệu nào, và soi chính tờ mẫu.",
+            "> ⚠ CHẾ ĐỘ VIẾT: **KHÔNG CÓ CĂN CỨ** — áp dụng §4, KHÔNG áp dụng §3.",
+            "> Kho không ghi nhận văn bản căn cứ nào khớp cho biểu mẫu này.",
+            "> Thừa nhận thẳng bằng một câu lời thường do BẠN tự đặt, KHÔNG trích",
+            "> Điều/khoản/số hiệu nào, và soi chính tờ mẫu.",
+            "",
+        ]
+    else:
+        phan += [
+            "> ✓ CHẾ ĐỘ VIẾT: **CÓ CĂN CỨ** — áp dụng §3, **KHÔNG áp dụng §4**.",
+            "> Biểu mẫu này CÓ văn bản căn cứ khớp kho (liệt kê ngay trên). Vì vậy:",
+            "> **TUYỆT ĐỐI KHÔNG viết câu nào nói rằng mẫu này 'không kèm văn bản",
+            "> quy định bắt buộc', 'lưu hành theo thông lệ', hay 'phần dưới không",
+            "> nói về điều luật'.** Những câu đó dành riêng cho nhóm không có căn",
+            "> cứ; viết ra ở đây là tự mâu thuẫn với chính phần bạn trích bên dưới.",
+            "> Cứ trích Điều/khoản từ mục Toàn văn một cách bình thường.",
             "",
         ]
 
