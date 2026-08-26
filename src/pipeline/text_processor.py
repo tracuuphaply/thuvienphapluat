@@ -63,6 +63,37 @@ def html_to_clean_text(html: str) -> str:
 
     text = html
 
+    # 0. BỎ HẲN RUỘT của <script>, <style>, <head> và chú thích HTML.
+    #
+    #    Bước "gỡ mọi thẻ còn lại" ở dưới chỉ xoá THẺ, giữ nguyên chữ nằm giữa
+    #    chúng. Với ba thẻ này thì chữ nằm giữa KHÔNG PHẢI nội dung văn bản:
+    #      · <style>  → luật CSS
+    #      · <script> → mã JavaScript
+    #      · <title>  → tiêu đề trang, không phải tiêu đề văn bản
+    #
+    #    Đo trên 01/2012/QĐ-TTg tải từ kho: bản Bộ Tư pháp là một trang HTML đủ
+    #    <head>, nên ba dòng đầu của bản làm sạch ra thành
+    #        Document Content
+    #        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+    #        p { margin: 10px 0; }
+    #    — và chúng hiện nguyên như vậy trên trang, ngay dưới mục "Nội dung".
+    #
+    #    Không chỉ hỏng phần hiển thị: `clean_text` còn là đầu vào của bước cắt
+    #    chunk và nhúng vector, nên mấy dòng CSS ấy đang được nhúng như thể là
+    #    nội dung pháp luật.
+    #
+    #    Bỏ <head> TRƯỚC <style>/<script> vì <head> chứa chúng — làm ngược lại
+    #    vẫn đúng nhưng phải quét hai lượt. Cờ DOTALL để bắt được thẻ nhiều dòng.
+    text = re.sub(r"<!--.*?-->", " ", text, flags=re.DOTALL)
+    text = re.sub(r"<head[^>]*>.*?</head\s*>", " ", text,
+                  flags=re.IGNORECASE | re.DOTALL)
+    text = re.sub(r"<(script|style)[^>]*>.*?</\1\s*>", " ", text,
+                  flags=re.IGNORECASE | re.DOTALL)
+    # Thẻ mở không có thẻ đóng (HTML hỏng): cắt tới hết chuỗi còn hơn để lọt cả
+    # phần đuôi — nhưng chỉ khi thật sự không tìm thấy thẻ đóng nào.
+    text = re.sub(r"<(script|style)[^>]*>(?![\s\S]*?</\1\s*>)[\s\S]*$", " ", text,
+                  flags=re.IGNORECASE)
+
     # 1. Normalize line endings
     text = text.replace("\r\n", "\n").replace("\r", "\n")
 

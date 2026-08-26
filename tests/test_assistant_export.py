@@ -34,6 +34,8 @@ def kho(master_session):
             territorial_scope=kw.get("scope", "trung_uong"),
             issue_date=kw.get("ngay", date(2024, 7, 24)),
             gdrive_fulltext_link=kw.get("drive"),
+            agency_name=kw.get("cq"),
+            eff_from=kw.get("hl_tu"),
         )
         master_session.add(d)
         master_session.commit()
@@ -136,9 +138,78 @@ class TestBieuMau:
         assert b["w"] == "hopdong-1.docx" and b["p"] == "hopdong-1.pdf"
         assert b["c"] == ["96/2024/NĐ-CP"]
 
+    def test_can_cu_khop_duoc_voi_so_hieu_van_ban_da_xuat(
+            self, master_session, kho, tmp_path):
+        """`c` của biểu mẫu phải nối được vào `n` của văn bản, không chỉ có mặt.
+
+        Trang trợ lý rọi biểu mẫu lên sơ đồ bằng cách tra SỐ HIỆU CĂN CỨ trong
+        bảng số hiệu → văn bản. Biểu mẫu không phải nút trong đồ thị (đồ thị chỉ
+        gồm văn bản), nên đây là chỗ neo duy nhất của nó.
+
+        Hai bên phải cùng một dạng chuỗi. Lệch đi một khoảng trắng hay một cách
+        viết hoa thì phép tra ra rỗng, và triệu chứng là trỏ vào biểu mẫu mà sơ
+        đồ đứng yên — không lỗi, không cảnh báo, chỉ là không có gì xảy ra. Test
+        `test_kem_ten_file_tai_ve_va_can_cu` không bắt được ca này: nó soi `c`
+        một mình, không đối chiếu với phía văn bản.
+        """
+        kho.vb("96/2024/NĐ-CP", "vb-96-2024")
+        kho.bm("hopdong-1", "bm-hopdong-1", can_cu=["96/2024/NĐ-CP"])
+        g = doc_goi(master_session, tmp_path)
+        so_hieu = {v["n"] for v in g["van_ban"]}
+        (b,) = g["bieu_mau"]
+        assert b["c"], "biểu mẫu mất căn cứ thì không rọi được lên sơ đồ"
+        assert set(b["c"]) <= so_hieu, (
+            f"căn cứ {b['c']} không khớp số hiệu nào đã xuất: {sorted(so_hieu)}")
+
     def test_co_co_da_bi_go(self, master_session, kho, tmp_path):
         kho.bm("hopdong-1", "bm-hopdong-1", go=date(2026, 8, 19))
-        assert doc_goi(master_session, tmp_path)["bieu_mau"][0]["g"] == 1
+        assert doc_goi(master_session, tmp_path)["bieu_mau"][0]["x"] == 1
+
+    def test_khong_go_thi_khong_co_co(self, master_session, kho, tmp_path):
+        """Mẫu bình thường KHÔNG được mang cờ đã-gỡ.
+
+        Ca này trước đây không có, và chính khoảng trống đó để lọt lỗi ở
+        test kế bên: cờ đã-gỡ và ID Drive từng cùng ghi vào khoá `g`.
+        """
+        kho.bm("hopdong-1", "bm-hopdong-1",
+               drive="https://drive.google.com/file/d/1AbC_dEf-23456789/view")
+        assert "x" not in doc_goi(master_session, tmp_path)["bieu_mau"][0]
+
+    def test_co_da_go_khong_bi_ID_drive_de_mat(self, master_session, kho, tmp_path):
+        """Mẫu vừa bị gỡ vừa có bản Drive phải giữ được CẢ HAI dữ kiện.
+
+        Lỗi đã xảy ra thật: `delisted_at` ghi vào `g`, rồi `gdrive_docx_link`
+        ghi đè cũng vào `g`. Vì 653/653 mẫu đều có link Drive nên `g` luôn
+        truthy, và trang trợ lý dán nhãn đỏ "Nguồn đã gỡ — không nên dùng để
+        nộp" lên TOÀN BỘ kho biểu mẫu, đồng thời mất hẳn khả năng nhận ra mẫu
+        bị gỡ thật. Hai dữ kiện độc lập thì phải nằm ở hai khoá.
+        """
+        kho.bm("hopdong-1", "bm-hopdong-1", go=date(2026, 8, 19),
+               drive="https://drive.google.com/file/d/1AbC_dEf-23456789/view")
+        (b,) = doc_goi(master_session, tmp_path)["bieu_mau"]
+        assert b["x"] == 1
+        assert b["g"] == "1AbC_dEf-23456789"
+
+
+class TestCoQuanVaNgayHieuLuc:
+    """Hai dữ kiện trang Quartz vẫn hiện mà trang trợ lý thì không.
+
+    Với người tra cứu pháp luật, "ai ban hành" là dữ kiện đọc đầu tiên — thiếu nó
+    thì popup trợ lý nghèo hơn hẳn trang tĩnh cùng nói về một văn bản.
+    """
+
+    def test_co_thi_ship(self, master_session, kho, tmp_path):
+        kho.vb("1/2024/NĐ-CP", "1-2024-ndd-cp",
+               cq="Chính phủ", hl_tu=date(2024, 9, 1))
+        (v,) = doc_goi(master_session, tmp_path)["van_ban"]
+        assert v["a"] == "Chính phủ"
+        assert v["h"] == "2024-09-01"
+
+    def test_vang_thi_bo_han_khoa(self, master_session, kho, tmp_path):
+        """Không có thì BỎ khoá, không ship chuỗi rỗng — 4.201 chuỗi rỗng là rác."""
+        kho.vb("1/2024/NĐ-CP", "1-2024-ndd-cp")
+        (v,) = doc_goi(master_session, tmp_path)["van_ban"]
+        assert "a" not in v and "h" not in v
 
 
 class TestLienKetDrive:

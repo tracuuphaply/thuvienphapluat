@@ -21,7 +21,8 @@ import logging
 from pathlib import Path
 
 from src.config import PROJECT_ROOT
-from src.publish import assistant_export, form_exporter, moc_static, site_exporter
+from src.publish import (assistant_export, form_exporter, html_site, moc_static,
+                         noi_dung, site_exporter)
 from src.storage.database import get_session, init_db
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,10 @@ def main() -> None:
                     help="Đếm và in mẫu, không ghi file")
     ap.add_argument("--all", action="store_true",
                     help="Đăng cả văn bản không phải QPPL (mặc định: chỉ QPPL)")
+    ap.add_argument("--html", action="store_true",
+                    help="Dựng THẲNG ra HTML (không Quartz, không markdown trung gian)")
+    ap.add_argument("--goc-url", default="",
+                    help="URL gốc của site, để sinh sitemap.xml")
     args = ap.parse_args()
 
     from src.config import impact_scorer_version
@@ -72,6 +77,69 @@ def main() -> None:
             return
 
         out_dir.mkdir(parents=True, exist_ok=True)
+        if args.html:
+            # ĐƯỜNG MỚI: DB → HTML, một bước. Không markdown trung gian, không
+            # Node. `out_dir` ở đây là GỐC BẢN DỰNG (không phải content/), vì
+            # không còn tầng nào đọc lại nó nữa.
+            tro_ly_dir = out_dir.parent / TRO_LY_DIR
+            # GÁN SLUG BIỂU MẪU TRƯỚC KHI XUẤT DỮ LIỆU TRỢ LÝ. `_bieu_mau()` chỉ
+            # lấy mẫu đã có `public_slug`, nên xuất trước khi gán thì du-lieu.json
+            # có 0 biểu mẫu — trang chủ hiện "Biểu mẫu 0" trong khi kho có đủ.
+            # Cùng lớp lỗi thứ tự với mục "Biểu mẫu kèm theo" trên trang văn bản.
+            html_site.gan_slug_bieu_mau(session)
+            # RUỘT TRƯỚC BỘ DỮ LIỆU, cùng một lớp ràng buộc thứ tự với dòng trên:
+            # `xuat_du_lieu()` gắn cờ "có ruột" theo tập slug mà bước này trả về,
+            # nên đảo lại là mọi tài liệu đều thiếu cờ và trang trợ lý không mở
+            # nội dung nào — im lặng, vì "không có ruột" cũng là trạng thái hợp lệ.
+            # Ruột ghi thẳng vào GỐC BẢN DỰNG, không vào thư mục dựng trợ lý:
+            # bước chép sang site chỉ mang đúng index.html và du-lieu.json, nên
+            # để ở đó là cả cây noi-dung/ nằm lại và mọi lượt tải ruột thành 404.
+            tk_ruot, ruot_vb, ruot_bm = noi_dung.xuat_noi_dung(session, out_dir)
+            tk_troly = assistant_export.xuat_du_lieu(
+                session, tro_ly_dir, ruot_vb=ruot_vb, ruot_bm=ruot_bm)
+            assistant_export.chep_ung_dung(tro_ly_dir)
+            tk = html_site.xuat_site(session, out_dir, version,
+                                     goc_url=args.goc_url, tro_ly_dir=tro_ly_dir)
+            session.commit()
+            print("\n=== Kết quả (HTML thẳng) ===")
+            for k, v in tk.as_dict().items():
+                print(f"  {k:12} {v}")
+            for k, v in tk_troly.as_dict().items():
+                print(f"  troly.{k:6} {v}")
+            for k, v in vars(tk_ruot).items():
+                print(f"  ruot.{k:7} {v}")
+            if not tk_troly.canh:
+                # KHO KHÔNG CÓ QUAN HỆ là ca đã tốn hai vòng báo lỗi, cả hai lần
+                # vì cùng một chuyện: dựng lại trang từ một kho cũ chưa nạp quan
+                # hệ. Bản dựng chạy trơn, không lỗi, và triệu chứng duy nhất nằm
+                # ở tít bên kia — sơ đồ liên kết ra đúng MỘT nút. Nói ngay ở đây,
+                # kèm luôn câu lệnh sửa.
+                print("\n  ⛔ KHO KHÔNG CÓ QUAN HỆ DẪN CHIẾU NÀO (0 cạnh).")
+                print("     Sơ đồ liên kết sẽ chỉ hiện MỘT nút — trông như hỏng.")
+                print("     Kho demo thì nạp lại:")
+                print("       python -m scripts.nap_demo --tu <du-lieu.json>")
+                print("     Kho thật thì kiểm bảng document_references.")
+            # Chỉ kể loại NÀO ĐANG THIẾU. Câu "4.169 văn bản và 0 biểu mẫu
+            # không có ruột" bắt người đọc tự lọc lấy vế có nghĩa, và số 0 nằm
+            # trong một câu cảnh báo thì đọc thoáng qua rất dễ thành "hỏng cả hai".
+            ke = []
+            if tk_ruot.thieu_van_ban:
+                ke.append(f"{tk_ruot.thieu_van_ban} văn bản")
+            if tk_ruot.thieu_bieu_mau:
+                ke.append(f"{tk_ruot.thieu_bieu_mau} biểu mẫu")
+            if ke:
+                # Nói ra, vì triệu chứng phía người dùng chỉ là "bấm vào không
+                # thấy nội dung" — không phân biệt được với hỏng.
+                print(f"\n  ⚠ {' và '.join(ke)} KHÔNG có ruột: kho chưa có file "
+                      f"nguồn (clean_text_path / body_md_path) trên máy này.")
+                print("    Trang vẫn chạy, các mục đó chỉ hiện dữ kiện như trước.")
+                if tk_ruot.thieu_van_ban and not tk_ruot.van_ban:
+                    print("    Riêng VĂN BẢN: trang công khai cố ý không đăng toàn")
+                    print("    văn, nên kho demo không bao giờ có. Cần kho thật.")
+            print(f"\nBản dựng sẵn ở: {out_dir}")
+            print("Không cần npm, không cần Quartz.")
+            return
+
 
         # BIỂU MẪU ĐĂNG TRƯỚC VĂN BẢN — thứ tự này quan trọng, không phải tuỳ ý.
         # `export_forms()` là nơi gán `LegalForm.public_slug`, mà mục "Biểu mẫu
@@ -118,6 +186,14 @@ def main() -> None:
     print("  cp -r %s ~/Downloads/legal-vault-public/" % (out_dir.parent / "tro-ly"))
     print("  cd ~/Downloads/legal-vault-public && git add -A "
           "&& git commit -m 'Cập nhật nội dung' && git push")
+    # tro-ly/ vẫn chép vào thư mục cùng tên ở repo công khai — chính CI mới là
+    # bên đặt nó vào GỐC bản dựng (trang chủ). Đừng chép thẳng vào gốc repo:
+    # index.html sẽ nằm cạnh README.md và package.json, còn du-lieu.json thì
+    # lẫn với package-lock.json.
+    print("\nTrang chủ là ứng dụng tra cứu: CI chép tro-ly/ vào gốc bản dựng.")
+    print("Nếu thấy content/index.md xuất hiện lại thì có ai đó đã truyền")
+    print("trang_tong_quan= cho moc_static.export_indexes — bỏ đi, không thì")
+    print("Quartz dựng ra public/index.html rồi CI dừng với lỗi.")
     print("\nGitHub Actions tự dựng lại trang. Xem docs/VIEC_CAN_BAN_LAM.md "
           "nếu cần dựng repo từ đầu.")
 

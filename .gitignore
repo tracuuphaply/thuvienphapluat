@@ -17,6 +17,10 @@ data/snapshots/
 data/backups/
 data/logs/
 data/clean_text/
+# Ruột biểu mẫu do scripts/nap_demo.py rút ra từ repo trang công khai —
+# bản sao dựng lại được bất cứ lúc nào, không phải nguồn.
+data/demo_ruot/
+data/demo_toan_van/
 data/chunks/
 data/metadata/
 data/lark_cache.json
