@@ -167,7 +167,7 @@ def merge_triggers(
     # Danh sách MOJ được quét không lọc lĩnh vực (API danh sách không trả lĩnh
     # vực), nên ở đây phải lọc thô theo tiêu đề — nếu không sẽ nạp toàn bộ văn
     # bản cả nước. Lĩnh vực thật được xác nhận lại sau khi lấy chi tiết.
-    from src.sources.moj_api import title_looks_business
+    from src.sources.moj_api import tieu_de_dang_theo_doi
 
     # Mọi MOJ item CHƯA gộp (gồm tất cả các tỉnh trùng số hiệu) — theo id() từng
     # bản, không theo số hiệu, nên không bỏ sót tỉnh nào.
@@ -175,7 +175,7 @@ def merge_triggers(
         for moj_data in items:
             if id(moj_data) in da_gop_moj:
                 continue
-            if title_looks_business(moj_data):
+            if tieu_de_dang_theo_doi(moj_data):
                 moj_data["_needs_field_check"] = True
                 merged.append(moj_data)
 

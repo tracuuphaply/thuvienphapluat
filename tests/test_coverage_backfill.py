@@ -106,7 +106,7 @@ class TestHistoricalPaging:
 
         monkeypatch.setattr(bh, "fetch_doc_list", fake_list)
         monkeypatch.setattr(bh, "_extract_items", lambda r: r["data"]["items"])
-        monkeypatch.setattr(bh, "title_looks_business", lambda item: True)
+        monkeypatch.setattr(bh, "tieu_de_dang_theo_doi", lambda item: True)
 
         got = bh.collect_candidates(date(2026, 1, 1), max_pages=50, sleep=0)
         assert goi == [1, 2], f"phải dừng ngay sau trang vượt mốc, đã lật {goi}"
@@ -123,7 +123,7 @@ class TestHistoricalPaging:
 
         monkeypatch.setattr(bh, "fetch_doc_list", fake_list)
         monkeypatch.setattr(bh, "_extract_items", lambda r: r["items"])
-        monkeypatch.setattr(bh, "title_looks_business", lambda i: True)
+        monkeypatch.setattr(bh, "tieu_de_dang_theo_doi", lambda i: True)
 
         got = bh.collect_candidates(date(2026, 1, 1), max_pages=3, sleep=0)
         assert len(got) == 1, "phân trang không ổn định có thể trả lặp, phải khử trùng"
@@ -140,7 +140,7 @@ class TestHistoricalPaging:
 
         monkeypatch.setattr(bh, "fetch_doc_list", fake_list)
         monkeypatch.setattr(bh, "_extract_items", lambda r: r["items"])
-        monkeypatch.setattr(bh, "title_looks_business", lambda i: True)
+        monkeypatch.setattr(bh, "tieu_de_dang_theo_doi", lambda i: True)
 
         bh.collect_candidates(date(2020, 1, 1), max_pages=5, sleep=0)
         assert len(goi) == 5

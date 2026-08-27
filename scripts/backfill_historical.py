@@ -28,7 +28,7 @@ from src.sources.moj_api import (
     fetch_doc_list,
     parse_doc_detail,
     parse_doc_summary,
-    title_looks_business,
+    tieu_de_dang_theo_doi,
 )
 from src.storage.database import (
     get_session,
@@ -80,7 +80,7 @@ def collect_candidates(until: date, max_pages: int, sleep: float) -> list[dict]:
                 continue
             # Lọc thô theo tiêu đề ở đây; lĩnh vực thật chỉ có ở API chi tiết
             # nên còn một vòng xác nhận nữa khi tải chi tiết.
-            if title_looks_business(item):
+            if tieu_de_dang_theo_doi(item):
                 candidates.append(item)
 
         if page % 20 == 0 or page == 1:
