@@ -170,13 +170,38 @@ async def _tai_chi_tiet(crawler: TVPLFormCrawler, muc: list, kq: KetQuaLuu,
     return kq
 
 
+def _ghi_ngay(field: int | None):
+    """Callback ghi từng trang liệt kê xuống DB ngay khi lấy được.
+
+    Cloudflare chặn giữa chừng ở lĩnh vực lớn: đo trên lĩnh vực 47 (Y tế, 1.860
+    mẫu = 93 trang), lượt chạy ném TVPLBlockedError và MẤT TRẮNG tất cả các trang
+    đã tải. Ghi ngay thì mỗi trang tải được là một trang giữ được, và lần sau chỉ
+    cần `--tu-trang` từ chỗ dừng.
+    """
+    def _cb(trang: int, muc: list) -> None:
+        if not muc:
+            return
+        session = SessionLocal()
+        try:
+            them = ghi_hang_doi(session, muc)
+            session.commit()
+            if them:
+                print(f"    trang {trang}: +{them} mục", flush=True)
+        finally:
+            session.close()
+    return _cb
+
+
 async def _liet_ke(crawler: TVPLFormCrawler, source: str, field: int | None,
-                   gioi_han: int | None) -> list:
+                   gioi_han: int | None, tu_trang: int = 1,
+                   ghi_dan: bool = False) -> list:
     if source == SOURCE_HOP_DONG:
         return await crawler.duyet_hop_dong(gioi_han=gioi_han)
     if field:
         return await crawler.duyet_danh_sach(
-            SOURCE_BIEU_MAU, field=field, gioi_han=gioi_han)
+            SOURCE_BIEU_MAU, field=field, gioi_han=gioi_han,
+            bat_dau_trang=tu_trang,
+            moi_trang=_ghi_ngay(field) if ghi_dan else None)
 
     muc: list = []
     for ma in BIEU_MAU_BUSINESS_FIELDS:
@@ -190,7 +215,8 @@ async def _liet_ke(crawler: TVPLFormCrawler, source: str, field: int | None,
 async def _cao(source: str, field: int | None, gioi_han: int | None,
                dry_run: bool, lam_lai: bool = False,
                tiep_tuc: bool = False, chi_hang_doi: bool = False,
-               dang_nhap: bool = True, loc_tieu_de: bool = False) -> KetQuaLuu:
+               dang_nhap: bool = True, loc_tieu_de: bool = False,
+               tu_trang: int = 1) -> KetQuaLuu:
     crawler = TVPLFormCrawler()
     kq = KetQuaLuu()
 
@@ -225,7 +251,18 @@ async def _cao(source: str, field: int | None, gioi_han: int | None,
     if await crawler.chuan_bi(dang_nhap):
         print("Đã đăng nhập TVPL.")
     try:
-        muc = await _liet_ke(crawler, source, field, gioi_han)
+        try:
+            muc = await _liet_ke(crawler, source, field, gioi_han,
+                                 tu_trang, chi_hang_doi)
+        except TVPLBlockedError:
+            # Không nuốt: nói rõ đã tới đâu và cách chạy tiếp. Trang đã lấy được
+            # thì đã nằm trong DB nhờ `_ghi_ngay`, không mất.
+            print(f"\n⚠️  Cloudflare chặn giữa chừng ở lĩnh vực {field}. "
+                  f"Các trang đã lấy ĐÃ được ghi vào hàng đợi.\n"
+                  f"   Chạy tiếp từ chỗ dừng:\n"
+                  f"   python -m scripts.crawl_forms --source bieumau "
+                  f"--field {field} --chi-hang-doi --tu-trang <N>")
+            raise
         print(f"Liệt kê được {len(muc)} biểu mẫu.")
 
         if dry_run:
@@ -313,6 +350,9 @@ def main() -> None:
                     help="Cào ở chế độ vãng lai; bị Cloudflare chặn sau ~40-70 trang")
     ap.add_argument("--chi-hang-doi", action="store_true",
                     help="Chỉ liệt kê và nạp hàng đợi vào DB, không tải chi tiết")
+    ap.add_argument("--tu-trang", type=int, default=1,
+                    help="Bắt đầu liệt kê từ trang N thay vì trang 1 — dùng khi "
+                         "lượt trước bị Cloudflare chặn giữa chừng")
     ap.add_argument("--loc-tieu-de", action="store_true",
                     help="Bỏ qua mẫu mà TIÊU ĐỀ đã cho thấy không phục vụ đối "
                          "tượng nào (báo cáo, quyết định… của cơ quan). Đo trên "
@@ -331,7 +371,8 @@ def main() -> None:
 
     kq = asyncio.run(_cao(args.source, args.field, args.limit, args.dry_run,
                           args.lam_lai, args.tiep_tuc, args.chi_hang_doi,
-                          not args.khong_dang_nhap, args.loc_tieu_de))
+                          not args.khong_dang_nhap, args.loc_tieu_de,
+                          args.tu_trang))
     if not args.dry_run:
         print(f"\nXong: {kq.tom_tat()}")
 

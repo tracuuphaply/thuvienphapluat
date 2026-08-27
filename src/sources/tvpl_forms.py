@@ -124,6 +124,8 @@ class TVPLFormCrawler(TVPLDownloader):
         loai: int = 0,
         field: int = 0,
         gioi_han: int | None = None,
+        bat_dau_trang: int = 1,
+        moi_trang=None,
     ) -> list[FormListItem]:
         """Lật hết các trang liệt kê của một bộ lọc, trả về danh sách mục.
 
@@ -131,12 +133,20 @@ class TVPLFormCrawler(TVPLDownloader):
         đủ `gioi_han`. Điều kiện "không còn mục mới" là chốt thật sự: TVPL trả về
         trang cuối cùng lặp lại khi `page` vượt quá số trang có thật, nên chỉ dựa
         vào nút "Trang sau" là lặp vô hạn.
+
+        `moi_trang(trang, muc)` được gọi NGAY sau mỗi trang, trước khi lật tiếp.
+        Đây là chốt chống mất trắng: Cloudflare chặn giữa chừng ở các lĩnh vực
+        lớn — đo được ở lĩnh vực 47 (Y tế, 1.860 mẫu = 93 trang) — và nếu chỉ trả
+        kết quả ở cuối hàm thì một lần chặn ở trang 50 xoá sạch 49 trang đã tải
+        được. Ghi từng trang thì lần chạy sau chỉ cần bắt đầu từ chỗ dừng.
+
+        `bat_dau_trang` để chạy tiếp từ trang đó, không lật lại từ đầu.
         """
         ket_qua: list[FormListItem] = []
         da_thay: set[str] = set()
         tong: int | None = None
 
-        for trang in range(1, MAX_PAGES + 1):
+        for trang in range(bat_dau_trang, MAX_PAGES + 1):
             url = (url_bieu_mau(field=field, page=trang, loai=loai)
                    if source == SOURCE_BIEU_MAU
                    else url_hop_dong(loai=loai, page=trang))
@@ -161,6 +171,8 @@ class TVPLFormCrawler(TVPLDownloader):
                     it.form_type_code = loai or None
                 da_thay.add(it.form_key)
             ket_qua.extend(moi)
+            if moi_trang is not None:
+                moi_trang(trang, moi)
 
             if gioi_han and len(ket_qua) >= gioi_han:
                 return ket_qua[:gioi_han]
