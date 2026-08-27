@@ -573,6 +573,26 @@ def _parse_date(value: Any) -> date | None:
     return None
 
 
+#: Số ký tự thật tối thiểu để coi một bản toàn văn là có nội dung.
+#: Cổng Bộ Tư pháp trả KHUNG HTML RỖNG (83 byte) thay vì báo lỗi, nên phép thử
+#: `if html:` luôn đúng và văn bản được ghi là "đã có toàn văn" dù không một chữ.
+#: Đo trên kho: 27 văn bản khai có toàn văn mà không có đoạn nào, và báo cáo có
+#: thể dẫn chúng như thể đã đọc được nội dung.
+NGUONG_TOAN_VAN = 200
+
+
+def toan_van_co_noi_dung(html: str | None) -> bool:
+    """Bản toàn văn này có chữ thật không, sau khi bóc hết thẻ HTML.
+
+    MỘT chỗ cho cả hai đường nạp. Chốt này vốn chỉ có trong
+    `backfill_fulltext_gdrive.py`, còn `backfill_cited_documents.py` thì không —
+    nên cùng một cái bẫy bị chặn ở một cửa và lọt ở cửa kia.
+    """
+    if not html:
+        return False
+    return len(re.sub(r"<[^>]+>", "", html).strip()) >= NGUONG_TOAN_VAN
+
+
 def _get_primary_field_code(doc: dict) -> int | None:
     """Mã lĩnh vực chính: ưu tiên doanh nghiệp, sau đó tới cá nhân.
 

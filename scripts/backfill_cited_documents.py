@@ -27,7 +27,11 @@ from sqlalchemy import text
 
 from src.config import DATA_DIR
 from src.pipeline.text_processor import process_fulltext
-from src.sources.moj_api import fetch_doc_detail, parse_doc_detail
+from src.sources.moj_api import (
+    fetch_doc_detail,
+    parse_doc_detail,
+    toan_van_co_noi_dung,
+)
 from src.storage.database import (
     get_session,
     insert_references,
@@ -106,8 +110,10 @@ def backfill_one(doc_num: str, moj_id: str) -> str:
     doc_data["moj_id"] = moj_id
     doc_data.setdefault("title", doc_num)
 
+    # `if fulltext:` là SAI ở đây: cổng trả khung HTML rỗng chứ không báo lỗi,
+    # nên phép thử rỗng-hay-không luôn qua và văn bản bị ghi là đã có toàn văn.
     fulltext = detail.get("fulltext_html", "")
-    if fulltext:
+    if toan_van_co_noi_dung(fulltext):
         doc_data["fulltext_path"] = save_moj_fulltext(moj_id, fulltext)
         doc_data["has_fulltext"] = True
         processed = process_fulltext(
