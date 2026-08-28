@@ -258,6 +258,32 @@ class TVPLDownloader:
         self._page = await self._context.new_page()
         logger.info("Playwright browser started.")
 
+    async def _lam_moi_trang(self) -> None:
+        """Vứt trang hiện tại và mở trang mới.
+
+        MỘT trang được tạo lúc khởi động rồi dùng lại cho mọi lượt điều hướng.
+        Khi một lượt `goto` timeout, Playwright bỏ cuộc nhưng lượt điều hướng ĐÓ
+        vẫn đang bay, và trang ở lại trạng thái hỏng — nên mọi mẫu sau đều hỏng
+        theo, chỉ khác cách hỏng:
+
+            10:33:24.946  bieumau-13352: ruột chỉ có 20 ký tự
+            10:33:24.964  bieumau-13354: ruột chỉ có 20 ký tự
+            10:33:24.981  bieumau-13948: ruột chỉ có 20 ký tự
+
+        Ba mẫu trong 35 mili giây — không trang nào tải nhanh thế. Chúng không hề
+        điều hướng; trang trả DOM rỗng tức thì. Mẫu kế tiếp thì báo thẳng:
+        "Navigation to .../1545 is interrupted by another navigation to
+        .../1544" — đúng lượt vừa timeout còn đang chạy.
+
+        Nên "vỏ rỗng 20 ký tự" KHÔNG phải một lỗi riêng của TVPL: nó là dư chấn
+        của lần timeout trước đó. Chữa gốc là bỏ trang hỏng đi.
+        """
+        try:
+            await self._page.close()
+        except Exception:                                # noqa: BLE001
+            pass
+        self._page = await self._context.new_page()
+
     async def _goto(self, url: str, timeout: int = 45000) -> None:
         """
         Điều hướng tới một URL và chờ Cloudflare (nếu có) giải xong.
@@ -265,8 +291,15 @@ class TVPLDownloader:
         Dùng 'domcontentloaded' chứ không phải 'networkidle': TVPL chạy quảng cáo
         và analytics liên tục nên mạng không bao giờ "idle" — chờ networkidle
         luôn timeout kể cả khi trang đã tải xong.
+
+        Điều hướng hỏng thì LÀM MỚI TRANG rồi mới ném lỗi lên: không làm vậy thì
+        một lần timeout kéo theo cả loạt mẫu sau — xem `_lam_moi_trang`.
         """
-        await self._page.goto(url, wait_until="domcontentloaded", timeout=timeout)
+        try:
+            await self._page.goto(url, wait_until="domcontentloaded", timeout=timeout)
+        except Exception:
+            await self._lam_moi_trang()
+            raise
 
         # Thử thách Cloudflare tự giải trong vài giây nếu phiên hợp lệ
         for _ in range(6):

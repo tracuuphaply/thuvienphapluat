@@ -130,3 +130,33 @@ class TestTienLocTieuDe:
         assert not tieu_de_dang_theo_doi(
             {"title": "Nghị quyết về phân bổ dự toán ngân sách trung ương"}
         )
+
+
+class TestCauDaoTrinhDuyetChet:
+    """Trình duyệt chết phải DỪNG lượt chạy, không đánh hỏng phần còn lại.
+
+    Ngày 28/08/2026 trình duyệt đóng giữa lượt cào biểu mẫu. Bộ cào không có
+    cầu dao cho tình huống đó nên nó chạy hết danh sách và ghi 3.917 bản ghi
+    FAILED trong vài giây, không một lượt nào chạm tới TVPL. Đọc kho sau đó thấy
+    "77% bị chặn" và kết luận nhầm là TVPL siết — MỘT sự cố bị nhân lên gần bốn
+    nghìn lần, che mất nguyên nhân thật trong nhiều giờ.
+    """
+
+    def test_nhan_ra_loi_trinh_duyet_chet(self):
+        from scripts.crawl_forms import DAU_HIEU_TRINH_DUYET_CHET
+
+        that = "Page.goto: Target page, context or browser has been closed"
+        assert any(d in that for d in DAU_HIEU_TRINH_DUYET_CHET)
+
+    def test_khong_nham_voi_loi_tu_khoi_duoc(self):
+        """Timeout và chặn Cloudflare KHÔNG được coi là trình duyệt chết.
+
+        Hai lỗi đó tự khỏi ở lượt sau; dừng cả lượt vì chúng là bỏ phí phiên
+        đang dùng được.
+        """
+        from scripts.crawl_forms import DAU_HIEU_TRINH_DUYET_CHET
+
+        for lanh in ("Page.goto: Timeout 45000ms exceeded",
+                     "Cloudflare đang chặn truy cập tự động",
+                     'Navigation to "https://x" is interrupted by another navigation'):
+            assert not any(d in lanh for d in DAU_HIEU_TRINH_DUYET_CHET), lanh

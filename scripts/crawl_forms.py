@@ -64,6 +64,15 @@ logger = logging.getLogger(__name__)
 #: cùng cơ chế với TVPL_MISSING_LINK_STREAK của bộ tải văn bản.
 MAX_BLOCKED_STREAK = 5
 
+#: Dấu hiệu trình duyệt/trang đã chết. Playwright ném đúng những chuỗi này khi
+#: phiên không còn, và KHÔNG lượt nào sau đó có thể thành công.
+DAU_HIEU_TRINH_DUYET_CHET = (
+    "Target page, context or browser has been closed",
+    "Target closed",
+    "Browser closed",
+    "Connection closed",
+)
+
 
 def _bo_qua_tai_lai(item, lam_lai: bool):
     """Trang đã có trên đĩa → bóc lại tại chỗ, KHÔNG tải lại từ TVPL.
@@ -138,6 +147,24 @@ async def _tai_chi_tiet(crawler: TVPLFormCrawler, muc: list, kq: KetQuaLuu,
                 logger.warning("%s: cào hỏng — %s", it.form_key, e)
                 luu_bieu_mau(session, it, crawl_status="FAILED",
                              crawl_error=str(e)[:500], ket_qua=kq)
+                # TRÌNH DUYỆT CHẾT THÌ DỪNG NGAY, không đi tiếp.
+                #
+                # Cầu dao Cloudflare ở trên chỉ gác lỗi có thể tự khỏi. Trình
+                # duyệt đóng thì KHÔNG lượt nào sau đó thành công được, nên đi
+                # tiếp chỉ để đánh hỏng phần còn lại của danh sách.
+                #
+                # ĐÃ XẢY RA THẬT ngày 28/08/2026: trình duyệt đóng giữa lượt, bộ
+                # cào chạy hết danh sách và ghi 3.917 bản ghi FAILED trong vài
+                # giây, không một lượt nào chạm tới TVPL. Đọc kho sau đó thấy
+                # "77% bị chặn" và tưởng TVPL siết — thật ra là MỘT sự cố bị
+                # nhân lên gần bốn nghìn lần, che mất nguyên nhân trong nhiều giờ.
+                if any(d in str(e) for d in DAU_HIEU_TRINH_DUYET_CHET):
+                    session.commit()
+                    print(f"\n⛔ Trình duyệt đã đóng — DỪNG ở mẫu {i}/{len(muc)}.\n"
+                          "   Mọi lượt sau chắc chắn hỏng nên không chạy tiếp.\n"
+                          "   Chạy lại lệnh này; phần đã tải nằm trên đĩa và "
+                          "không bị tải lại.")
+                    return kq
                 continue
 
             luu_bieu_mau(
