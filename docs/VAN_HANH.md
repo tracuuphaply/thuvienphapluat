@@ -265,6 +265,33 @@ làm việc gì có ích. Hàng đợi nằm trong bảng `legal_forms` (trạng
 nên chỉ cần liệt kê MỘT lần, sau đó `--tiep-tuc` dùng trọn `cf_clearance` còn tươi
 cho đúng việc tải trang chi tiết.
 
+### Bộ cào chiếm mất Chrome cá nhân
+
+macOS chỉ cho MỘT tiến trình Google Chrome tồn tại mỗi lúc. Bộ cào chạy Chrome
+với hồ sơ riêng `data/chrome_profile`, nên trong lúc cào, bấm icon Chrome trên
+Dock sẽ kích hoạt đúng bản của bộ cào — cửa sổ trống, không tab, không bookmark,
+không phiên đăng nhập nào của người dùng.
+
+TRÔNG NHƯ MẤT DỮ LIỆU NHƯNG KHÔNG PHẢI. Hồ sơ cá nhân nằm ở
+`~/Library/Application Support/Google/Chrome`, hoàn toàn không bị đụng tới; nó
+chỉ bị che. Thoát Chrome của bộ cào là mở lại bình thường:
+
+```bash
+pkill -f "user-data-dir=.*thuvienphapluat/data/chrome_profile"
+```
+
+ĐỪNG XOÁ `SingletonLock` TRONG HỒ SƠ CÁ NHÂN khi gặp triệu chứng này. Khoá đó
+trỏ tới PID chủ và được dọn tự động khi Chrome thoát sạch — đã kiểm ngày
+29/08/2026: khoá biến mất ngay sau khi tắt bản pipeline, tức nó là dấu vết chứ
+không phải nguyên nhân. Xoá file khoá trong hồ sơ người dùng để chữa một triệu
+chứng mình chưa hiểu là cách nhanh nhất để hỏng thêm thứ khác.
+
+Kiểm khoá còn chủ hay không trước khi kết luận:
+
+```bash
+ps -p "$(readlink ~/Library/Application\ Support/Google/Chrome/SingletonLock | sed 's/.*-//')"
+```
+
 ### Bị Cloudflare chặn giữa chừng
 
 Bộ cào tự dừng sau 5 lần chặn liên tiếp (`MAX_BLOCKED_STREAK`) thay vì đốt hết
