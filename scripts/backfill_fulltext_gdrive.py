@@ -148,11 +148,24 @@ def main() -> None:
 
         xong = hong = lien_tiep = 0
         dung_som = False
+        bo_qua_khong_co_ruot = 0
         for i, d in enumerate(co_moj, 1):
             p = lay_toan_van(d)
             if not p:
-                hong += 1
-                lien_tiep += 1
+                # KHÔNG tính vào cầu dao.
+                #
+                # Cầu dao `TRAN_HONG_LIEN_TIEP` gác lỗi HỆ THỐNG — đụng hạn mức
+                # ghi Drive, cổng Bộ Tư pháp chặn — những thứ nghỉ vài phút là
+                # chạy lại được. "Toàn văn quá ngắn" thì không bao giờ tự khỏi:
+                # nguồn không có nội dung, thử lại bao nhiêu lần cũng vậy.
+                #
+                # ĐÃ XẢY RA THẬT ngày 29/08/2026: 12 văn bản ngắn liên tiếp làm
+                # cầu dao ngắt cả lượt chạy, và lặp y hệt qua cả ba lượt thử lại
+                # — 84 văn bản đứng yên, trong đó có những bản LẤY ĐƯỢC nằm phía
+                # sau mà không bao giờ tới lượt. Tín hiệu "bỏ qua bản này" bị đọc
+                # thành "dừng tất cả".
+                bo_qua_khong_co_ruot += 1
+                continue
             else:
                 kq = gdrive.upload_document_files({
                     "doc_num": d.doc_num,
@@ -193,6 +206,7 @@ def main() -> None:
     print("\n=== Kết quả ===")
     print(f"  đã có bản Drive  {xong}")
     print(f"  hỏng             {hong}")
+    print(f"  nguồn không có nội dung (bỏ qua, không phải lỗi)  {bo_qua_khong_co_ruot}")
     if dung_som:
         print("  DỪNG SỚM — chạy lại lệnh này để tiếp tục.")
     print("\nDựng lại trang công khai để mục Nguồn gốc trỏ về bản đọc được:")
