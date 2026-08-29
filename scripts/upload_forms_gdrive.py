@@ -28,6 +28,7 @@ import time
 from datetime import date
 from pathlib import Path
 
+from src.forms.store import loc_dang_cong_khai
 from src.storage.database import get_session, init_db
 from src.storage.models import LegalForm
 
@@ -35,7 +36,11 @@ logger = logging.getLogger(__name__)
 
 # Quy tắc dựng URL công khai nằm ở src/storage/gdrive.py::lien_ket_cong_khai —
 # MỘT chỗ cho cả văn bản lẫn biểu mẫu, vì cùng một cái bẫy `ouid`.
+#: Thư mục Drive theo đối tượng phục vụ. Mẫu phục vụ CẢ HAI xếp vào thư mục
+#: doanh nghiệp — 231 mẫu như vậy — để 638 mẫu đã tải trước đây không phải dời
+#: chỗ: dời file trên Drive là đổi thứ người dùng đã có link.
 TEN_THU_MUC = "Biểu mẫu doanh nghiệp"
+TEN_THU_MUC_CA_NHAN = "Biểu mẫu cá nhân"
 CO_LO = 20
 
 #: Nghỉ giữa hai lượt tải. Drive có hạn mức ghi theo phút cho mỗi người dùng, và
@@ -76,10 +81,15 @@ def main() -> None:
 
     init_db()
     with get_session() as session:
-        q = (session.query(LegalForm)
-             .filter(LegalForm.is_business.is_(True))
-             .filter(LegalForm.docx_path.isnot(None))
-             .order_by(LegalForm.form_key))
+        # Tải cho MỌI mẫu sẽ lên trang công khai — doanh nghiệp HOẶC cá nhân.
+        #
+        # Chỗ này từng lọc `is_business.is_(True)`: cổng THỨ TÁM chặn đối tượng
+        # cá nhân, sau `build_forms`. Kế hoạch mở kho liệt kê sáu chỗ; thực tế có
+        # tám. Bỏ sót chỗ này thì mẫu cá nhân dựng xong vẫn nằm trên đĩa máy
+        # chạy, không ai ngoài mở được — mà trang công khai lại trỏ về Drive.
+        q = loc_dang_cong_khai(
+            session.query(LegalForm).filter(LegalForm.docx_path.isnot(None))
+        ).order_by(LegalForm.form_key)
         if not args.lai:
             q = q.filter(LegalForm.gdrive_docx_link.is_(None))
         forms = q.all()
@@ -106,18 +116,25 @@ def main() -> None:
                   "và credentials/gdrive_token.json")
             return
         thu_muc_bm = gdrive.ensure_folder(thu_muc, TEN_THU_MUC)
-        if not thu_muc_bm:
-            print(f"KHÔNG tạo được thư mục con {TEN_THU_MUC!r}")
+        thu_muc_cn = gdrive.ensure_folder(thu_muc, TEN_THU_MUC_CA_NHAN)
+        if not thu_muc_bm or not thu_muc_cn:
+            print("KHÔNG tạo được thư mục con trên Drive")
             return
         print(f"  thư mục đích: {TEN_THU_MUC} ({thu_muc_bm})")
+        print(f"                {TEN_THU_MUC_CA_NHAN} ({thu_muc_cn})")
+
+        def _thu_muc_cho(form: LegalForm) -> str:
+            """Mẫu phục vụ cả hai xếp theo doanh nghiệp — xem TEN_THU_MUC."""
+            return thu_muc_bm if form.is_business else thu_muc_cn
 
         xong = hong = lien_tiep = 0
         dung_som = False
         for i, f in enumerate(forms, 1):
-            kq = gdrive.upload_file(f.docx_path, thu_muc_bm, _ten_file(f))
+            dich = _thu_muc_cho(f)
+            kq = gdrive.upload_file(f.docx_path, dich, _ten_file(f))
             if kq and kq.get("id"):
                 f.gdrive_docx_link = kq["link"]
-                f.gdrive_folder_id = thu_muc_bm
+                f.gdrive_folder_id = dich
                 f.gdrive_uploaded_at = date.today()
                 # Trang công khai phải dựng lại: liên kết tải về đổi chỗ.
                 f.published_hash = None
