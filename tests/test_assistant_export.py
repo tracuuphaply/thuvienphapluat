@@ -138,7 +138,29 @@ class TestBieuMau:
 
     def test_co_co_da_bi_go(self, master_session, kho, tmp_path):
         kho.bm("hopdong-1", "bm-hopdong-1", go=date(2026, 8, 19))
-        assert doc_goi(master_session, tmp_path)["bieu_mau"][0]["g"] == 1
+        assert doc_goi(master_session, tmp_path)["bieu_mau"][0]["x"] == 1
+
+    def test_co_bi_go_va_id_drive_khong_dung_chung_khoa(self, master_session, kho,
+                                                        tmp_path):
+        """Mẫu vừa bị gỡ vừa có bản Drive phải giữ được CẢ HAI thông tin.
+
+        Bản trước đặt cả hai vào khoá "g", nên dòng gán ID Drive ghi đè cờ bị gỡ
+        và cờ đó biến mất. Lúc phát hiện chưa hỏng dữ liệu — 0 mẫu bị gỡ — nhưng
+        cả 2.467 mẫu nay đều có link Drive, nên mẫu đầu tiên bị nguồn gỡ sẽ mất
+        cờ mà không ai thấy. Bảng mô tả trường cũng khai "g" hai lần và Python
+        chỉ giữ cái sau, nên đọc tài liệu cũng không phát hiện được.
+        """
+        kho.bm("hopdong-1", "bm-hopdong-1", go=date(2026, 8, 19),
+               drive="https://drive.google.com/file/d/1RAMQ50O1equNkCM91tL/view")
+        bm = doc_goi(master_session, tmp_path)["bieu_mau"][0]
+        assert bm["x"] == 1, "cờ bị gỡ phải còn"
+        assert bm["g"] == "1RAMQ50O1equNkCM91tL", "ID Drive phải còn"
+
+    def test_co_doi_tuong_de_ben_doc_dung_bo_loc(self, master_session, kho, tmp_path):
+        """Không có cờ đối tượng thì phía giao diện không dựng nổi bộ lọc
+        Doanh nghiệp / Cá nhân, dù kho đã phân loại đủ."""
+        kho.bm("hopdong-1", "bm-hopdong-1")
+        assert doc_goi(master_session, tmp_path)["bieu_mau"][0].get("b") == 1
 
 
 class TestLienKetDrive:
