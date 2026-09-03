@@ -34,6 +34,46 @@ _DOC_NUM_RE = re.compile(
 # Những chuỗi trông giống số hiệu nhưng không phải, hay gặp trong văn bản.
 _IGNORE = re.compile(r"^\d+[/-]\d{1,2}$")
 
+#: Tiền tố của GIẤY TỜ GIAO DỊCH, không phải của văn bản quy phạm pháp luật.
+#: "01/HĐ-BHXH-2025" là SỐ HỢP ĐỒNG do hai bên tự đặt, không phải văn bản do cơ
+#: quan nhà nước ban hành — không có gì để đối chiếu với kho, và chặn nó là chặn
+#: oan. Chuyện này đã xảy ra thật: một bài hướng dẫn điền hợp đồng nêu ví dụ số
+#: hợp đồng và bị cổng loại cả bài. Bài hướng dẫn ĐIỀN biểu mẫu thì đương nhiên
+#: phải nêu ví dụ cách ghi số — đúng thứ nó tồn tại để dạy.
+#:
+#: Danh sách này CHỈ gồm ký hiệu không bao giờ là loại VBQPPL. Loại thật thì
+#: vẫn phải qua cổng: QH, NĐ-CP, TT-BTC, QĐ-TTg, QĐ-UBND, VBHN-VPQH…
+#: Khớp theo TIỀN TỐ, không khớp chính xác. Mã hợp đồng là tập MỞ: mỗi ngành tự
+#: đặt thêm — HĐQLVH (quản lý vận hành), HĐDV (dịch vụ), HĐXD (xây dựng), HĐTV
+#: (tư vấn)… Liệt kê từng cái thì không bao giờ đủ, và mỗi cái sót là một bài
+#: đúng bị loại oan. Đã gặp thật hai lần liên tiếp: "01/HĐ-BHXH-2025" rồi
+#: "01/2027/HĐQLVH-SXD".
+#:
+#: An toàn vì KHÔNG loại VBQPPL nào bắt đầu bằng những tiền tố này. Loại thật:
+#: QH, NĐ-CP, TT-BTC, TTLT, QĐ-TTg, QĐ-UBND, VBHN-VPQH, NQ, CT, PL-UBTVQH.
+_TIEN_TO_GIAY_TO = (
+    "HD",     # HĐ… — mọi loại hợp đồng, gồm HĐLĐ, HĐKT, HĐDV, HĐQLVH…
+    "PLHD",   # PLHĐ — phụ lục hợp đồng
+    "BB",     # BB… — biên bản
+    "GXN",    # GXN — giấy xác nhận
+    "GUQ",    # GUQ — giấy uỷ quyền
+    "DN",     # ĐN… — đề nghị
+    "TTr",    # TTr — tờ trình
+)
+
+
+def _la_giay_to_giao_dich(token: str) -> bool:
+    """Token là số của một giấy tờ giao dịch chứ không phải số hiệu VBQPPL.
+
+    So trên phần chữ NGAY SAU nhóm số đầu tiên, đã bỏ dấu — "01/HĐ-BHXH-2025"
+    cho ra "HD", "15/HĐLĐ/2026" cho ra "HDLD".
+    """
+    m = re.match(r"^\d+[/-](?:\d{4}[/-])?([A-Za-zĐđ]+)", token)
+    if not m:
+        return False
+    ma = fold_dau(m.group(1)).upper()
+    return any(ma.startswith(t.upper()) for t in _TIEN_TO_GIAY_TO)
+
 
 @dataclass
 class CitationReport:
@@ -65,7 +105,7 @@ def extract_doc_nums(text: str) -> list[str]:
     seen: dict[str, None] = {}
     for raw in _DOC_NUM_RE.findall(text or ""):
         token = raw.strip().rstrip(".,;:")
-        if _IGNORE.match(token):
+        if _IGNORE.match(token) or _la_giay_to_giao_dich(token):
             continue
         seen.setdefault(token, None)
     return list(seen)

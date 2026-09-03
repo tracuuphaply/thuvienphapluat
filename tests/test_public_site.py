@@ -193,12 +193,26 @@ class TestVanBanNguCanh:
                 "issue_date": datetime.date(2026, 1, 5)})
         master_session.commit()
 
-        moc_static.export_indexes(master_session, tmp_path, "v-test")
-        home = (tmp_path / "index.md").read_text(encoding="utf-8")
+        moc_static.export_indexes(master_session, tmp_path, "v-test",
+                                  trang_tong_quan="tong-quan.md")
+        home = (tmp_path / "tong-quan.md").read_text(encoding="utf-8")
 
         neu_ra = int(re.search(r"\*\*(\d+)\*\* văn bản trong danh mục", home).group(1))
         tong_bang = sum(int(m) for m in re.findall(r"\|\s*(\d+)\s*\|", home))
         assert tong_bang == neu_ra, home
+
+    def test_mac_dinh_khong_sinh_trang_chu(self, master_session, tmp_path):
+        """Trang chủ giờ là ứng dụng tra cứu, chép vào gốc bản dựng.
+
+        Sinh index.md ở đây thì Quartz phát ra public/index.html rồi bị bản chép
+        đè lên — một file dựng ra chỉ để bị ghi đè, và là chỗ để hai bên lệch
+        nhau về sau. Chỉ mục ngành/địa bàn/năm vẫn phải sinh như thường.
+        """
+        from src.publish import moc_static
+
+        moc_static.export_indexes(master_session, tmp_path, "v-test")
+        assert not (tmp_path / "index.md").exists()
+        assert (tmp_path / "nganh").is_dir()
 
 
 class TestPhanGiaiWikilink:

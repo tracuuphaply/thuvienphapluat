@@ -43,6 +43,13 @@ def _is_transient(exc: Exception) -> bool:
     """Lỗi có khả năng tự khỏi khi thử lại: mạng chập chờn hoặc máy chủ quá tải."""
     if isinstance(exc, httpx.HTTPStatusError):
         return exc.response.status_code in (429, 500, 502, 503, 504)
+    # URL méo (thiếu scheme, host rỗng) KHÔNG bao giờ tự khỏi — nó là lỗi cấu
+    # hình, không phải nấc mạng. Nhưng httpx xếp nó vào TransportError, nên
+    # không loại riêng thì ba lượt thử lại đốt 16 giây rồi vẫn hỏng y hệt, và
+    # người vận hành đọc log thấy "lỗi tạm thời" nên đi tìm nhầm chỗ. Đã gặp
+    # thật khi OPENAI_API_BASE bị truyền vào dạng chuỗi rỗng.
+    if isinstance(exc, (httpx.UnsupportedProtocol, httpx.InvalidURL)):
+        return False
     # TransportError phủ ConnectError (gồm DNS), ReadError, TimeoutException…
     return isinstance(exc, httpx.TransportError)
 
