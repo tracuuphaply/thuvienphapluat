@@ -29,7 +29,7 @@ from pathlib import Path
 from sqlalchemy import text
 
 from src.forms import effectivity as bm_eff
-from src.legal.form_taxonomy import NGHIEP_VU
+from src.legal.form_taxonomy import NGHIEP_VU, NGHIEP_VU_CA_NHAN
 from src.legal.tvpl_fields import TEN_THEO_MA
 from src.obsidian.config_obsidian import HIERARCHY_LABELS
 from src.storage.models import LegalForm, LegalFormRef
@@ -69,6 +69,10 @@ GIAI_NGHIA_TRUONG = {
         "t": "tiêu đề",
         "v": "nhóm nghiệp vụ",
         "e": "cờ hiệu lực biểu mẫu",
+        "x": "đã bị nguồn gỡ (1) hay không",
+        "b": "phục vụ doanh nghiệp (1)",
+        "i": "phục vụ cá nhân (1)",
+        "vc": "nhóm nghiệp vụ cá nhân — tra trong nghiep_vu_ca_nhan",
         "x": "đã bị nguồn gỡ khỏi trang liệt kê (1) — vắng nghĩa là chưa gỡ",
         "w": "tên file .docx",
         "p": "tên file .pdf",
@@ -157,11 +161,14 @@ def _van_ban(session, co_ruot: set[str] | None = None) -> tuple[list[dict], dict
     return ds, chi_so
 
 
+def _bieu_mau(session) -> list[dict]:
+    """Biểu mẫu đã đăng (doanh nghiệp hoặc cá nhân), kèm tên file và căn cứ."""
+    from src.forms.store import loc_dang_cong_khai
+
 def _bieu_mau(session, co_ruot: set[str] | None = None) -> list[dict]:
     """Biểu mẫu doanh nghiệp đã đăng, kèm tên file tải về và số hiệu căn cứ."""
     forms = (
-        session.query(LegalForm)
-        .filter(LegalForm.is_business.is_(True))
+        loc_dang_cong_khai(session.query(LegalForm))
         .filter(LegalForm.public_slug.isnot(None))
         .order_by(LegalForm.form_key)
         .all()
@@ -180,6 +187,25 @@ def _bieu_mau(session, co_ruot: set[str] | None = None) -> list[dict]:
             "e": f.eff_state or bm_eff.KHONG_RO,
             "c": can_cu.get(f.form_key, [])[:4],
         }
+        # Khoá "x", KHÔNG dùng lại "g". Bản trước đặt cả cờ bị-gỡ lẫn ID Drive
+        # vào cùng khoá "g", nên mẫu vừa bị gỡ vừa có bản Drive thì cờ bị ghi đè
+        # và biến mất. Chưa hỏng dữ liệu lúc phát hiện — 0 mẫu bị gỡ — nhưng là
+        # bẫy nằm chờ: cả 2.467 mẫu nay đều có link Drive, nên mẫu đầu tiên bị
+        # nguồn gỡ sẽ mất cờ mà không ai thấy. Bảng mô tả trường cũng khai "g"
+        # hai lần, và Python chỉ giữ cái sau.
+        if f.delisted_at:
+            muc["x"] = 1
+        if f.is_business:
+            muc["b"] = 1
+        if f.is_individual:
+            muc["i"] = 1
+        # Chỉ xuất nhóm cá nhân cho mẫu THẬT SỰ phục vụ cá nhân. Phễu đặt nhóm
+        # mặc định cho mọi mẫu mà không kiểm cờ, nên 3 mẫu chỉ phục vụ doanh
+        # nghiệp vẫn mang nhóm "khac_ca_nhan" — bên đọc lọc theo "vc" sẽ thấy
+        # chúng lọt vào danh mục cá nhân. Ràng ở đây để bản bàn giao tự nhất
+        # quán, thay vì bắt mỗi nơi tiêu thụ tự kiểm chéo với cờ "i".
+        if f.is_individual and f.nghiep_vu_ca_nhan:
+            muc["vc"] = json.loads(f.nghiep_vu_ca_nhan or "[]")
         if co_ruot is not None and f.public_slug in co_ruot:
             muc["r"] = 1
         if f.delisted_at:
@@ -247,6 +273,11 @@ def xuat_du_lieu(session, out_dir: Path,
         "_truong": GIAI_NGHIA_TRUONG,
         "linh_vuc": [{"ma": ma, "ten": ten} for ma, ten in sorted(TEN_THEO_MA.items())],
         "nghiep_vu": [{"ma": ma, "ten": ten} for ma, ten in NGHIEP_VU.items()],
+        # 15 nhóm theo SỰ KIỆN ĐỜI NGƯỜI, tập riêng với 12 nhóm nghiệp vụ doanh
+        # nghiệp. Thiếu bảng này thì phía đọc không dịch được mã trong trường
+        # "vc" thành tên hiển thị.
+        "nghiep_vu_ca_nhan": [{"ma": ma, "ten": ten}
+                              for ma, ten in NGHIEP_VU_CA_NHAN.items()],
         "hieu_luc_vb": {
             "con_hieu_luc": "Còn hiệu lực",
             "het_toan_bo": "Hết hiệu lực toàn bộ",

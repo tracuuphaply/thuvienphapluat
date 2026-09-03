@@ -64,6 +64,15 @@ logger = logging.getLogger(__name__)
 #: cùng cơ chế với TVPL_MISSING_LINK_STREAK của bộ tải văn bản.
 MAX_BLOCKED_STREAK = 5
 
+#: Dấu hiệu trình duyệt/trang đã chết. Playwright ném đúng những chuỗi này khi
+#: phiên không còn, và KHÔNG lượt nào sau đó có thể thành công.
+DAU_HIEU_TRINH_DUYET_CHET = (
+    "Target page, context or browser has been closed",
+    "Target closed",
+    "Browser closed",
+    "Connection closed",
+)
+
 
 def _bo_qua_tai_lai(item, lam_lai: bool):
     """Trang đã có trên đĩa → bóc lại tại chỗ, KHÔNG tải lại từ TVPL.
@@ -138,6 +147,24 @@ async def _tai_chi_tiet(crawler: TVPLFormCrawler, muc: list, kq: KetQuaLuu,
                 logger.warning("%s: cào hỏng — %s", it.form_key, e)
                 luu_bieu_mau(session, it, crawl_status="FAILED",
                              crawl_error=str(e)[:500], ket_qua=kq)
+                # TRÌNH DUYỆT CHẾT THÌ DỪNG NGAY, không đi tiếp.
+                #
+                # Cầu dao Cloudflare ở trên chỉ gác lỗi có thể tự khỏi. Trình
+                # duyệt đóng thì KHÔNG lượt nào sau đó thành công được, nên đi
+                # tiếp chỉ để đánh hỏng phần còn lại của danh sách.
+                #
+                # ĐÃ XẢY RA THẬT ngày 28/08/2026: trình duyệt đóng giữa lượt, bộ
+                # cào chạy hết danh sách và ghi 3.917 bản ghi FAILED trong vài
+                # giây, không một lượt nào chạm tới TVPL. Đọc kho sau đó thấy
+                # "77% bị chặn" và tưởng TVPL siết — thật ra là MỘT sự cố bị
+                # nhân lên gần bốn nghìn lần, che mất nguyên nhân trong nhiều giờ.
+                if any(d in str(e) for d in DAU_HIEU_TRINH_DUYET_CHET):
+                    session.commit()
+                    print(f"\n⛔ Trình duyệt đã đóng — DỪNG ở mẫu {i}/{len(muc)}.\n"
+                          "   Mọi lượt sau chắc chắn hỏng nên không chạy tiếp.\n"
+                          "   Chạy lại lệnh này; phần đã tải nằm trên đĩa và "
+                          "không bị tải lại.")
+                    return kq
                 continue
 
             luu_bieu_mau(
@@ -170,13 +197,38 @@ async def _tai_chi_tiet(crawler: TVPLFormCrawler, muc: list, kq: KetQuaLuu,
     return kq
 
 
+def _ghi_ngay(field: int | None):
+    """Callback ghi từng trang liệt kê xuống DB ngay khi lấy được.
+
+    Cloudflare chặn giữa chừng ở lĩnh vực lớn: đo trên lĩnh vực 47 (Y tế, 1.860
+    mẫu = 93 trang), lượt chạy ném TVPLBlockedError và MẤT TRẮNG tất cả các trang
+    đã tải. Ghi ngay thì mỗi trang tải được là một trang giữ được, và lần sau chỉ
+    cần `--tu-trang` từ chỗ dừng.
+    """
+    def _cb(trang: int, muc: list) -> None:
+        if not muc:
+            return
+        session = SessionLocal()
+        try:
+            them = ghi_hang_doi(session, muc)
+            session.commit()
+            if them:
+                print(f"    trang {trang}: +{them} mục", flush=True)
+        finally:
+            session.close()
+    return _cb
+
+
 async def _liet_ke(crawler: TVPLFormCrawler, source: str, field: int | None,
-                   gioi_han: int | None) -> list:
+                   gioi_han: int | None, tu_trang: int = 1,
+                   ghi_dan: bool = False) -> list:
     if source == SOURCE_HOP_DONG:
         return await crawler.duyet_hop_dong(gioi_han=gioi_han)
     if field:
         return await crawler.duyet_danh_sach(
-            SOURCE_BIEU_MAU, field=field, gioi_han=gioi_han)
+            SOURCE_BIEU_MAU, field=field, gioi_han=gioi_han,
+            bat_dau_trang=tu_trang,
+            moi_trang=_ghi_ngay(field) if ghi_dan else None)
 
     muc: list = []
     for ma in BIEU_MAU_BUSINESS_FIELDS:
@@ -190,7 +242,8 @@ async def _liet_ke(crawler: TVPLFormCrawler, source: str, field: int | None,
 async def _cao(source: str, field: int | None, gioi_han: int | None,
                dry_run: bool, lam_lai: bool = False,
                tiep_tuc: bool = False, chi_hang_doi: bool = False,
-               dang_nhap: bool = True) -> KetQuaLuu:
+               dang_nhap: bool = True, loc_tieu_de: bool = False,
+               tu_trang: int = 1) -> KetQuaLuu:
     crawler = TVPLFormCrawler()
     kq = KetQuaLuu()
 
@@ -203,6 +256,12 @@ async def _cao(source: str, field: int | None, gioi_han: int | None,
             muc = hang_doi_con_lai(session, source)
         finally:
             session.close()
+        if loc_tieu_de:
+            truoc = len(muc)
+            muc = [it for it in muc if _dang_doc_tiep(it.title)]
+            print(f"Lọc tiêu đề: bỏ {truoc - len(muc)}/{truoc} mẫu "
+                  f"({(truoc - len(muc)) / max(truoc, 1) * 100:.0f}%) "
+                  f"không phục vụ đối tượng nào đang theo dõi.")
         if gioi_han:
             muc = muc[:gioi_han]
         print(f"Chạy tiếp: {len(muc)} mẫu còn thiếu, không lật lại trang liệt kê.")
@@ -219,7 +278,18 @@ async def _cao(source: str, field: int | None, gioi_han: int | None,
     if await crawler.chuan_bi(dang_nhap):
         print("Đã đăng nhập TVPL.")
     try:
-        muc = await _liet_ke(crawler, source, field, gioi_han)
+        try:
+            muc = await _liet_ke(crawler, source, field, gioi_han,
+                                 tu_trang, chi_hang_doi)
+        except TVPLBlockedError:
+            # Không nuốt: nói rõ đã tới đâu và cách chạy tiếp. Trang đã lấy được
+            # thì đã nằm trong DB nhờ `_ghi_ngay`, không mất.
+            print(f"\n⚠️  Cloudflare chặn giữa chừng ở lĩnh vực {field}. "
+                  f"Các trang đã lấy ĐÃ được ghi vào hàng đợi.\n"
+                  f"   Chạy tiếp từ chỗ dừng:\n"
+                  f"   python -m scripts.crawl_forms --source bieumau "
+                  f"--field {field} --chi-hang-doi --tu-trang <N>")
+            raise
         print(f"Liệt kê được {len(muc)} biểu mẫu.")
 
         if dry_run:
@@ -264,6 +334,34 @@ async def _cao(source: str, field: int | None, gioi_han: int | None,
         await crawler.stop()
 
 
+def _dang_doc_tiep(tieu_de: str | None) -> bool:
+    """Tiêu đề này có đáng bỏ một lượt tải trang chi tiết không.
+
+    BỎ khi loại văn bản phủ quyết cờ cá nhân VÀ tiêu đề không có chút dấu hiệu
+    doanh nghiệp nào — tức mẫu không phục vụ đối tượng nào đang theo dõi, và tầng
+    2 sẽ kết luận đúng như vậy sau khi tải xong.
+
+    Đo trên 201 mẫu hiệu chuẩn: bỏ 119/201 (59%), MẤT 0 mẫu cá nhân và 7 mẫu
+    doanh nghiệp. Trên 11.639 mẫu của 18 lĩnh vực, tức bỏ khoảng 6.890 lượt tải —
+    chừng bốn giờ đồng hồ và ngần ấy lượt qua Cloudflare.
+
+    Đây là đánh đổi có ý thức, không phải tối ưu miễn phí: 3,5% mẫu doanh nghiệp
+    trong các lĩnh vực này sẽ không vào kho. Chấp nhận được vì các lĩnh vực này
+    vốn chưa từng được cào cho phía doanh nghiệp — không có gì thụt lùi, chỉ là
+    không thu thêm.
+    """
+    from src.forms.relevance import (
+        LOAI_KHONG_PHAI_CA_NHAN,
+        loai_van_ban,
+        quyet_dinh_quy_tac,
+    )
+
+    td = tieu_de or ""
+    if loai_van_ban(td) not in LOAI_KHONG_PHAI_CA_NHAN:
+        return True
+    return quyet_dinh_quy_tac(td).diem_giu > 0
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Cào biểu mẫu pháp lý từ TVPL")
     ap.add_argument("--source", choices=[SOURCE_HOP_DONG, SOURCE_BIEU_MAU],
@@ -279,6 +377,13 @@ def main() -> None:
                     help="Cào ở chế độ vãng lai; bị Cloudflare chặn sau ~40-70 trang")
     ap.add_argument("--chi-hang-doi", action="store_true",
                     help="Chỉ liệt kê và nạp hàng đợi vào DB, không tải chi tiết")
+    ap.add_argument("--tu-trang", type=int, default=1,
+                    help="Bắt đầu liệt kê từ trang N thay vì trang 1 — dùng khi "
+                         "lượt trước bị Cloudflare chặn giữa chừng")
+    ap.add_argument("--loc-tieu-de", action="store_true",
+                    help="Bỏ qua mẫu mà TIÊU ĐỀ đã cho thấy không phục vụ đối "
+                         "tượng nào (báo cáo, quyết định… của cơ quan). Đo trên "
+                         "bộ hiệu chuẩn: bỏ 59% lượt tải, mất 0 mẫu cá nhân")
     ap.add_argument("--tiep-tuc", action="store_true",
                     help="Lấy hàng đợi từ DB, bỏ giai đoạn liệt kê (nên dùng "
                          "cho mọi lượt sau lượt đầu)")
@@ -293,7 +398,8 @@ def main() -> None:
 
     kq = asyncio.run(_cao(args.source, args.field, args.limit, args.dry_run,
                           args.lam_lai, args.tiep_tuc, args.chi_hang_doi,
-                          not args.khong_dang_nhap))
+                          not args.khong_dang_nhap, args.loc_tieu_de,
+                          args.tu_trang))
     if not args.dry_run:
         print(f"\nXong: {kq.tom_tat()}")
 

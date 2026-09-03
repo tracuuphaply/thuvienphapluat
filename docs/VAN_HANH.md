@@ -205,6 +205,32 @@ python -m scripts.upload_forms_gdrive             # đưa bản .docx lên Drive
 Phân loại trước, dựng file sau — dựng cho cả kho rồi mới biết phần lớn là báo cáo
 nội bộ của cơ quan nhà nước thì đã đốt công vô ích.
 
+### Hiệu chuẩn phễu trước khi cào diện rộng
+
+```bash
+python -m scripts.hieu_chuan_ca_nhan lay-mau --so-mau 200
+python -m scripts.hieu_chuan_ca_nhan cham
+# điền trường "nhan_tay" trong data/hieu_chuan_ca_nhan.json
+python -m scripts.hieu_chuan_ca_nhan do
+```
+
+**Không được bỏ bước này.** "Liên quan cá nhân" là nói về CHỦ ĐỀ, không phải về
+người điền. Đo trực tiếp trên lĩnh vực 39 (Tư pháp – Hộ tịch, 186 mẫu): 12/12 mẫu
+đầu đều là *"MẪU BÁO CÁO KẾT QUẢ ĐĂNG KÝ KHAI SINH… TẠI ỦY BAN NHÂN DÂN CẤP XÃ"* —
+mẫu của UBND gửi lên tỉnh, không mẫu nào do người dân điền. Cào cả 11.639 rồi mới
+biết tỉ lệ nhiễu là lặp lại đúng bài học 17.385 mẫu của đợt doanh nghiệp.
+
+Hai điều dễ làm sai khi lấy mẫu:
+
+- **Lấy ngẫu nhiên theo trang**, không lấy đầu danh sách. TVPL sắp mới-trước, mà
+  mẫu mới phần lớn là biểu báo cáo do các thông tư gần đây ban hành.
+- **Chia chỉ tiêu theo căn bậc hai** của quy mô lĩnh vực. Chia đều thì lĩnh vực
+  28 mẫu và lĩnh vực 1.860 mẫu cùng được 11; chia theo tỉ lệ thì Y tế nuốt 32 mẫu
+  còn Hôn nhân – Gia đình được 0, mà đó mới là nhóm việc cá nhân gặp nhiều nhất.
+
+Con số đo ra là **cận dưới**: lệnh `cham` chỉ chấm trên tiêu đề, chưa tải ruột
+mẫu. Có ruột thì tầng 2 chỉ tốt lên.
+
 ### Đưa biểu mẫu lên Drive
 
 `upload_forms_gdrive` chỉ tải bản **.docx**, không tải .pdf. Bản Word là bản điền
@@ -238,6 +264,33 @@ Nghĩa là 40 lượt liệt kê làm Cloudflare dựng lại thử thách trư�
 làm việc gì có ích. Hàng đợi nằm trong bảng `legal_forms` (trạng thái `PENDING`)
 nên chỉ cần liệt kê MỘT lần, sau đó `--tiep-tuc` dùng trọn `cf_clearance` còn tươi
 cho đúng việc tải trang chi tiết.
+
+### Bộ cào chiếm mất Chrome cá nhân
+
+macOS chỉ cho MỘT tiến trình Google Chrome tồn tại mỗi lúc. Bộ cào chạy Chrome
+với hồ sơ riêng `data/chrome_profile`, nên trong lúc cào, bấm icon Chrome trên
+Dock sẽ kích hoạt đúng bản của bộ cào — cửa sổ trống, không tab, không bookmark,
+không phiên đăng nhập nào của người dùng.
+
+TRÔNG NHƯ MẤT DỮ LIỆU NHƯNG KHÔNG PHẢI. Hồ sơ cá nhân nằm ở
+`~/Library/Application Support/Google/Chrome`, hoàn toàn không bị đụng tới; nó
+chỉ bị che. Thoát Chrome của bộ cào là mở lại bình thường:
+
+```bash
+pkill -f "user-data-dir=.*thuvienphapluat/data/chrome_profile"
+```
+
+ĐỪNG XOÁ `SingletonLock` TRONG HỒ SƠ CÁ NHÂN khi gặp triệu chứng này. Khoá đó
+trỏ tới PID chủ và được dọn tự động khi Chrome thoát sạch — đã kiểm ngày
+29/08/2026: khoá biến mất ngay sau khi tắt bản pipeline, tức nó là dấu vết chứ
+không phải nguyên nhân. Xoá file khoá trong hồ sơ người dùng để chữa một triệu
+chứng mình chưa hiểu là cách nhanh nhất để hỏng thêm thứ khác.
+
+Kiểm khoá còn chủ hay không trước khi kết luận:
+
+```bash
+ps -p "$(readlink ~/Library/Application\ Support/Google/Chrome/SingletonLock | sed 's/.*-//')"
+```
 
 ### Bị Cloudflare chặn giữa chừng
 

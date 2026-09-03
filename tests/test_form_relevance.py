@@ -21,11 +21,20 @@ from src.forms import pheu
 from src.forms.classifier import KetQuaPhanLoai, dung_prompt, phan_loai
 from src.forms.relevance import (
     BIEU_MAU_BUSINESS_FIELDS,
+    DAU_HIEU_CA_NHAN,
+    DAU_HIEU_LOAI,
     NGUONG_CHAC,
     la_linh_vuc_kinh_doanh,
+    loai_van_ban,
     quyet_dinh_quy_tac,
 )
-from src.legal.form_taxonomy import CO_QUAN_NHA_NUOC, DOANH_NGHIEP, KHAC, NGHIEP_VU
+from src.legal.form_taxonomy import (
+    CA_NHAN,
+    CO_QUAN_NHA_NUOC,
+    DOANH_NGHIEP,
+    KHAC,
+    NGHIEP_VU,
+)
 from src.rag.reports.llm import LLMResult
 from src.sources.tvpl_forms_parse import chu_trong_ruot, tach_chi_tiet
 from src.storage.models import LegalForm
@@ -241,8 +250,12 @@ class TestChayPheu:
 
     def test_ngoai_linh_vuc_bi_cat_o_tang_1_khong_doc_ruot(
             self, master_session, form_that):
+        # 12 = Đảng: ngoài CẢ HAI whitelist. Trước đây test này dùng 18 (Giáo
+        # dục) và nó ngừng đúng khi mở phạm vi sang cá nhân — Giáo dục là lĩnh
+        # vực cá nhân thật, 805 mẫu. Ví dụ cho "ngoài phạm vi" phải là lĩnh vực
+        # không đối tượng nào đọc, không phải lĩnh vực chưa đến lượt.
         form_that("bieumau_detail_47131_doi_nguoi_dai_dien", "bieumau", "47131",
-                  "MẪU ĐƠN GÌ ĐÓ", field_code=18)   # 18 = Giáo dục
+                  "MẪU ĐƠN GÌ ĐÓ", field_code=12)
         tk = pheu.chay_pheu(master_session, dung_mo_hinh=False)
         assert tk.tang1_loai == 1
         f = master_session.query(LegalForm).one()
@@ -382,3 +395,227 @@ class TestMacDinhTheoKho:
         form_tho("hopdong-9004", "hopdong", "HỢP ĐỒNG KHOÁN VIỆC", THAN_TRUNG_TINH)
         pheu.chay_pheu(master_session, dung_mo_hinh=False)
         assert master_session.query(LegalForm).one().audience_confidence == 0.0
+
+
+class TestDoiTuongCaNhan:
+    """Mở phễu sang cá nhân — bộ dấu hiệu thứ ba.
+
+    VÌ SAO PHẢI CÓ BỘ THỨ BA CHỨ KHÔNG ĐẢO BỘ CŨ. Câu hỏi cũ là "có phải doanh
+    nghiệp không", nên mọi thứ không-phải-doanh-nghiệp đều bị gom vào một rọ:
+    Kho bạc Nhà nước nằm chung rọ với người dân đi xin xác nhận hộ nghèo. Câu hỏi
+    mới là "AI điền", và ở câu hỏi mới thì hai thứ đó ngược nhau hoàn toàn.
+    """
+
+    def test_bon_tu_da_chuyen_khoi_danh_sach_loai(self):
+        """Đây là thay đổi đáng kể nhất của đợt này, chốt lại để không quay đầu.
+
+        "học sinh", "sinh viên", "hộ nghèo", "người có công" từng là dấu hiệu
+        LOẠI — đúng với câu hỏi cũ, sai hoàn toàn với câu hỏi mới. Giữ chúng ở
+        danh sách loại là tự tay vứt đúng phần kho định đi tìm.
+        """
+        for tu in ("học sinh", "sinh viên", "hộ nghèo", "người có công"):
+            assert tu not in DAU_HIEU_LOAI, f"{tu!r} vẫn còn ở danh sách loại"
+            assert tu in DAU_HIEU_CA_NHAN, f"{tu!r} chưa vào danh sách cá nhân"
+
+    def test_don_xac_nhan_ho_ngheo_la_ca_nhan_khong_phai_bi_loai(self):
+        kq = quyet_dinh_quy_tac("Đơn đề nghị xác nhận hộ nghèo")
+        assert kq.audience == CA_NHAN
+        assert kq.cho_ca_nhan is True and kq.cho_doanh_nghiep is False
+
+    def test_ho_tich_la_ca_nhan(self):
+        for td in ("Tờ khai đăng ký kết hôn",
+                   "Tờ khai đăng ký khai sinh",
+                   "Đơn yêu cầu công nhận thuận tình ly hôn"):
+            assert quyet_dinh_quy_tac(td).audience == CA_NHAN, td
+
+    def test_mot_mau_phuc_vu_CA_HAI_ben(self):
+        """Hợp đồng thuê nhà, hợp đồng vay, giấy uỷ quyền — cả hai bên đều dùng.
+
+        `audience` chỉ giữ được một giá trị nên ép mẫu chọn một phía là mất nó ở
+        phía kia. Hai cờ độc lập thì không phải chọn.
+        """
+        kq = quyet_dinh_quy_tac(
+            "HỢP ĐỒNG THUÊ NHÀ Ở giữa doanh nghiệp và cá nhân",
+            "Bên cho thuê: công ty trách nhiệm hữu hạn … "
+            "Bên thuê: hộ gia đình, cá nhân …")
+        assert kq.cho_doanh_nghiep is True and kq.cho_ca_nhan is True
+        assert "cả hai bên" in kq.ly_do()
+
+    def test_dau_hieu_nha_nuoc_van_lam_ca_hai_ben_kia_mat_hieu_luc(self):
+        """"Cơ quan điền" và "dân điền" thì đúng là loại trừ nhau — khác với
+        doanh nghiệp và cá nhân, hai bên đó cùng đúng được."""
+        kq = quyet_dinh_quy_tac(
+            "Báo cáo quyết toán ngân sách nhà nước của Kho bạc Nhà nước")
+        assert kq.audience == CO_QUAN_NHA_NUOC
+        assert kq.cho_doanh_nghiep is False and kq.cho_ca_nhan is False
+
+    def test_co_mui_nha_nuoc_ma_khong_sach_thi_de_mo_hinh_doc(self):
+        """Mẫu mà cơ quan gửi VỀ cá nhân là ca thật sự nhập nhằng. Đoán ở đó là
+        đoán sai — giữ nguyên điều kiện khắt khe của bản hai bộ."""
+        kq = quyet_dinh_quy_tac(
+            "Thông báo của Ủy ban nhân dân xã về hộ nghèo",
+            "Ủy ban nhân dân … cơ quan nhà nước … hộ nghèo … hộ gia đình …")
+        assert kq.audience is None
+
+    def test_mau_doanh_nghiep_thuan_khong_bi_gan_them_co_ca_nhan(self):
+        kq = quyet_dinh_quy_tac("Giấy đề nghị đăng ký doanh nghiệp")
+        assert kq.cho_doanh_nghiep is True and kq.cho_ca_nhan is False
+
+
+class TestGhiHaiCoVaoKho:
+    def test_mau_ca_nhan_khong_bi_ghi_ly_do_loai(self, master_session, form_tho):
+        """`excluded_reason` chỉ có nghĩa khi mẫu KHÔNG phục vụ ai trong hai bên.
+
+        Trước đây nó ghi "không phải doanh nghiệp" cho cả mẫu cá nhân — mà mẫu cá
+        nhân đâu có bị loại, nó chỉ phục vụ bên khác.
+        """
+        form_tho("hopdong-9101", "hopdong", "Tờ khai đăng ký kết hôn",
+                 THAN_TRUNG_TINH)
+        pheu.chay_pheu(master_session, dung_mo_hinh=False)
+        f = master_session.query(LegalForm).one()
+        assert f.is_individual is True
+        assert f.excluded_reason is None
+
+    def test_mau_nha_nuoc_van_ghi_ly_do_loai(self, master_session, form_tho):
+        form_tho("hopdong-9102", "hopdong",
+                 "HỢP ĐỒNG LÀM VIỆC ĐỐI VỚI VIÊN CHỨC", THAN_TRUNG_TINH)
+        pheu.chay_pheu(master_session, dung_mo_hinh=False)
+        f = master_session.query(LegalForm).one()
+        assert f.is_business is False and f.is_individual is False
+        assert f.excluded_reason == pheu.LY_DO_KHONG_PHAI_DN
+
+
+class TestSanMacDinhVaChayLai:
+    """Hai lỗi tìm được khi chạy phễu lại trên 662 mẫu thật, chốt để không tái diễn."""
+
+    def test_chay_lai_phai_GO_DUOC_co_da_gan_sai(self, master_session, form_tho):
+        """Nhánh "không kết luận được" vốn `continue` thẳng, không đụng vào mẫu.
+
+        Hệ quả: sửa quy tắc rồi chạy lại mà kho KHÔNG ĐỔI — mẫu giữ nguyên nhãn
+        của lần trước và mọi lần chạy lại sau đều vô hiệu. Đây là loại lỗi im
+        lặng tệ nhất: nó làm người sửa tin rằng quy tắc mới không có tác dụng.
+        """
+        form_tho("bieumau-9201", "bieumau", "MẪU ĐƠN KHÔNG RÕ AI ĐIỀN",
+                 THAN_TRUNG_TINH)
+        f = master_session.query(LegalForm).one()
+        f.is_business = True                    # nhãn sai từ lần chạy trước
+        f.audience = DOANH_NGHIEP
+        master_session.commit()
+
+        pheu.chay_pheu(master_session, chay_lai=True, dung_mo_hinh=False)
+        f = master_session.query(LegalForm).one()
+        assert f.is_business is None, "chạy lại không gỡ được nhãn cũ"
+        assert f.audience is None
+
+    def test_mot_lan_nhac_co_quan_KHONG_chan_mac_dinh_theo_kho(self, master_session,
+                                                               form_tho):
+        """47/662 mẫu hợp đồng có đúng MỘT lần nhắc tên cơ quan — gần như luôn là
+        dòng chứng thực ("Chứng thực tại Uỷ ban nhân dân xã…"), không phải cơ
+        quan là một bên ký. Chặn ở mức một là loại nhầm hợp đồng dân sự thuần."""
+        form_tho("hopdong-9202", "hopdong", "HỢP ĐỒNG HUỶ BỎ HỢP ĐỒNG UỶ QUYỀN",
+                 THAN_TRUNG_TINH + " Chứng thực tại Uỷ ban nhân dân xã. ")
+        pheu.chay_pheu(master_session, dung_mo_hinh=False)
+        assert master_session.query(LegalForm).one().is_business is True
+
+    def test_hai_lan_nhac_co_quan_thi_CHAN(self, master_session, form_tho):
+        """Hai tên cơ quan khác nhau trong ruột thì cơ quan là một BÊN KÝ.
+
+        Đo trên kho thật: 10 mẫu đạt mức này và cả 10 đều đúng là việc nhà nước —
+        chi trả trợ cấp qua Kho bạc, dịch vụ sự nghiệp dùng ngân sách, hợp đồng
+        của nhà trường.
+        """
+        form_tho("hopdong-9203", "hopdong", "HỢP ĐỒNG CHI TRẢ TRỢ CẤP",
+                 THAN_TRUNG_TINH
+                 + " Kho bạc Nhà nước chuyển kinh phí. Uỷ ban nhân dân huyện ký. ")
+        pheu.chay_pheu(master_session, dung_mo_hinh=False)
+        f = master_session.query(LegalForm).one()
+        assert not f.is_business and not f.is_individual
+
+    def test_ten_loai_co_quan_phan_biet_voi_ten_doi_tuong_phuc_vu(self):
+        """"học sinh" là đối tượng được phục vụ; "trường THCS" là bên ký.
+
+        Bỏ "học sinh" khỏi danh sách nhà nước là đúng — nhưng nếu không thêm tên
+        loại cơ quan thì "HỢP ĐỒNG SỬA CHỮA BÀN GHẾ HỌC SINH" (giữa trường và
+        nhà thầu) bị xếp thành mẫu cá nhân.
+        """
+        kq = quyet_dinh_quy_tac(
+            "HỢP ĐỒNG SỬA CHỮA BÀN GHẾ HỌC SINH",
+            "Trường THCS Đồng Tiến … nhà trường … học sinh …")
+        assert kq.cho_ca_nhan is False
+        assert "trường thcs" in kq.dau_hieu_loai
+
+
+class TestLoaiVanBanPhuQuyet:
+    """Tầng phủ quyết theo LOẠI VĂN BẢN — thứ tìm ra nhờ hiệu chuẩn.
+
+    ĐO TRÊN 201 MẪU NGẪU NHIÊN, 18 lĩnh vực liên quan cá nhân, 26/08/2026.
+
+    Nhãn tay: 144 cơ quan (71,6%) · 28 doanh nghiệp (13,9%) · 20 cá nhân (10,0%)
+    · 9 cả hai (4,5%). Tức chỉ 14,4% số mẫu trong các lĩnh vực "liên quan cá
+    nhân" là do cá nhân điền — phần còn lại nói VỀ cá nhân chứ không DO cá nhân
+    điền.
+
+    Từ khoá chủ đề một mình không phân biệt được, vì văn bản do cơ quan phát hành
+    cũng nói đúng chủ đề đó. Cả 17 ca dương tính giả đều đúng dạng ấy.
+
+    Thêm tầng phủ quyết theo loại văn bản, đo lại trên cùng 201 mẫu:
+        chỉ từ khoá chủ đề     chính xác 26,1%  độ phủ 30,0%
+        + phủ quyết loại VB    chính xác 75,0%  độ phủ 30,0%
+        + loại giấy tờ cá nhân chính xác 83,3%  độ phủ 51,7%  F1 63,8
+    (nhị phân "có phục vụ cá nhân không", chấm trên TIÊU ĐỀ — cận dưới, vì có
+    ruột mẫu thì tầng 2 chỉ tốt lên.)
+    """
+
+    def test_bao_cao_khong_bao_gio_la_giay_to_ca_nhan(self):
+        """0/37 mẫu "BÁO CÁO" trong bộ hiệu chuẩn do cá nhân điền. Cùng thế với
+        QUYẾT ĐỊNH 0/21, THÔNG BÁO 0/17, BIÊN BẢN 0/13 — tổng 93 mẫu, không một
+        mẫu nào."""
+        for td in ("MẪU BÁO CÁO HOẠT ĐỘNG BẢO HIỂM Y TẾ",
+                   "MẪU QUYẾT ĐỊNH VỀ VIỆC HƯỞNG TRỢ CẤP HẰNG THÁNG",
+                   "MẪU THÔNG BÁO VỀ VIỆC CHI TRẢ LƯƠNG HƯU, TRỢ CẤP BẢO HIỂM XÃ HỘI",
+                   "MẪU BÁO CÁO TUỔI LY HÔN TRUNG BÌNH CỦA TÒA ÁN NHÂN DÂN TỐI CAO"):
+            assert quyet_dinh_quy_tac(td).cho_ca_nhan is False, td
+
+    def test_phu_quyet_chu_khong_tru_diem(self):
+        """Một công cụ do tổ chức phát hành thì KHÔNG có mức chủ đề nào làm nó
+        thành giấy tờ của người dân được."""
+        kq = quyet_dinh_quy_tac(
+            "MẪU BÁO CÁO về hộ nghèo, người có công, thương binh, trẻ em")
+        assert kq.diem_ca_nhan >= NGUONG_CHAC   # điểm chủ đề rất cao
+        assert kq.cho_ca_nhan is False          # vẫn bị phủ quyết
+
+    def test_loai_giay_to_ca_nhan_tu_no_da_du(self):
+        """22/23 ca bỏ sót có điểm chủ đề BẰNG 0 — tiêu đề không chứa từ khoá nào.
+
+        "Bản khai để giải quyết chế độ Bà mẹ Việt Nam anh hùng", "Phiếu khai báo
+        tạm vắng", "Bản tường trình": đòi thêm bằng chứng chủ đề ở đây là đòi thứ
+        mà chính loại giấy tờ đã nói.
+        """
+        for td in ("MẪU BẢN KHAI ĐỂ GIẢI QUYẾT CHẾ ĐỘ BÀ MẸ VIỆT NAM ANH HÙNG",
+                   "MẪU PHIẾU KHAI BÁO TẠM VẮNG",
+                   "MẪU BẢN TƯỜNG TRÌNH",
+                   "MẪU ĐƠN XIN XÁC NHẬN LẠI THỜI HẠN SỬ DỤNG ĐẤT NÔNG NGHIỆP"):
+            kq = quyet_dinh_quy_tac(td)
+            assert kq.diem_ca_nhan == 0, f"{td} — mẫu này phải KHÔNG có từ khoá"
+            assert kq.cho_ca_nhan is True, td
+
+    def test_to_khai_co_dau_hieu_doanh_nghiep_thi_khong_gan_co_ca_nhan(self):
+        """"Tờ khai thuế GTGT" và "tờ khai hải quan" cũng là "tờ khai", và chúng
+        là giấy tờ doanh nghiệp nộp hằng kỳ. Bộ 201 mẫu có TỜ KHAI 2/2 cá nhân,
+        nhưng cỡ mẫu đó không đủ để bỏ qua điều đã biết chắc từ kho doanh nghiệp.
+        """
+        kq = quyet_dinh_quy_tac("MẪU TỜ KHAI THUẾ GIÁ TRỊ GIA TĂNG CỦA DOANH NGHIỆP")
+        assert kq.cho_doanh_nghiep is True
+        assert kq.cho_ca_nhan is False
+
+    def test_loai_van_ban_xet_DAU_tieu_de_khong_phai_bat_ky_dau(self):
+        """"Đơn đề nghị cấp bản sao quyết định ly hôn" là đơn của người dân, không
+        phải quyết định của toà. Chữ "quyết định" ở đó là tân ngữ."""
+        assert loai_van_ban("MẪU ĐƠN XIN cấp bản sao QUYẾT ĐỊNH ly hôn") == "đơn xin"
+        assert loai_van_ban("MẪU QUYẾT ĐỊNH về việc ly hôn") == "quyết định"
+
+    def test_hop_dong_khong_bi_tang_nay_dung_toi(self):
+        """662 mẫu hợp đồng đều bắt đầu bằng "HỢP ĐỒNG" — không thuộc bảng nào,
+        nên tầng này không đụng tới kho đang chạy. Đo sau khi thêm: 638 mẫu đăng
+        được, y như trước."""
+        assert loai_van_ban("HỢP ĐỒNG THUÊ NHÀ Ở") == ""

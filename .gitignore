@@ -58,9 +58,13 @@ data/cam-nang/
 .DS_Store
 
 # Bổ sung sau audit
-# WAL của SQLite chứa đúng dữ liệu mà *.db định loại trừ
+# WAL của SQLite chứa đúng dữ liệu mà *.db định loại trừ.
+# -journal cũng vậy, và nó mới là file hay gặp: SQLite mặc định chạy rollback
+# journal chứ không phải WAL, nên *.db-journal xuất hiện mỗi khi có giao dịch ghi
+# đang mở. Quy tắc cũ chặn WAL mà bỏ sót nó.
 *.db-wal
 *.db-shm
+*.db-journal
 # báo cáo sinh ra, không phải mã nguồn
 data/reports/
 # kết quả dò mã quan hệ, sinh lại được

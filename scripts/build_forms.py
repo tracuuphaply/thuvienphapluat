@@ -6,7 +6,7 @@ Dựng lại biểu mẫu thành Markdown + DOCX + PDF của mình.
     python -m scripts.build_forms --dung-lai     # dựng lại cả mẫu đã có file
     python -m scripts.build_forms --khong-pdf    # nhanh gấp ~4 lần, chỉ MD + DOCX
 
-CHỈ DỰNG MẪU `is_business = 1`. Chạy trước `classify_forms` thì không có mẫu nào
+DỰNG MẪU PHỤC VỤ DOANH NGHIỆP HOẶC CÁ NHÂN. Chạy trước `classify_forms` thì không có mẫu nào
 để dựng — đó là đúng, không phải lỗi.
 
 File ra nằm ở data/forms/build/{form_key}/, TÁCH khỏi data/forms/html/ chứa bản
@@ -21,6 +21,7 @@ from pathlib import Path
 
 from src.forms.pheu import doc_ruot_mau
 from src.forms.renderer import dung_tat_ca
+from src.forms.store import loc_dang_cong_khai
 from src.sources.tvpl_forms_parse import FormParseError, tach_chi_tiet
 from src.storage.database import SessionLocal, init_db
 from src.storage.models import LegalForm, LegalFormRef
@@ -61,9 +62,16 @@ def main() -> None:
     session = SessionLocal()
     xong = bo_qua = hong = 0
     try:
-        q = session.query(LegalForm).filter(
-            LegalForm.is_business.is_(True),
-            LegalForm.crawl_status == "OK",
+        # Dựng cho MỌI mẫu sẽ lên trang công khai — doanh nghiệp HOẶC cá nhân.
+        #
+        # Chỗ này từng lọc `is_business.is_(True)`, và đó là cổng THỨ BẢY chặn
+        # đối tượng cá nhân. Kế hoạch mở kho liệt kê sáu chỗ, sáu chỗ đó đã mở;
+        # chỗ này không có trong danh sách. Hậu quả nếu bỏ sót: 1.050 mẫu cá nhân
+        # phân loại xong vẫn không bao giờ có file .docx, nên không đăng được —
+        # và không một dòng cảnh báo nào, vì với bộ dựng thì "không có mẫu nào
+        # để dựng" là trạng thái hợp lệ.
+        q = loc_dang_cong_khai(
+            session.query(LegalForm).filter(LegalForm.crawl_status == "OK")
         )
         if not args.dung_lai:
             q = q.filter(LegalForm.docx_path.is_(None))

@@ -20,8 +20,11 @@ import httpx
 from src.config import (
     BUSINESS_FIELD_CODES,
     BUSINESS_FIELDS,
+    CA_NHAN_FIELD_CODES,
+    CA_NHAN_FIELDS,
     MOJ_BASE_URL,
     MOJ_FIELD_KEYWORDS,
+    MOJ_FIELD_KEYWORDS_CA_NHAN,
     MOJ_MAX_PAGES,
     MOJ_PAGE_SIZE,
     MOJ_RATE_LIMIT_SECONDS,
@@ -104,13 +107,28 @@ def _extract_field_names(doc: dict) -> list[str]:
 
 def _extract_field_codes(doc: dict) -> set[int]:
     """Ánh xạ tên lĩnh vực MOJ → mã lĩnh vực doanh nghiệp (BUSINESS_FIELDS)."""
+    return _map_field_codes(doc, MOJ_FIELD_KEYWORDS)
+
+
+def _map_field_codes(doc: dict, bang: dict[str, int]) -> set[int]:
+    """Ánh xạ tên lĩnh vực MOJ → mã, theo bảng từ khoá được truyền vào.
+
+    Tách ra để hai đối tượng dùng chung MỘT cách dò. Chép thân hàm sang bảng thứ
+    hai thì hai bản sẽ lệch nhau ở lần sửa sau, và lệch ở đây là lấy về sai lĩnh
+    vực — thứ không ai thấy cho tới lúc đọc kho.
+    """
     codes: set[int] = set()
     for name in _extract_field_names(doc):
         lowered = name.lower()
-        for keyword, code in MOJ_FIELD_KEYWORDS.items():
+        for keyword, code in bang.items():
             if keyword in lowered:
                 codes.add(code)
     return codes
+
+
+def _extract_field_codes_ca_nhan(doc: dict) -> set[int]:
+    """Ánh xạ tên lĩnh vực MOJ → mã lĩnh vực cá nhân (CA_NHAN_FIELDS)."""
+    return _map_field_codes(doc, MOJ_FIELD_KEYWORDS_CA_NHAN)
 
 
 def is_business_document(doc: dict) -> bool:
@@ -121,6 +139,22 @@ def is_business_document(doc: dict) -> bool:
     (API danh sách) thì trả False — việc lọc lúc đó do TVPL đảm nhiệm.
     """
     return bool(_extract_field_codes(doc) & BUSINESS_FIELD_CODES)
+
+
+def is_individual_document(doc: dict) -> bool:
+    """Văn bản có thuộc lĩnh vực phục vụ CÁ NHÂN không."""
+    return bool(_extract_field_codes_ca_nhan(doc) & CA_NHAN_FIELD_CODES)
+
+
+def la_van_ban_theo_doi(doc: dict) -> bool:
+    """Cổng lĩnh vực của kho: phục vụ doanh nghiệp HOẶC cá nhân.
+
+    MỘT hàm cho cổng, thay vì để mỗi chỗ gọi tự `or` hai hàm lại. Kho biểu mẫu
+    đã đi qua đúng bài này: cổng nằm rải ở sáu chỗ, và khi mở sang cá nhân thì
+    12/18 lĩnh vực bị một chỗ sót âm thầm chặn lại — 67% phần định cào biến mất
+    mà không có dòng lỗi nào.
+    """
+    return is_business_document(doc) or is_individual_document(doc)
 
 
 def title_looks_business(doc: dict) -> bool:
@@ -137,6 +171,28 @@ def title_looks_business(doc: dict) -> bool:
     return any(keyword in haystack for keyword in MOJ_FIELD_KEYWORDS)
 
 
+def _haystack(doc: dict) -> str:
+    return " ".join(
+        str(doc.get(key) or "") for key in ("title", "doc_num", "docNum", "agency_name")
+    ).lower()
+
+
+def title_looks_ca_nhan(doc: dict) -> bool:
+    """Tiền lọc rẻ tiền cho văn bản phục vụ cá nhân. Song song title_looks_business."""
+    haystack = _haystack(doc)
+    return any(keyword in haystack for keyword in MOJ_FIELD_KEYWORDS_CA_NHAN)
+
+
+def tieu_de_dang_theo_doi(doc: dict) -> bool:
+    """Tiền lọc tiêu đề cho CẢ HAI đối tượng — dùng ở các vòng quét danh sách.
+
+    API danh sách của Bộ Tư pháp không trả lĩnh vực, nên đây là cổng duy nhất
+    trước khi quyết định có tốn một lượt gọi API chi tiết hay không. Lĩnh vực
+    thật vẫn được xác nhận lại sau bằng `la_van_ban_theo_doi`.
+    """
+    return title_looks_business(doc) or title_looks_ca_nhan(doc)
+
+
 def get_field_name(doc: dict) -> str:
     """Get the primary business field name for a document."""
     doc_codes = _extract_field_codes(doc)
@@ -144,6 +200,9 @@ def get_field_name(doc: dict) -> str:
     if matching:
         code = min(matching)  # Pick the primary (lowest code)
         return BUSINESS_FIELDS.get(code, "Khác")
+    cn = _extract_field_codes_ca_nhan(doc) & CA_NHAN_FIELD_CODES
+    if cn:
+        return CA_NHAN_FIELDS.get(min(cn), "Khác")
     # Không khớp lĩnh vực doanh nghiệp → giữ nguyên tên lĩnh vực gốc của MOJ
     names = _extract_field_names(doc)
     return names[0] if names else "Khác"
@@ -514,10 +573,39 @@ def _parse_date(value: Any) -> date | None:
     return None
 
 
+#: Số ký tự thật tối thiểu để coi một bản toàn văn là có nội dung.
+#: Cổng Bộ Tư pháp trả KHUNG HTML RỖNG (83 byte) thay vì báo lỗi, nên phép thử
+#: `if html:` luôn đúng và văn bản được ghi là "đã có toàn văn" dù không một chữ.
+#: Đo trên kho: 27 văn bản khai có toàn văn mà không có đoạn nào, và báo cáo có
+#: thể dẫn chúng như thể đã đọc được nội dung.
+NGUONG_TOAN_VAN = 200
+
+
+def toan_van_co_noi_dung(html: str | None) -> bool:
+    """Bản toàn văn này có chữ thật không, sau khi bóc hết thẻ HTML.
+
+    MỘT chỗ cho cả hai đường nạp. Chốt này vốn chỉ có trong
+    `backfill_fulltext_gdrive.py`, còn `backfill_cited_documents.py` thì không —
+    nên cùng một cái bẫy bị chặn ở một cửa và lọt ở cửa kia.
+    """
+    if not html:
+        return False
+    return len(re.sub(r"<[^>]+>", "", html).strip()) >= NGUONG_TOAN_VAN
+
+
 def _get_primary_field_code(doc: dict) -> int | None:
-    """Get the primary business field code."""
+    """Mã lĩnh vực chính: ưu tiên doanh nghiệp, sau đó tới cá nhân.
+
+    Không hợp hai tập rồi lấy `min`: hai hệ mã chồng số nhau (12 bên cá nhân và
+    12 bên doanh nghiệp là hai lĩnh vực khác hẳn), nên `min` trên tập hợp sẽ trả
+    một con số đúng kiểu mà sai nghĩa. Thử doanh nghiệp trước, hết mới sang cá
+    nhân, và mỗi nhánh chỉ lấy `min` trong hệ mã của chính nó.
+    """
     codes = _extract_field_codes(doc) & BUSINESS_FIELD_CODES
-    return min(codes) if codes else None
+    if codes:
+        return min(codes)
+    cn = _extract_field_codes_ca_nhan(doc) & CA_NHAN_FIELD_CODES
+    return min(cn) if cn else None
 
 
 # ──────────────────────────────────────────────

@@ -308,3 +308,25 @@ class TestThuTuDangTrang:
         trang_dung = site_exporter.render_page(master_session, doc, [], {})
         assert "Chưa ghi nhận biểu mẫu nào" not in trang_dung
         assert form_da_dung.public_slug in trang_dung
+
+
+class TestDangMauCaNhan:
+    def test_mau_chi_phuc_vu_ca_nhan_van_duoc_dang(self, master_session, form_da_dung,
+                                                    tmp_path):
+        """Cổng đăng là "phục vụ NGƯỜI ĐỌC THẬT", không phải "phục vụ doanh
+        nghiệp". Mẫu ly hôn không phải mẫu doanh nghiệp, nhưng nó là mẫu mà một
+        người thật phải điền — đó mới là điều kiện."""
+        form_da_dung.is_business = False
+        form_da_dung.is_individual = True
+        master_session.commit()
+        out = tmp_path / "content"
+        assert form_exporter.export_forms(master_session, out).written == 1
+        assert (out / "bieu-mau" / f"{form_da_dung.public_slug}.md").exists()
+
+    def test_mau_khong_phuc_vu_ai_thi_khong_dang(self, master_session, form_da_dung,
+                                                 tmp_path):
+        form_da_dung.is_business = False
+        form_da_dung.is_individual = False
+        master_session.commit()
+        out = form_exporter.export_forms(master_session, tmp_path / "content")
+        assert out.written == 0

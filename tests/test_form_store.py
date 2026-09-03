@@ -196,3 +196,45 @@ def test_giu_nguon_can_cu_de_biet_do_chac_chan(master_session, nguon):
                  body_hash="h1")
     master_session.commit()
     assert master_session.query(LegalFormRef).one().source == nguon
+
+
+class TestCongDangCongKhai:
+    """MỘT hàm cho mọi bên tiêu thụ trang công khai.
+
+    Trước đây điều kiện `is_business == 1` nằm rải ở sáu chỗ — trang công khai,
+    bộ dữ liệu trợ lý, chỉ mục tìm kiếm, lệnh Telegram. Mở sang cá nhân nghĩa là
+    sửa đúng sáu chỗ, và sót một chỗ thì mẫu cá nhân có trong kho, có trang, mà
+    tìm không ra: không có gì hỏng, không có gì báo.
+    """
+
+    def _mau(self, session, key, **kw):
+        from src.storage.models import LegalForm
+
+        f = LegalForm(form_key=key, source="hopdong", external_id=key.split("-")[-1],
+                      title=f"MẪU {key}", crawl_status="OK", **kw)
+        session.add(f)
+        session.commit()
+        return f
+
+    def test_lay_ca_hai_ben_va_bo_mau_khong_phuc_vu_ai(self, master_session):
+        from src.forms.store import loc_dang_cong_khai
+        from src.storage.models import LegalForm
+
+        self._mau(master_session, "hopdong-1", is_business=True, is_individual=False)
+        self._mau(master_session, "hopdong-2", is_business=False, is_individual=True)
+        self._mau(master_session, "hopdong-3", is_business=True, is_individual=True)
+        self._mau(master_session, "hopdong-4", is_business=False, is_individual=False)
+        self._mau(master_session, "hopdong-5")          # cả hai còn None
+
+        keys = sorted(f.form_key for f in
+                      loc_dang_cong_khai(master_session.query(LegalForm)).all())
+        assert keys == ["hopdong-1", "hopdong-2", "hopdong-3"]
+
+    def test_mau_phuc_vu_ca_hai_chi_xuat_hien_MOT_lan(self, master_session):
+        """Hợp `OR` chứ không phải nối hai truy vấn — nối thì mẫu cả-hai ra hai
+        dòng, và trang công khai sinh hai trang cho cùng một biểu mẫu."""
+        from src.forms.store import loc_dang_cong_khai
+        from src.storage.models import LegalForm
+
+        self._mau(master_session, "hopdong-9", is_business=True, is_individual=True)
+        assert loc_dang_cong_khai(master_session.query(LegalForm)).count() == 1

@@ -45,15 +45,23 @@ NGHI_GIAY = 0.35
 TRAN_HONG_LIEN_TIEP = 12
 THU_MUC_TOAN_VAN = PROJECT_ROOT / "data" / "moj"
 
-_RE_MOJ_ID = re.compile(r"/doc/([0-9a-fA-F-]{16,})")
+#: id trong URL cổng Bộ Tư pháp. KHÔNG đặt sàn độ dài: id thật là số ngắn
+#: (`/doc/18113`), trong khi bản cũ của mẫu này đòi từ 16 ký tự và vì thế loại
+#: 1.625/1.694 văn bản — 96% — mà không báo gì, chỉ in ra "không có nguồn để lấy".
+_RE_MOJ_ID = re.compile(r"/doc/([0-9A-Za-z-]+)")
 
 
 def moj_id(doc: Document) -> str:
-    """id văn bản trên hệ thống Bộ Tư pháp, rút từ moj_url.
+    """id văn bản trên hệ thống Bộ Tư pháp: ưu tiên cột, sau đó rút từ URL.
 
-    Rút từ URL chứ không đọc một cột riêng: `moj_url` là thứ ĐÃ được kiểm chứng
-    bằng chính lượt tải trước, còn cột id thì có thể rỗng ở các bản ghi cũ.
+    Bản cũ CHỈ rút từ URL, với lý do ghi trong docstring rằng "cột id có thể
+    rỗng ở các bản ghi cũ". Lý do đó không đúng với kho thật: cả 1.625 văn bản
+    đang thiếu bản Drive đều có sẵn cột `moj_id`. Đọc cột trước rồi mới rút URL
+    thì đúng ở cả hai phía — và không phụ thuộc vào hình dạng URL, thứ đã thay
+    đổi ít nhất một lần.
     """
+    if (doc.moj_id or "").strip():
+        return str(doc.moj_id).strip()
     m = _RE_MOJ_ID.search(doc.moj_url or "")
     return m.group(1) if m else ""
 
@@ -104,9 +112,18 @@ def main() -> None:
 
     init_db()
     with get_session() as session:
+        # MỌI văn bản ĐÃ ĐĂNG, không chỉ văn bản quy phạm.
+        #
+        # Bộ lọc cũ là `is_vbqppl = 1`, hợp lý với ý định ban đầu nhưng để lọt
+        # 230 văn bản đã đăng mà không phải quy phạm — công điện, thông báo,
+        # chỉ thị, quyết định cá biệt. Trang của chúng vẫn trỏ về cổng API Bộ Tư
+        # pháp, tức người bấm vào nhận một khối JSON thô, đúng vấn đề mà chính
+        # script này sinh ra để chữa.
+        #
+        # Điều kiện đúng là "đã đăng", không phải "là quy phạm": hễ một trang
+        # công khai tồn tại thì nó cần một bản đọc được ở đầu bên kia đường link.
         docs = (session.query(Document)
                 .filter(Document.public_slug.isnot(None))
-                .filter(Document.is_vbqppl.is_(True))
                 .filter(Document.gdrive_fulltext_link.is_(None))
                 .order_by(Document.doc_num)
                 .all())
@@ -131,11 +148,24 @@ def main() -> None:
 
         xong = hong = lien_tiep = 0
         dung_som = False
+        bo_qua_khong_co_ruot = 0
         for i, d in enumerate(co_moj, 1):
             p = lay_toan_van(d)
             if not p:
-                hong += 1
-                lien_tiep += 1
+                # KHÔNG tính vào cầu dao.
+                #
+                # Cầu dao `TRAN_HONG_LIEN_TIEP` gác lỗi HỆ THỐNG — đụng hạn mức
+                # ghi Drive, cổng Bộ Tư pháp chặn — những thứ nghỉ vài phút là
+                # chạy lại được. "Toàn văn quá ngắn" thì không bao giờ tự khỏi:
+                # nguồn không có nội dung, thử lại bao nhiêu lần cũng vậy.
+                #
+                # ĐÃ XẢY RA THẬT ngày 29/08/2026: 12 văn bản ngắn liên tiếp làm
+                # cầu dao ngắt cả lượt chạy, và lặp y hệt qua cả ba lượt thử lại
+                # — 84 văn bản đứng yên, trong đó có những bản LẤY ĐƯỢC nằm phía
+                # sau mà không bao giờ tới lượt. Tín hiệu "bỏ qua bản này" bị đọc
+                # thành "dừng tất cả".
+                bo_qua_khong_co_ruot += 1
+                continue
             else:
                 kq = gdrive.upload_document_files({
                     "doc_num": d.doc_num,
@@ -176,6 +206,7 @@ def main() -> None:
     print("\n=== Kết quả ===")
     print(f"  đã có bản Drive  {xong}")
     print(f"  hỏng             {hong}")
+    print(f"  nguồn không có nội dung (bỏ qua, không phải lỗi)  {bo_qua_khong_co_ruot}")
     if dung_som:
         print("  DỪNG SỚM — chạy lại lệnh này để tiếp tục.")
     print("\nDựng lại trang công khai để mục Nguồn gốc trỏ về bản đọc được:")

@@ -459,3 +459,84 @@ MOJ_FIELD_KEYWORDS: dict[str, int] = {
 # TVPL fields query string for GetWidget.ashx
 TVPL_FIELDS_QUERY = ",".join(str(c) for c in sorted(BUSINESS_FIELD_CODES))
 # → "1,2,3,4,6,7,8,9,10,14"
+
+# ──────────────────────────────────────────────
+# Lĩnh vực văn bản phục vụ CÁ NHÂN
+#
+# ĐÁNH SỐ RIÊNG, KHÔNG DÙNG CHUNG VỚI BIỂU MẪU. Danh mục lĩnh vực của trang văn
+# bản và của kho biểu mẫu là hai hệ mã khác nhau: mã 24 ở đây là "Y tế", còn mã
+# 24 bên biểu mẫu là "Lao động – Tiền lương". Trộn hai hệ là lỗi câm — nó vẫn
+# chạy, chỉ lấy về sai lĩnh vực. `src/forms/relevance.py` đã ghi cùng cảnh báo
+# này cho chiều ngược lại.
+#
+# TÁM MÃ DƯỚI ĐÂY CHỌN BẰNG BẰNG CHỨNG, không theo phỏng đoán. Cách làm: rút
+# tiêu đề thật của từng mã trong kho 4.201 văn bản rồi đọc xem ai là người phải
+# làm theo. Kết quả lệch khỏi danh sách phỏng đoán ban đầu ở ba chỗ:
+#
+#   BỎ 15 — mẫu thật ra là "dân quân tự vệ", "chế độ với cán bộ công chức",
+#           "cán bộ chiến sĩ Công an". Đây là tổ chức bộ máy nhà nước, không
+#           phải việc của người dân.
+#   BỎ 26 — "Luật Xuất bản", "xét tặng danh hiệu Nghệ nhân nhân dân", quản lý
+#           hoạt động văn hoá. Không phải việc cá nhân tra cứu.
+#   THÊM 13 — "Luật sư", "Trợ giúp pháp lý", "Đấu giá tài sản", "Giám định tư
+#           pháp". Đây đúng là chỗ người dân tìm đến khi cần người bênh vực.
+#
+# Cũng đã cân nhắc và LOẠI hai mã trông có vẻ hợp: 21 (thật ra là hàng hải,
+# cảng biển, kinh doanh vận tải) và 23 (khoáng sản, môi trường, thủy sản).
+#
+# Cổng này CHẶT chứ không rộng, vì trang công khai KHÔNG lọc văn bản theo lĩnh
+# vực lần nữa — mọi `is_vbqppl` đều được đăng. Cổng rộng ở đây là đăng thẳng
+# văn bản tổ chức bộ máy lên trang cho người dân đọc.
+# ──────────────────────────────────────────────
+CA_NHAN_FIELDS: dict[int, str] = {
+    12: "Nhà ở - Bất động sản",
+    13: "Bổ trợ tư pháp - Trợ giúp pháp lý",
+    16: "Xử lý vi phạm hành chính",
+    17: "Hình sự - Hành chính",
+    18: "Tố tụng - Thi hành án",
+    22: "Giáo dục - Phổ biến pháp luật",
+    24: "Y tế - An toàn thực phẩm",
+    25: "Hộ tịch - Quốc tịch - Chứng thực",
+}
+
+CA_NHAN_FIELD_CODES: set[int] = set(CA_NHAN_FIELDS.keys())
+
+#: Hợp hai đối tượng — dùng ở CỔNG CÀO. Hai tập rời nhau nên hợp không mất mã
+#: nào; giữ riêng hai biến để còn phân biệt được văn bản phục vụ ai.
+THEO_DOI_FIELD_CODES: set[int] = BUSINESS_FIELD_CODES | CA_NHAN_FIELD_CODES
+
+#: Từ khoá tên lĩnh vực MOJ → mã lĩnh vực cá nhân. Song song MOJ_FIELD_KEYWORDS.
+#: Một tên khớp nhiều từ khoá thì nhận nhiều mã, đúng như bên doanh nghiệp —
+#: "Thi hành án dân sự" khớp cả `thi hành án` (18) lẫn `dân sự` (25), và cả hai
+#: đều là lĩnh vực cá nhân nên không có gì phải chọn.
+MOJ_FIELD_KEYWORDS_CA_NHAN: dict[str, int] = {
+    "nhà ở": 12,
+    "bất động sản": 12,
+    "bổ trợ tư pháp": 13,
+    "trợ giúp pháp lý": 13,
+    "luật sư": 13,
+    "công chứng": 13,
+    "đấu giá tài sản": 13,
+    "giám định tư pháp": 13,
+    "xử lý vi phạm hành chính": 16,
+    "xử phạt vi phạm hành chính": 16,
+    "hình sự": 17,
+    "tố tụng": 18,
+    "thi hành án": 18,
+    "giáo dục": 22,
+    "học sinh": 22,
+    "sinh viên": 22,
+    "y tế": 24,
+    "khám bệnh": 24,
+    "chữa bệnh": 24,
+    "an toàn thực phẩm": 24,
+    "bảo hiểm y tế": 24,
+    "hộ tịch": 25,
+    "quốc tịch": 25,
+    "chứng thực": 25,
+    "cư trú": 25,
+    "dân sự": 25,
+    "hôn nhân": 25,
+    "gia đình": 25,
+    "thừa kế": 25,
+}

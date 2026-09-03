@@ -522,6 +522,13 @@ class LegalForm(Base):
     audience_reason = Column(Text, comment="Vì sao xếp vào nhóm đó — để soi lại")
     nghiep_vu = Column(String(300), comment="JSON mã nhóm nghiệp vụ, tập đóng 12 nhóm")
     is_business = Column(Boolean, comment="Có phục vụ hoạt động kinh doanh không")
+    # Cờ RIÊNG, cùng bật được với is_business: hợp đồng thuê nhà, hợp đồng vay,
+    # giấy uỷ quyền — doanh nghiệp dùng, cá nhân cũng dùng. `audience` chỉ giữ
+    # được một giá trị nên ép mẫu chọn một phía là mất nó ở phía kia.
+    is_individual = Column(Boolean, comment="Có phục vụ việc riêng của cá nhân không")
+    nghiep_vu_ca_nhan = Column(
+        String(300),
+        comment="JSON mã nhóm sự kiện đời người, tập đóng 15 nhóm")
     excluded_reason = Column(String(120), comment="Lý do bị loại — để biết vì sao vắng")
 
     # ── Hiệu lực (src/forms/effectivity.py) ──

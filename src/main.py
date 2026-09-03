@@ -431,12 +431,15 @@ def run_pipeline(
 
                         # Văn bản chỉ có ở MOJ mới qua được bộ lọc thô theo tiêu
                         # đề; giờ mới có lĩnh vực thật để xác nhận. Không thuộc
-                        # lĩnh vực doanh nghiệp thì loại.
+                        # lĩnh vực đang theo dõi (doanh nghiệp HOẶC cá nhân) thì
+                        # loại. `field_code` do `_get_primary_field_code` đặt, và
+                        # hàm đó đã nhận cả hai hệ mã — nên chỗ này không phải
+                        # sửa gì thêm khi mở đối tượng, chỉ sửa lời cho đúng.
                         if doc_data.pop("_needs_field_check", False) and not detail.get(
                             "field_code"
                         ):
                             logger.info(
-                                "  → Bỏ qua %s: không thuộc lĩnh vực doanh nghiệp (%s)",
+                                "  → Bỏ qua %s: không thuộc lĩnh vực đang theo dõi (%s)",
                                 doc_data.get("doc_num"),
                                 detail.get("field_name"),
                             )
